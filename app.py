@@ -114,8 +114,6 @@ div[data-testid="stToolbar"]{display:none!important;}
 
 /* SIDEBAR */
 section[data-testid="stSidebar"]{background:linear-gradient(180deg,#050510 0%,#0b0b24 40%,#080820 100%)!important;border-left:1px solid rgba(108,92,231,0.08)!important;box-shadow:8px 0 60px rgba(0,0,0,0.7)!important;}
-section[data-testid="stSidebar"][aria-expanded="false"]{transform:translateX(0)!important;width:var(--sidebar-width,280px)!important;}
-button[data-testid="stSidebarCollapseButton"]{display:none!important;}
 section[data-testid="stSidebar"]>div:first-child{padding-top:0!important;}
 section[data-testid="stSidebar"] .stMarkdown p,section[data-testid="stSidebar"] .stMarkdown span,section[data-testid="stSidebar"] label,section[data-testid="stSidebar"] .stRadio>div>label{color:rgba(255,255,255,0.55)!important;font-size:.8rem!important;font-family:'Inter','Cairo',sans-serif!important;}
 section[data-testid="stSidebar"] .stRadio>div>div>label{background:rgba(108,92,231,0.12)!important;border:2px solid rgba(108,92,231,0.3)!important;border-radius:8px!important;padding:.55rem 1rem!important;margin:3px 4px!important;transition:all .35s cubic-bezier(.4,0,.2,1)!important;position:relative!important;overflow:hidden!important;display:flex!important;align-items:center!important;gap:.6rem!important;}
@@ -123,8 +121,6 @@ section[data-testid="stSidebar"] .stRadio>div>div>label:hover{background:rgba(10
 section[data-testid="stSidebar"] .stRadio>div>div:has(input:checked)>label{background:rgba(108,92,231,0.3)!important;border:2px solid rgba(108,92,231,0.7)!important;border-radius:8px!important;box-shadow:0 0 20px rgba(108,92,231,0.2)!important;color:#fff!important;font-weight:700!important;padding:.55rem 1rem!important;margin:3px 4px!important;}
 section[data-testid="stSidebar"] .stRadio>div>div>label::before{display:none!important;}
 section[data-testid="stSidebar"] .stRadio>div>div>label::after{display:none!important;}
-section[data-testid="stSidebar"] .stRadio svg{color:rgba(108,92,231,.4)!important;width:0!important;height:0!important;margin:0!important;opacity:0!important;display:none!important;}
-section[data-testid="stSidebar"] .stRadio>div>div:has(input:checked)>label svg{color:#a29bfe!important;width:16px!important;height:16px!important;opacity:1!important;display:inline-block!important;flex-shrink:0!important;}
 section[data-testid="stSidebar"] .stRadio>div{gap:0!important;}
 section[data-testid="stSidebar"] hr{border-color:rgba(108,92,231,.06)!important;}
 section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p{margin:0!important;}
