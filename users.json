@@ -1,0 +1,29 @@
+[
+  {
+    "username": "admin",
+    "password": "e135f8b16b776fd758d1fc4e08e0ec0daf96666136300c4871786ad1c543d0b4",
+    "display_name": "المدير",
+    "role": "admin",
+    "permissions": [
+      "🏠 الرئيسية",
+      "📋 نموذج 41",
+      "💰 القيمة المضافة",
+      "🛒 فواتير الماركت",
+      "👥 إدارة المستخدمين"
+    ],
+    "created_at": "2026-07-22T17:49:32.227770"
+  },
+  {
+    "username": "Samar",
+    "password": "607d26b2ae54ae320b12af40e85eb8ba592b6cef3b9ae4c19dfd8ceda1851572",
+    "display_name": "Samar Mohamed Ali",
+    "role": "user",
+    "permissions": [
+      "🏠 الرئيسية",
+      "📋 نموذج 41",
+      "💰 القيمة المضافة",
+      "🛒 فواتير الماركت"
+    ],
+    "created_at": "2026-07-22T18:13:16.952469"
+  }
+]
