@@ -221,21 +221,25 @@ section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p{margin:0!
 ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(108,92,231,.25);border-radius:5px}
 </style>
 <script>
-try{localStorage.setItem('stSidebarState','expanded');}catch(e){}
-var _sbInt=setInterval(function(){
-    var b=document.querySelector('[data-testid="stSidebarCollapseButton"]');
-    if(b){
-        var s=b.closest('[data-testid="stSidebar"]');
-        if(s){
-            var rect=s.getBoundingClientRect();
-            if(rect.width<100){
-                try{b.click();}catch(e){}
-            }
+(function(){
+    try{localStorage.setItem('stSidebarState','expanded');}catch(e){}
+    try{sessionStorage.setItem('stSidebarState','expanded');}catch(e){}
+    function openSidebar(){
+        var btn=document.querySelector('[data-testid="stSidebarCollapseButton"]');
+        if(!btn)return;
+        var sb=btn.closest('[data-testid="stSidebar"]');
+        if(!sb)return;
+        if(sb.getAttribute('aria-expanded')==='false'){
+            btn.click();
         }
-        clearInterval(_sbInt);
     }
-},300);
-setTimeout(function(){clearInterval(_sbInt);},5000);
+    var tries=0;
+    var t=setInterval(function(){
+        tries++;
+        if(tries>30){clearInterval(t);return;}
+        try{openSidebar();}catch(e){}
+    },500);
+})();
 </script>
 """, unsafe_allow_html=True)
 
