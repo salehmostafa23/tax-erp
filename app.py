@@ -271,7 +271,7 @@ def read_form41_excel(f):
     return df
 def read_vat_excel(f):
     df=pd.read_excel(f,header=None,engine='openpyxl')
-    cols=['م','اسم الممول','رقم التسجيل الضريبي','20% قيمة مضافة','ضريبة الجدول']
+    cols=['م','اسم الممول','رقم التسجيل الضريبي','ضريبة الجدول','20% قيمة مضافة']
     if len(df.columns)<len(cols):
         for i in range(len(df.columns),len(cols)): df[i]=''
     df.columns=cols[:len(df.columns)]
