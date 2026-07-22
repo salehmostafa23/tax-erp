@@ -134,6 +134,7 @@ section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p{margin:0!
 .erp-topbar h2{margin:0;font-size:1.3rem;font-weight:700;background:linear-gradient(135deg,#fff 0%,#a29bfe 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
 .erp-topbar p{margin:.2rem 0 0;font-size:.78rem;color:var(--text2);}
 .erp-topbar-right{display:flex;align-items:center;gap:.8rem;z-index:1;}
+.erp-topbar-right button:hover{background:rgba(108,92,231,.3)!important;border-color:rgba(108,92,231,.5)!important;transform:scale(1.05);}
 .erp-badge{background:rgba(108,92,231,0.12);border:1px solid rgba(108,92,231,0.2);padding:.35rem .9rem;border-radius:20px;color:var(--accent2);font-size:.72rem;font-weight:600;}
 .erp-time{color:var(--text2);font-size:.75rem;}
 
@@ -220,27 +221,6 @@ section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p{margin:0!
 
 ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(108,92,231,.25);border-radius:5px}
 </style>
-<script>
-(function(){
-    try{localStorage.setItem('stSidebarState','expanded');}catch(e){}
-    try{sessionStorage.setItem('stSidebarState','expanded');}catch(e){}
-    function openSidebar(){
-        var btn=document.querySelector('[data-testid="stSidebarCollapseButton"]');
-        if(!btn)return;
-        var sb=btn.closest('[data-testid="stSidebar"]');
-        if(!sb)return;
-        if(sb.getAttribute('aria-expanded')==='false'){
-            btn.click();
-        }
-    }
-    var tries=0;
-    var t=setInterval(function(){
-        tries++;
-        if(tries>30){clearInterval(t);return;}
-        try{openSidebar();}catch(e){}
-    },500);
-})();
-</script>
 """, unsafe_allow_html=True)
 
 # ====================== SIDEBAR ======================
@@ -587,9 +567,8 @@ def gen_vat_word(supplier_name, tax_number, results, export_date_str, request_da
             except: pass
 
 # ====================== TOPBAR ======================
-now=datetime.now().strftime("%d/%m/%Y • %H:%M")
 st.markdown(f"""<div class="erp-topbar"><div><h2>{page}</h2><p>مرحباً بك في لوحة التحكم</p></div>
-<div class="erp-topbar-right"><span class="erp-badge">📊 Dashboard</span><span class="erp-time">{now}</span></div></div>""", unsafe_allow_html=True)
+<div class="erp-topbar-right"><span class="erp-badge">📊 Dashboard</span><button onclick="document.querySelector('[data-testid=\\'stSidebarCollapseButton\\']').click()" style="background:rgba(108,92,231,.15);border:1px solid rgba(108,92,231,.3);border-radius:10px;padding:.4rem 1rem;color:#a29bfe;font-size:.78rem;font-weight:600;cursor:pointer;font-family:Inter,Cairo,sans-serif;">القائمة ☰</button></div></div>""", unsafe_allow_html=True)
 
 # ====================== HELPER: BATCH CARD HTML ======================
 def batch_card_html(rec, btype):
