@@ -25,5 +25,18 @@
       "🛒 فواتير الماركت"
     ],
     "created_at": "2026-07-22T18:13:16.952469"
+  },
+  {
+    "username": "Salma",
+    "password": "130f6ddf0c7c527c899bf39bf6dfd712d77abc430b0f7f5e406d551ec11cf5b1",
+    "display_name": "Salma Refaat",
+    "role": "user",
+    "permissions": [
+      "🏠 الرئيسية",
+      "📋 نموذج 41",
+      "💰 القيمة المضافة",
+      "🛒 فواتير الماركت"
+    ],
+    "created_at": "2026-07-22T18:14:02.382003"
   }
 ]
