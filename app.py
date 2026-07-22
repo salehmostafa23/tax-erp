@@ -114,7 +114,6 @@ div[data-testid="stToolbar"]{display:none!important;}
 
 /* SIDEBAR */
 section[data-testid="stSidebar"]{background:linear-gradient(180deg,#050510 0%,#0b0b24 40%,#080820 100%)!important;border-left:1px solid rgba(108,92,231,0.08)!important;box-shadow:8px 0 60px rgba(0,0,0,0.7)!important;}
-section[data-testid="stSidebar"] button[data-testid="stSidebarCollapseButton"]{display:none!important;}
 section[data-testid="stSidebar"]>div:first-child{padding-top:0!important;}
 section[data-testid="stSidebar"] .stMarkdown p,section[data-testid="stSidebar"] .stMarkdown span,section[data-testid="stSidebar"] label,section[data-testid="stSidebar"] .stRadio>div>label{color:rgba(255,255,255,0.55)!important;font-size:.8rem!important;font-family:'Inter','Cairo',sans-serif!important;}
 section[data-testid="stSidebar"] .stRadio>div>div>label{background:rgba(108,92,231,0.12)!important;border:2px solid rgba(108,92,231,0.3)!important;border-radius:8px!important;padding:.55rem 1rem!important;margin:3px 4px!important;transition:all .35s cubic-bezier(.4,0,.2,1)!important;position:relative!important;overflow:hidden!important;display:flex!important;align-items:center!important;gap:.6rem!important;}
@@ -221,6 +220,19 @@ section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p{margin:0!
 
 ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(108,92,231,.25);border-radius:5px}
 </style>
+<script>
+var _sbInt=setInterval(function(){
+    var b=document.querySelector('[data-testid="stSidebarCollapseButton"]');
+    if(b){
+        var s=b.closest('[data-testid="stSidebar"]');
+        if(s){
+            var m=window.getComputedStyle(s).margin;
+            if(m&&m!=='0px'){b.click();}
+        }
+        clearInterval(_sbInt);
+    }
+},500);
+</script>
 """, unsafe_allow_html=True)
 
 # ====================== SIDEBAR ======================
