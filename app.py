@@ -281,6 +281,7 @@ def load_data(f):
 def read_form41_excel(f):
     df=pd.read_excel(f,header=None,engine='openpyxl')
     cols=['م','رقم التسجيل الضريبي','اسم الممول','تاريخ التعامل','طبيعة التعامل','القيمة الإجمالية للتعامل','نسبة الخصم','المحصل لحساب الضريبة']
+    df=df.iloc[:,:len(cols)]
     if len(df.columns)<len(cols):
         for i in range(len(df.columns),len(cols)): df[i]=''
     df.columns=cols[:len(df.columns)]
@@ -288,6 +289,7 @@ def read_form41_excel(f):
 def read_vat_excel(f):
     df=pd.read_excel(f,header=None,engine='openpyxl')
     cols=['م','اسم الممول','رقم التسجيل الضريبي','ضريبة الجدول','20% قيمة مضافة']
+    df=df.iloc[:,:len(cols)]
     if len(df.columns)<len(cols):
         for i in range(len(df.columns),len(cols)): df[i]=''
     df.columns=cols[:len(df.columns)]
