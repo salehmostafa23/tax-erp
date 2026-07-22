@@ -5,11 +5,94 @@ import os
 import uuid
 import shutil
 import math
+import hashlib
 from datetime import datetime
 from io import BytesIO
 import openpyxl
 
 st.set_page_config(page_title="Tax Management System", page_icon="🏢", layout="wide", initial_sidebar_state="expanded")
+
+# ====================== DIRS ======================
+DATA_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# ====================== USERS ======================
+USERS_FILE=os.path.join(DATA_DIR,"users.json")
+ALL_PAGES=["🏠 الرئيسية","📋 نموذج 41","💰 القيمة المضافة","🛒 فواتير الماركت"]
+ADMIN_PAGE="👥 إدارة المستخدمين"
+
+def _hash_pw(pw,salt="tax_erp_salt_2024"):
+    return hashlib.sha256(f"{salt}{pw}".encode()).hexdigest()
+
+def load_users():
+    if os.path.exists(USERS_FILE):
+        try:
+            with open(USERS_FILE,'r',encoding='utf-8') as f: return json.load(f)
+        except: pass
+    default=[{"username":"admin","password":_hash_pw("admin123"),"display_name":"المدير","role":"admin","permissions":ALL_PAGES+[ADMIN_PAGE],"created_at":datetime.now().isoformat()}]
+    save_users(default)
+    return default
+
+def save_users(data):
+    with open(USERS_FILE,'w',encoding='utf-8') as f: json.dump(data,f,ensure_ascii=False,indent=2,default=str)
+
+def authenticate_user(username,password):
+    users=load_users()
+    pw_hash=_hash_pw(password)
+    for u in users:
+        if u['username']==username and u['password']==pw_hash:
+            return u
+    return None
+
+def get_current_user():
+    return st.session_state.get('current_user',None)
+
+def user_has_permission(page):
+    u=get_current_user()
+    if not u: return False
+    if u.get('role')=='admin': return True
+    return page in u.get('permissions',[])
+
+# ====================== LOGIN ======================
+if 'current_user' not in st.session_state:
+    st.session_state['current_user']=None
+
+if not st.session_state['current_user']:
+    st.markdown("""
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Cairo:wght@300;400;500;600;700;800&display=swap');
+    :root{--bg:#0a0a15;--surface:rgba(22,22,40,0.7);--surface2:#1e1e38;--border:rgba(255,255,255,0.06);--text:#eaeaf2;--text2:#7878a0;--accent:#6c5ce7;--accent2:#a29bfe;}
+    html,body,[class*="css"]{font-family:'Inter','Cairo',sans-serif!important;}
+    #MainMenu,footer,header,.stDeployButton{visibility:hidden!important;}
+    div[data-testid="stToolbar"]{display:none!important;}
+    .stApp{background:linear-gradient(135deg,#08081a 0%,#0d0d22 50%,#0a0a18 100%)!important;}
+    .login-box{max-width:400px;margin:6rem auto 0;padding:2.5rem 2rem;border-radius:20px;background:rgba(22,22,40,0.7);border:1px solid rgba(255,255,255,0.06);backdrop-filter:blur(20px);box-shadow:0 20px 60px rgba(0,0,0,.5);position:relative;overflow:hidden;}
+    .login-box::before{content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;background:radial-gradient(circle at center,rgba(108,92,231,0.06),transparent 50%);pointer-events:none;}
+    .login-icon{width:70px;height:70px;margin:0 auto 1.2rem;border-radius:22px;background:linear-gradient(135deg,#6c5ce7 0%,#a29bfe 50%,#00cec9 100%);display:flex;align-items:center;justify-content:center;font-size:2rem;box-shadow:0 8px 30px rgba(108,92,231,0.45);}
+    .login-title{margin:0 0 .3rem;color:#fff;font-size:1.4rem;font-weight:800;text-align:center;letter-spacing:.5px;}
+    .login-sub{margin:0 0 1.5rem;color:rgba(255,255,255,.3);font-size:.75rem;text-align:center;letter-spacing:1px;}
+    .stTextInput>div>div>input{background:rgba(30,30,56,0.8)!important;border:1px solid rgba(255,255,255,0.08)!important;border-radius:12px!important;color:#fff!important;padding:.7rem 1rem!important;}
+    .stTextInput>div>div>input:focus{border-color:rgba(108,92,231,0.5)!important;box-shadow:0 0 0 3px rgba(108,92,231,0.1)!important;}
+    .stButton>button[kind="primary"]{background:linear-gradient(135deg,#6c5ce7 0%,#a29bfe 100%)!important;border:none!important;border-radius:12px!important;font-family:'Cairo',sans-serif!important;font-weight:700!important;color:#fff!important;padding:.6rem 0!important;width:100%!important;box-shadow:0 4px 20px rgba(108,92,231,0.4)!important;transition:all .3s!important;font-size:.95rem!important;}
+    .stButton>button[kind="primary"]:hover{transform:translateY(-2px)!important;box-shadow:0 8px 30px rgba(108,92,231,0.5)!important;}
+    .login-err{background:rgba(255,107,107,.1);border:1px solid rgba(255,107,107,.2);border-radius:10px;padding:.5rem 1rem;color:#ff6b6b;font-size:.8rem;text-align:center;margin-top:.5rem;}
+    </style>
+    """, unsafe_allow_html=True)
+    st.markdown('<div class="login-box"><div class="login-icon">🏢</div><h2 class="login-title">Tax Management System</h2><p class="login-sub">نظام إدارة الضرائب المتكامل</p></div>', unsafe_allow_html=True)
+    with st.form("login_form",clear_on_submit=False):
+        u=st.text_input("اسم المستخدم",key="login_user",placeholder="Username")
+        p=st.text_input("كلمة المرور",key="login_pass",type="password",placeholder="Password")
+        submitted=st.form_submit_button("تسجيل الدخول",type="primary",use_container_width=True)
+        if submitted:
+            if not u or not p:
+                st.markdown('<div class="login-err">أدخل اسم المستخدم وكلمة المرور</div>', unsafe_allow_html=True)
+            else:
+                user=authenticate_user(u.strip(),p)
+                if user:
+                    st.session_state['current_user']=user
+                    st.rerun()
+                else:
+                    st.markdown('<div class="login-err">بيانات الدخول غير صحيحة</div>', unsafe_allow_html=True)
+    st.stop()
 
 # ====================== CSS ======================
 st.markdown("""
@@ -26,14 +109,13 @@ div[data-testid="stToolbar"]{display:none!important;}
 section[data-testid="stSidebar"]{background:linear-gradient(180deg,#050510 0%,#0b0b24 40%,#080820 100%)!important;border-left:1px solid rgba(108,92,231,0.08)!important;box-shadow:8px 0 60px rgba(0,0,0,0.7)!important;}
 section[data-testid="stSidebar"]>div:first-child{padding-top:0!important;}
 section[data-testid="stSidebar"] .stMarkdown p,section[data-testid="stSidebar"] .stMarkdown span,section[data-testid="stSidebar"] label,section[data-testid="stSidebar"] .stRadio>div>label{color:rgba(255,255,255,0.55)!important;font-size:.8rem!important;font-family:'Inter','Cairo',sans-serif!important;}
-section[data-testid="stSidebar"] .stRadio>div>div>label{background:rgba(255,255,255,0.02)!important;border:1px solid transparent!important;border-radius:14px!important;padding:.65rem 1.1rem!important;margin:3px 0!important;transition:all .35s cubic-bezier(.4,0,.2,1)!important;position:relative!important;overflow:hidden!important;display:flex!important;align-items:center!important;gap:.6rem!important;}
-section[data-testid="stSidebar"] .stRadio>div>div>label:hover{background:rgba(108,92,231,0.08)!important;border-color:rgba(108,92,231,0.1)!important;color:rgba(255,255,255,.85)!important;}
-section[data-testid="stSidebar"] .stRadio>div>div>label[data-checked="true"]{background:linear-gradient(135deg,rgba(108,92,231,0.18) 0%,rgba(0,206,201,0.06) 100%)!important;border:1px solid rgba(108,92,231,0.2)!important;box-shadow:0 4px 20px rgba(108,92,231,0.1),inset 0 1px 0 rgba(255,255,255,0.03)!important;color:#fff!important;font-weight:600!important;}
-section[data-testid="stSidebar"] .stRadio>div>div>label[data-checked="true"]::before{height:100%!important;}
+section[data-testid="stSidebar"] .stRadio>div>div>label{background:rgba(255,255,255,0.02)!important;border:2px solid rgba(255,255,255,0.04)!important;border-radius:12px!important;padding:.65rem 1.1rem!important;margin:3px 4px!important;transition:all .35s cubic-bezier(.4,0,.2,1)!important;position:relative!important;overflow:hidden!important;display:flex!important;align-items:center!important;gap:.6rem!important;}
+section[data-testid="stSidebar"] .stRadio>div>div>label:hover{background:rgba(108,92,231,0.1)!important;border:2px solid rgba(108,92,231,0.25)!important;color:rgba(255,255,255,.9)!important;}
+section[data-testid="stSidebar"] .stRadio>div>div:has(input:checked)>label{background:rgba(108,92,231,0.15)!important;border:2px solid rgba(108,92,231,0.6)!important;border-radius:12px!important;box-shadow:0 0 20px rgba(108,92,231,0.15),inset 0 0 20px rgba(108,92,231,0.05)!important;color:#fff!important;font-weight:700!important;padding:.65rem 1.1rem!important;margin:3px 4px!important;}
 section[data-testid="stSidebar"] .stRadio>div>div>label::before{display:none!important;}
 section[data-testid="stSidebar"] .stRadio>div>div>label::after{display:none!important;}
 section[data-testid="stSidebar"] svg{color:rgba(108,92,231,.4)!important;width:0!important;height:0!important;margin:0!important;opacity:0!important;display:none!important;}
-section[data-testid="stSidebar"] .stRadio>div>div>label[data-checked="true"] svg{color:#6c5ce7!important;width:14px!important;height:14px!important;opacity:1!important;display:inline-block!important;flex-shrink:0!important;}
+section[data-testid="stSidebar"] .stRadio>div>div:has(input:checked)>label svg{color:#a29bfe!important;width:16px!important;height:16px!important;opacity:1!important;display:inline-block!important;flex-shrink:0!important;}
 section[data-testid="stSidebar"] .stRadio>div{gap:0!important;}
 section[data-testid="stSidebar"] hr{border-color:rgba(108,92,231,.06)!important;}
 section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p{margin:0!important;}
@@ -148,7 +230,19 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
     st.markdown("<p style='color:rgba(255,255,255,.18);font-size:.55rem;font-weight:700;letter-spacing:3px;padding:.3rem .8rem;margin:.3rem 0 .5rem;text-transform:uppercase;'>القائمة</p>", unsafe_allow_html=True)
-    page = st.radio("nav", ["🏠 الرئيسية","📋 نموذج 41","💰 القيمة المضافة","🛒 فواتير الماركت"], label_visibility="collapsed", index=0)
+    cu=get_current_user()
+    nav_pages=[p for p in ALL_PAGES if p in cu.get('permissions',[]) or cu.get('role')=='admin']
+    if cu.get('role')=='admin': nav_pages.append(ADMIN_PAGE)
+    page=st.radio("nav",nav_pages,label_visibility="collapsed",index=0)
+    st.markdown("<div style='height:1px;background:linear-gradient(90deg,transparent,rgba(108,92,231,.1),transparent);margin:1.2rem .8rem;'></div>", unsafe_allow_html=True)
+    st.markdown(f"""<div style="padding:.7rem 1rem;border-radius:14px;background:rgba(108,92,231,.04);border:1px solid rgba(108,92,231,.06);margin:0 .5rem;text-align:center;">
+        <p style="color:rgba(255,255,255,.6);font-size:.65rem;margin:0 0 .2rem;">المستخدم: <strong style="color:#a29bfe;">{cu.get('display_name','')}</strong></p>
+        <p style="color:rgba(255,255,255,.25);font-size:.55rem;margin:0;">{cu.get('role','user')}</p></div>""", unsafe_allow_html=True)
+    if st.button("🚪 خروج",key="logout_btn",use_container_width=True):
+        st.session_state['current_user']=None
+        for k in list(st.session_state.keys()):
+            if k!='current_user': del st.session_state[k]
+        st.rerun()
     st.markdown("<div style='height:1px;background:linear-gradient(90deg,transparent,rgba(108,92,231,.1),transparent);margin:1.2rem .8rem;'></div>", unsafe_allow_html=True)
     st.markdown("""<div style="padding:.8rem 1rem;border-radius:14px;background:linear-gradient(135deg,rgba(108,92,231,.04),rgba(0,206,201,.02));border:1px solid rgba(108,92,231,.06);margin:0 .5rem;text-align:center;">
         <div style="display:flex;align-items:center;justify-content:center;gap:.4rem;margin-bottom:.3rem;">
@@ -158,7 +252,6 @@ with st.sidebar:
         <p style="color:rgba(255,255,255,.22);font-size:.55rem;margin:0;letter-spacing:1px;">v1.0.0 • Tax Management System</p></div>""", unsafe_allow_html=True)
 
 # ====================== DATA ======================
-DATA_DIR = os.path.dirname(os.path.abspath(__file__))
 FORM41_FILE = os.path.join(DATA_DIR, "form41_data.json")
 VAT_FILE = os.path.join(DATA_DIR, "vat_data.json")
 def save_data(f,d):
@@ -268,6 +361,7 @@ def load_requests():
 
 def save_requests(data):
     with open(REQUESTS_FILE,'w',encoding='utf-8') as f: json.dump(data,f,ensure_ascii=False,indent=2,default=str)
+
 
 def _replace_in_paragraph(para, old, new):
     full = para.text
@@ -486,6 +580,60 @@ def _sf(v):
 def meta_html(label, value, color="var(--accent2)"):
     return f"""<div class="erp-meta-item"><div class="erp-meta-k">{label}</div><div class="erp-meta-v" style="color:{color}">{value}</div></div>"""
 
+# ====================== ADMIN ======================
+if page == ADMIN_PAGE:
+    cu=get_current_user()
+    if cu.get('role')!='admin':
+        st.error("لا تملك صلاحية الوصول");st.stop()
+    st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>إدارة المستخدمين</h3></div>',unsafe_allow_html=True)
+    users=load_users()
+    tab_add,tab_list=st.tabs(["➕ إضافة مستخدم","📋 قائمة المستخدمين"])
+    with tab_add:
+        with st.form("add_user_form",clear_on_submit=True):
+            c1,c2=st.columns(2)
+            with c1: new_user=st.text_input("اسم المستخدم (Username)")
+            with c2: new_name=st.text_input("الاسم الكامل")
+            c3,c4=st.columns(2)
+            with c3: new_pw=st.text_input("كلمة المرور",type="password")
+            with c4: new_role=st.selectbox("الدور",["user","admin"])
+            st.markdown('<p style="color:var(--text2);font-size:.8rem;margin:.5rem 0 .3rem;">الصلاحيات:</p>',unsafe_allow_html=True)
+            perm_cols=st.columns(4)
+            perm_checks=[]
+            for i,pg in enumerate(ALL_PAGES):
+                with perm_cols[i%4]:
+                    perm_checks.append((pg,st.checkbox(pg,key=f"perm_{i}")))
+            if st.form_submit_button("💾 إضافة المستخدم",type="primary",use_container_width=True):
+                if not new_user or not new_pw or not new_name:
+                    st.error("أدخل كل البيانات المطلوبة")
+                elif any(u['username']==new_user for u in users):
+                    st.error("اسم المستخدم موجود بالفعل")
+                else:
+                    perms=[p for p,c in perm_checks if c]
+                    if new_role=='admin': perms=ALL_PAGES+[ADMIN_PAGE]
+                    users.append({"username":new_user.strip(),"password":_hash_pw(new_pw),"display_name":new_name.strip(),"role":new_role,"permissions":perms,"created_at":datetime.now().isoformat()})
+                    save_users(users)
+                    st.success(f"تم إضافة {new_name.strip()} بنجاح!")
+    with tab_list:
+        if users:
+            for idx,u in enumerate(users):
+                is_admin=u.get('role')=='admin'
+                role_label="👑 مدير" if is_admin else "👤 مستخدم"
+                perms=u.get('permissions',[])
+                perms_display="، ".join(perms) if perms else "بدون صلاحيات"
+                with st.container():
+                    st.markdown(f"""<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:1rem 1.2rem;margin-bottom:.6rem;display:flex;align-items:center;justify-content:space-between;">
+                        <div><strong style="color:var(--text);font-size:.9rem;">{u.get('display_name','')}</strong> <span style="color:rgba(255,255,255,.3);font-size:.75rem;">@{u['username']}</span></div>
+                        <span style="color:var(--accent2);font-size:.75rem;">{role_label}</span></div>""",unsafe_allow_html=True)
+                    st.markdown(f'<p style="color:var(--text2);font-size:.7rem;margin:-.5rem 0 .5rem;">الصلاحيات: {perms_display}</p>',unsafe_allow_html=True)
+                    ec1,ec2=st.columns([3,1])
+                    with ec2:
+                        if u['username']!='admin' and st.button("🗑️ حذف",key=f"del_user_{idx}",type="secondary",use_container_width=True):
+                            users=[x for x in users if x['username']!=u['username']]
+                            save_users(users);st.success(f"تم حذف {u.get('display_name','')}");st.rerun()
+        else:
+            st.info("لا يوجد مستخدمون")
+    st.stop()
+
 # ====================== HOME ======================
 if page == "🏠 الرئيسية":
     # Detail view
@@ -579,6 +727,7 @@ if page == "🏠 الرئيسية":
 
 # ====================== FORM 41 ======================
 elif page == "📋 نموذج 41":
+    if not user_has_permission(page): st.error("لا تملك صلاحية الوصول");st.stop()
     sub = st.radio("f41", ["📤 رفع وربط البيانات","🔍 استعلام بالسجل الضريبي","📅 استعلام بالفترة"], horizontal=True, label_visibility="collapsed")
 
     if sub == "📤 رفع وربط البيانات":
@@ -742,6 +891,7 @@ elif page == "📋 نموذج 41":
 
 # ====================== VAT ======================
 elif page == "💰 القيمة المضافة":
+    if not user_has_permission(page): st.error("لا تملك صلاحية الوصول");st.stop()
     sub=st.radio("vat",["📤 رفع وربط البيانات","🔍 استعلام بالسجل الضريبي","📅 استعلام بالفترة"],horizontal=True,label_visibility="collapsed")
     if sub=="📤 رفع وربط البيانات":
         st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>رفع شيت القيمة المضافة</h3></div>',unsafe_allow_html=True)
@@ -889,6 +1039,7 @@ elif page == "💰 القيمة المضافة":
 
 # ====================== MARKET ======================
 elif page=="🛒 فواتير الماركت":
+    if not user_has_permission(page): st.error("لا تملك صلاحية الوصول");st.stop()
     st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>فواتير الماركت — إنشاء Template Portal</h3></div>',unsafe_allow_html=True)
     if 'mkt_step' not in st.session_state: st.session_state['mkt_step']=1
 
