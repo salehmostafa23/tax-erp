@@ -9,6 +9,7 @@ import hashlib
 from datetime import datetime
 from io import BytesIO
 import openpyxl
+from github_storage import gh_read, gh_write
 
 st.set_page_config(page_title="Tax Management System", page_icon="🏢", layout="wide", initial_sidebar_state="expanded")
 
@@ -24,6 +25,10 @@ def _hash_pw(pw,salt="tax_erp_salt_2024"):
     return hashlib.sha256(f"{salt}{pw}".encode()).hexdigest()
 
 def load_users():
+    gh=gh_read("users.json")
+    if gh is not None:
+        with open(USERS_FILE,'w',encoding='utf-8') as f: json.dump(gh,f,ensure_ascii=False,indent=2,default=str)
+        return gh
     if os.path.exists(USERS_FILE):
         try:
             with open(USERS_FILE,'r',encoding='utf-8') as f: return json.load(f)
@@ -34,6 +39,7 @@ def load_users():
 
 def save_users(data):
     with open(USERS_FILE,'w',encoding='utf-8') as f: json.dump(data,f,ensure_ascii=False,indent=2,default=str)
+    gh_write("users.json",data)
 
 def authenticate_user(username,password):
     users=load_users()
@@ -255,9 +261,18 @@ with st.sidebar:
 # ====================== DATA ======================
 FORM41_FILE = os.path.join(DATA_DIR, "form41_data.json")
 VAT_FILE = os.path.join(DATA_DIR, "vat_data.json")
+
+def _gh_key(f):
+    return os.path.basename(f)
+
 def save_data(f,d):
     with open(f,'w',encoding='utf-8') as fh: json.dump(d,fh,ensure_ascii=False,indent=2,default=str)
+    gh_write(_gh_key(f),d)
 def load_data(f):
+    gh=gh_read(_gh_key(f))
+    if gh is not None:
+        with open(f,'w',encoding='utf-8') as fh: json.dump(gh,fh,ensure_ascii=False,indent=2,default=str)
+        return gh
     if os.path.exists(f):
         try:
             with open(f,'r',encoding='utf-8') as fh: return json.load(fh)
@@ -354,6 +369,10 @@ MONTHS={1:'يناير',2:'فبراير',3:'مارس',4:'أبريل',5:'مايو'
 REQUESTS_FILE=os.path.join(DATA_DIR,"requests_registry.json")
 
 def load_requests():
+    gh=gh_read("requests_registry.json")
+    if gh is not None:
+        with open(REQUESTS_FILE,'w',encoding='utf-8') as f: json.dump(gh,f,ensure_ascii=False,indent=2,default=str)
+        return gh
     if os.path.exists(REQUESTS_FILE):
         try:
             with open(REQUESTS_FILE,'r',encoding='utf-8') as f: return json.load(f)
@@ -362,6 +381,7 @@ def load_requests():
 
 def save_requests(data):
     with open(REQUESTS_FILE,'w',encoding='utf-8') as f: json.dump(data,f,ensure_ascii=False,indent=2,default=str)
+    gh_write("requests_registry.json",data)
 
 
 def _replace_in_paragraph(para, old, new):
