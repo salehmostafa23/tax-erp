@@ -65,11 +65,11 @@ if not st.session_state['current_user']:
     #MainMenu,footer,header,.stDeployButton{visibility:hidden!important;}
     div[data-testid="stToolbar"]{display:none!important;}
     .stApp{background:linear-gradient(135deg,#08081a 0%,#0d0d22 50%,#0a0a18 100%)!important;}
-    .login-box{max-width:400px;margin:6rem auto 0;padding:2.5rem 2rem;border-radius:20px;background:rgba(22,22,40,0.7);border:1px solid rgba(255,255,255,0.06);backdrop-filter:blur(20px);box-shadow:0 20px 60px rgba(0,0,0,.5);position:relative;overflow:hidden;}
+    .login-box{max-width:320px;margin:6rem auto 0;padding:1.5rem 1.5rem;border-radius:16px;background:rgba(22,22,40,0.7);border:1px solid rgba(255,255,255,0.06);backdrop-filter:blur(20px);box-shadow:0 20px 60px rgba(0,0,0,.5);position:relative;overflow:hidden;}
     .login-box::before{content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;background:radial-gradient(circle at center,rgba(108,92,231,0.06),transparent 50%);pointer-events:none;}
-    .login-icon{width:70px;height:70px;margin:0 auto 1.2rem;border-radius:22px;background:linear-gradient(135deg,#6c5ce7 0%,#a29bfe 50%,#00cec9 100%);display:flex;align-items:center;justify-content:center;font-size:2rem;box-shadow:0 8px 30px rgba(108,92,231,0.45);}
-    .login-title{margin:0 0 .3rem;color:#fff;font-size:1.4rem;font-weight:800;text-align:center;letter-spacing:.5px;}
-    .login-sub{margin:0 0 1.5rem;color:rgba(255,255,255,.3);font-size:.75rem;text-align:center;letter-spacing:1px;}
+    .login-icon{width:50px;height:50px;margin:0 auto .8rem;border-radius:14px;background:linear-gradient(135deg,#6c5ce7 0%,#a29bfe 50%,#00cec9 100%);display:flex;align-items:center;justify-content:center;font-size:1.5rem;box-shadow:0 8px 30px rgba(108,92,231,0.45);}
+    .login-title{margin:0 0 .2rem;color:#fff;font-size:1.1rem;font-weight:800;text-align:center;letter-spacing:.5px;}
+    .login-sub{margin:0 0 1rem;color:rgba(255,255,255,.3);font-size:.65rem;text-align:center;letter-spacing:1px;}
     .stTextInput>div>div>input{background:rgba(30,30,56,0.8)!important;border:1px solid rgba(255,255,255,0.08)!important;border-radius:12px!important;color:#fff!important;padding:.7rem 1rem!important;}
     .stTextInput>div>div>input:focus{border-color:rgba(108,92,231,0.5)!important;box-shadow:0 0 0 3px rgba(108,92,231,0.1)!important;}
     .stButton>button[kind="primary"]{background:linear-gradient(135deg,#6c5ce7 0%,#a29bfe 100%)!important;border:none!important;border-radius:12px!important;font-family:'Cairo',sans-serif!important;font-weight:700!important;color:#fff!important;padding:.6rem 0!important;width:100%!important;box-shadow:0 4px 20px rgba(108,92,231,0.4)!important;transition:all .3s!important;font-size:.95rem!important;}
@@ -92,6 +92,7 @@ if not st.session_state['current_user']:
                     st.rerun()
                 else:
                     st.markdown('<div class="login-err">بيانات الدخول غير صحيحة</div>', unsafe_allow_html=True)
+    st.markdown('<p style="text-align:center;color:rgba(255,255,255,.2);font-size:.6rem;margin-top:2rem;font-family:Cairo,sans-serif;">جميع الحقوق محفوظة © تصميم محاسب / صالح مصطفى</p>', unsafe_allow_html=True)
     st.stop()
 
 # ====================== CSS ======================
@@ -109,9 +110,9 @@ div[data-testid="stToolbar"]{display:none!important;}
 section[data-testid="stSidebar"]{background:linear-gradient(180deg,#050510 0%,#0b0b24 40%,#080820 100%)!important;border-left:1px solid rgba(108,92,231,0.08)!important;box-shadow:8px 0 60px rgba(0,0,0,0.7)!important;}
 section[data-testid="stSidebar"]>div:first-child{padding-top:0!important;}
 section[data-testid="stSidebar"] .stMarkdown p,section[data-testid="stSidebar"] .stMarkdown span,section[data-testid="stSidebar"] label,section[data-testid="stSidebar"] .stRadio>div>label{color:rgba(255,255,255,0.55)!important;font-size:.8rem!important;font-family:'Inter','Cairo',sans-serif!important;}
-section[data-testid="stSidebar"] .stRadio>div>div>label{background:rgba(255,255,255,0.02)!important;border:2px solid rgba(255,255,255,0.04)!important;border-radius:12px!important;padding:.65rem 1.1rem!important;margin:3px 4px!important;transition:all .35s cubic-bezier(.4,0,.2,1)!important;position:relative!important;overflow:hidden!important;display:flex!important;align-items:center!important;gap:.6rem!important;}
-section[data-testid="stSidebar"] .stRadio>div>div>label:hover{background:rgba(108,92,231,0.1)!important;border:2px solid rgba(108,92,231,0.25)!important;color:rgba(255,255,255,.9)!important;}
-section[data-testid="stSidebar"] .stRadio>div>div:has(input:checked)>label{background:rgba(108,92,231,0.15)!important;border:2px solid rgba(108,92,231,0.6)!important;border-radius:12px!important;box-shadow:0 0 20px rgba(108,92,231,0.15),inset 0 0 20px rgba(108,92,231,0.05)!important;color:#fff!important;font-weight:700!important;padding:.65rem 1.1rem!important;margin:3px 4px!important;}
+section[data-testid="stSidebar"] .stRadio>div>div>label{background:rgba(108,92,231,0.12)!important;border:2px solid rgba(108,92,231,0.3)!important;border-radius:8px!important;padding:.55rem 1rem!important;margin:3px 4px!important;transition:all .35s cubic-bezier(.4,0,.2,1)!important;position:relative!important;overflow:hidden!important;display:flex!important;align-items:center!important;gap:.6rem!important;}
+section[data-testid="stSidebar"] .stRadio>div>div>label:hover{background:rgba(108,92,231,0.2)!important;border:2px solid rgba(108,92,231,0.4)!important;color:rgba(255,255,255,.9)!important;}
+section[data-testid="stSidebar"] .stRadio>div>div:has(input:checked)>label{background:rgba(108,92,231,0.3)!important;border:2px solid rgba(108,92,231,0.7)!important;border-radius:8px!important;box-shadow:0 0 20px rgba(108,92,231,0.2)!important;color:#fff!important;font-weight:700!important;padding:.55rem 1rem!important;margin:3px 4px!important;}
 section[data-testid="stSidebar"] .stRadio>div>div>label::before{display:none!important;}
 section[data-testid="stSidebar"] .stRadio>div>div>label::after{display:none!important;}
 section[data-testid="stSidebar"] svg{color:rgba(108,92,231,.4)!important;width:0!important;height:0!important;margin:0!important;opacity:0!important;display:none!important;}
