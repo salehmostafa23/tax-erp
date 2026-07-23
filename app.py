@@ -752,9 +752,8 @@ if page == "🏠 الرئيسية":
     f41_n = sum(len(r.get('records',[])) for r in f41)
     vat_n = sum(len(r.get('records',[])) for r in vat)
 
-    now=datetime.now().strftime("%d/%m/%Y • %H:%M")
     st.markdown(f"""<div class="erp-topbar"><div><h2>{page}</h2><p>مرحباً بك في لوحة التحكم</p></div>
-<div class="erp-topbar-right"><span class="erp-badge">📊 Dashboard</span><span class="erp-time">{now}</span></div></div>""", unsafe_allow_html=True)
+<div class="erp-topbar-right"><span class="erp-badge">📊 Dashboard</span><a href="https://invoicing.eta.gov.eg/" target="_blank" style="background:rgba(0,206,201,.12);border:1px solid rgba(0,206,201,.3);border-radius:10px;padding:.35rem .9rem;color:#00cec9;font-size:.72rem;font-weight:600;text-decoration:none;cursor:pointer;transition:all .3s;">portal الفواتير الإلكترونية</a></div></div>""", unsafe_allow_html=True)
 
     st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>نظرة عامة</h3></div>', unsafe_allow_html=True)
     c1,c2,c3,c4=st.columns(4)
