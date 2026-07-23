@@ -281,11 +281,28 @@ def load_data(f):
     return []
 def read_form41_excel(f):
     df=pd.read_excel(f,header=None,engine='openpyxl')
-    cols=['م','رقم التسجيل الضريبي','اسم الممول','تاريخ التعامل','طبيعة التعامل','القيمة الإجمالية للتعامل','نسبة الخصم','المحصل لحساب الضريبة']
-    df=df.iloc[:,:len(cols)]
-    if len(df.columns)<len(cols):
-        for i in range(len(df.columns),len(cols)): df[i]=''
-    df.columns=cols[:len(df.columns)]
+    target=['م','رقم التسجيل الضريبي','اسم الممول','تاريخ التعامل','طبيعة التعامل','القيمة الإجمالية للتعامل','نسبة الخصم','المحصل لحساب الضريبة']
+    alias={'م':['م','ت','مسلسل','الرقم','رقم'],'رقم التسجيل الضريبي':['رقم التسجيل الضريبي','الرقم الضريبي','التسجيل','رقم تسجيل','tax_no','tax_number'],'اسم الممول':['اسم الممول','اسم المورد','الممول','المورد','الاسم','اسم'],'تاريخ التعامل':['تاريخ التعامل','التاريخ','تاريخ','date'],'طبيعة التعامل':['طبيعة التعامل','النوع','طبيعة','نوع التعامل'],'القيمة الإجمالية للتعامل':['القيمة الإجمالية للتعامل','القيمة الإجمالية','قيمة التعامل','القيمة','value'],'نسبة الخصم':['نسبة الخصم','الخصم','نسبة','discount'],'المحصل لحساب الضريبة':['المحصل لحساب الضريبة','المحصل لساب الضريبة','المحصل','ضريبة','tax']}
+    hdr=[str(v).strip() for v in df.iloc[0].tolist()]
+    mapped={}
+    used_cols=set()
+    for tgt,al in alias.items():
+        for i,h in enumerate(hdr):
+            if i in used_cols: continue
+            if any(a in h for a in al if a):
+                mapped[tgt]=i;used_cols.add(i);break
+    if len(mapped)>=6:
+        df=df.iloc[1:].reset_index(drop=True)
+        for tgt in target:
+            if tgt not in mapped:
+                mapped[tgt]=len(df.columns);df[len(df.columns)]=''
+        df=df[[mapped[t] for t in target]]
+        df.columns=target
+    else:
+        df=df.iloc[:,:len(target)]
+        if len(df.columns)<len(target):
+            for i in range(len(df.columns),len(target)): df[i]=''
+        df.columns=target[:len(df.columns)]
     return df
 def read_vat_excel(f):
     df=pd.read_excel(f,header=None,engine='openpyxl')
@@ -728,10 +745,12 @@ if page == "🏠 الرئيسية":
                         st.rerun()
 
         if dv['type'] == 'f41':
-            total = sum(_sf(r.get('المحصل لحساب الضريبة',0)) for r in records)
-            s1,s2 = st.columns(2)
-            with s1: st.markdown(f'<div class="erp-stat s-orange"><div class="erp-stat-label">إجمالي المحصل لحساب الضريبة</div><div class="erp-stat-value">{fmt(total)}</div></div>', unsafe_allow_html=True)
-            with s2: st.markdown(f'<div class="erp-stat s-blue"><div class="erp-stat-label">عدد السجلات</div><div class="erp-stat-value">{len(records)}</div></div>', unsafe_allow_html=True)
+            total_tax = sum(_sf(r.get('المحصل لحساب الضريبة',0)) for r in records)
+            total_val = sum(_sf(r.get('القيمة الإجمالية للتعامل',0)) for r in records)
+            s1,s2,s3 = st.columns(3)
+            with s1: st.markdown(f'<div class="erp-stat s-orange"><div class="erp-stat-label">إجمالي المحصل لحساب الضريبة</div><div class="erp-stat-value">{fmt(total_tax)}</div></div>', unsafe_allow_html=True)
+            with s2: st.markdown(f'<div class="erp-stat s-cyan"><div class="erp-stat-label">إجمالي القيمة الإجمالية للتعامل</div><div class="erp-stat-value">{fmt(total_val)}</div></div>', unsafe_allow_html=True)
+            with s3: st.markdown(f'<div class="erp-stat s-blue"><div class="erp-stat-label">عدد السجلات</div><div class="erp-stat-value">{len(records)}</div></div>', unsafe_allow_html=True)
         else:
             tt=sum(_sf(r.get('ضريبة الجدول',0)) for r in records)
             tv=sum(_sf(r.get('20% قيمة مضافة',0)) for r in records)
