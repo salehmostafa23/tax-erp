@@ -1453,45 +1453,53 @@ elif page=="📄 Portal الفواتير الإلكترونية":
     if portal_sub=="🔗 ربط مباشر مع البورتال":
         st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>ربط مباشر مع بوابة الفواتير الإلكترونية</h3></div>',unsafe_allow_html=True)
 
-        st.markdown("""<div class="erp-card" style="margin-bottom:1rem;">
-            <div class="erp-card-header">
-                <div class="erp-card-icon" style="background:linear-gradient(135deg,rgba(0,206,201,.15),rgba(0,206,201,.03));">🔗</div>
-                <div><h3>بيانات الاتصال مع البورتال</h3>
-                <p style="color:var(--text2);font-size:.78rem;margin:0;">أدخل Client ID و Client Secret من حسابك في بوابة الفواتير الإلكترونية</p></div>
-            </div>
-        </div>""",unsafe_allow_html=True)
+        eta_cid=os.environ.get("ETA_CLIENT_ID","")
+        eta_csec=os.environ.get("ETA_CLIENT_SECRET","")
+        if not eta_cid:
+            try:
+                eta_cid=st.secrets.get("ETA_CLIENT_ID","")
+                eta_csec=st.secrets.get("ETA_CLIENT_SECRET","")
+            except:
+                pass
 
-        st.markdown("""<div style="padding:.8rem 1rem;border-radius:10px;background:rgba(253,203,110,.06);border:1px solid rgba(253,203,110,.15);margin-bottom:1rem;font-size:.78rem;color:#fdcb6e;">
-            💡 <strong>كيف تحصل على البيانات:</strong><br>
-            1. سجل دخول على <a href="https://profile.eta.gov.eg" target="_blank" style="color:#74b9ff;">profile.eta.gov.eg</a><br>
-            2. روح على قسم "Manage My Account" أو "API Credentials"<br>
-            3. هتلاقي <strong>Client ID</strong> و <strong>Client Secret</strong><br>
-            4. لو مش لاقيهم، اتصل على 16395 أو راسل einvoice_support@efinance.com.eg
-        </div>""",unsafe_allow_html=True)
-
-        with st.form("eta_credentials_form"):
-            c1,c2=st.columns(2)
-            with c1:
-                eta_client_id=st.text_input("Client ID",value=st.session_state.get("eta_client_id",""),placeholder="أدخل Client ID")
-            with c2:
-                eta_client_secret=st.text_input("Client Secret",value=st.session_state.get("eta_client_secret",""),type="password",placeholder="أدخل Client Secret")
-            st.markdown('<div style="color:var(--text2);font-size:.75rem;margin:.3rem 0;">📅 الاتصال آمن — البيانات مش بتتتسجل في أي مكان</div>',unsafe_allow_html=True)
-            submitted=st.form_submit_button("🔐 الاتصال بالبورتال",type="primary")
-
-        if submitted:
-            if not eta_client_id or not eta_client_secret:
-                st.error("أدخل Client ID و Client Secret")
+        if eta_cid and not st.session_state.get("eta_token"):
+            with st.spinner("جاري الاتصال التلقائي بالبورتال..."):
+                token,err=eta_login(eta_cid,eta_csec)
+            if err:
+                st.error(f"❌ فشل الاتصال التلقائي: {err}")
+                st.info("يمكنك إدخال البيانات يدوياً من النموذج أدناه")
             else:
-                with st.spinner("جاري الاتصال بالبورتال..."):
-                    token,err=eta_login(eta_client_id,eta_client_secret)
-                if err:
-                    st.error(f"❌ فشل الاتصال: {err}")
+                st.session_state["eta_token"]=token
+                st.session_state["eta_client_id"]=eta_cid
+                st.session_state["eta_client_secret"]=eta_csec
+                st.success("✅ تم الاتصال التلقائي بالبورتال!")
+                st.rerun()
+
+        if not eta_cid:
+            st.markdown("""<div style="padding:.8rem 1rem;border-radius:10px;background:rgba(253,203,110,.06);border:1px solid rgba(253,203,110,.15);margin-bottom:1rem;font-size:.78rem;color:#fdcb6e;">
+                💡 أدخل بيانات الاتصال يدوياً من البورتال
+            </div>""",unsafe_allow_html=True)
+            with st.form("eta_credentials_form"):
+                c1,c2=st.columns(2)
+                with c1:
+                    eta_client_id_input=st.text_input("Client ID",value=st.session_state.get("eta_client_id",""),placeholder="أدخل Client ID")
+                with c2:
+                    eta_client_secret_input=st.text_input("Client Secret",value=st.session_state.get("eta_client_secret",""),type="password",placeholder="أدخل Client Secret")
+                submitted=st.form_submit_button("🔐 الاتصال بالبورتال",type="primary")
+            if submitted:
+                if not eta_client_id_input or not eta_client_secret_input:
+                    st.error("أدخل Client ID و Client Secret")
                 else:
-                    st.session_state["eta_token"]=token
-                    st.session_state["eta_client_id"]=eta_client_id
-                    st.session_state["eta_client_secret"]=eta_client_secret
-                    st.success("✅ تم الاتصال بالبورتال بنجاح!")
-                    st.rerun()
+                    with st.spinner("جاري الاتصال بالبورتال..."):
+                        token,err=eta_login(eta_client_id_input,eta_client_secret_input)
+                    if err:
+                        st.error(f"❌ فشل الاتصال: {err}")
+                    else:
+                        st.session_state["eta_token"]=token
+                        st.session_state["eta_client_id"]=eta_client_id_input
+                        st.session_state["eta_client_secret"]=eta_client_secret_input
+                        st.success("✅ تم الاتصال بالبورتال بنجاح!")
+                        st.rerun()
 
         if st.session_state.get("eta_token"):
             st.markdown('<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(85,239,196,.06);border:1px solid rgba(85,239,196,.15);color:#55efc4;font-size:.82rem;margin:.5rem 0;">✅ متصلاً بالبورتال — جاهز لجلب الفواتير</div>',unsafe_allow_html=True)
