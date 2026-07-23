@@ -1492,21 +1492,6 @@ elif page=="📄 Portal الفواتير الإلكترونية":
                 st.session_state[f"show_details_{label_type}"]=False
                 st.rerun()
 
-        st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>النتائج</h3></div>',unsafe_allow_html=True)
-        for idx,rec in enumerate(filtered):
-            recs=rec.get('records',[])
-            status=rec.get('status','')
-            s_color='#55efc4' if status in ['مقبولة','مستلمة'] else '#fdcb6e' if status in ['مرسلة','معلقة'] else '#ff6b6b'
-            with st.expander(f"📎 {rec.get('file_name','')} — {rec.get('period','-')} — {len(recs)} فاتورة — {status}",expanded=False):
-                st.dataframe(pd.DataFrame(recs),use_container_width=True,height=250)
-                dc1,dc2=st.columns(2)
-                with dc1:
-                    df_rec=pd.DataFrame(recs)
-                    buf=BytesIO()
-                    df_rec.to_excel(buf,index=False,engine='xlsxwriter')
-                    buf.seek(0)
-                    st.download_button(f"📥 تحميل هذا الرفع (Excel)",data=buf.getvalue(),file_name=f"{rec.get('file_name','invoice')}_{rec.get('period','')}.xlsx",mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",key=f"dl_{label_type}_{idx}")
-
         if all_records:
             st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>تحميل جماعي</h3></div>',unsafe_allow_html=True)
             gc1,gc2,gc3=st.columns(3)
