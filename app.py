@@ -751,6 +751,10 @@ if page == "🏠 الرئيسية":
     f41_n = sum(len(r.get('records',[])) for r in f41)
     vat_n = sum(len(r.get('records',[])) for r in vat)
 
+    now=datetime.now().strftime("%d/%m/%Y • %H:%M")
+    st.markdown(f"""<div class="erp-topbar"><div><h2>{page}</h2><p>مرحباً بك في لوحة التحكم</p></div>
+<div class="erp-topbar-right"><span class="erp-badge">📊 Dashboard</span><span class="erp-time">{now}</span></div></div>""", unsafe_allow_html=True)
+
     st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>نظرة عامة</h3></div>', unsafe_allow_html=True)
     c1,c2,c3,c4=st.columns(4)
     with c1: st.markdown(f'<div class="erp-stat s-blue"><div class="erp-stat-label">نموذج 41</div><div class="erp-stat-value">{f41_n}</div><div class="erp-stat-sub">{len(f41)} رفع</div></div>', unsafe_allow_html=True)
