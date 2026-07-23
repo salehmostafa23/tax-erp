@@ -1378,15 +1378,6 @@ elif page=="🛒 فواتير الماركت":
 elif page=="📄 Portal الفواتير الإلكترونية":
     if not user_has_permission(page): st.error("لا تملك صلاحية الوصول");st.stop()
 
-    qp=st.query_params
-    if "close_modal" in qp:
-        cm_val=qp["close_modal"]
-        for k in list(st.session_state.keys()):
-            if k.startswith("show_details_"):
-                st.session_state[k]=False
-        st.query_params.clear()
-        st.rerun()
-
     st.markdown(f"""<div class="erp-topbar"><div><h2>{page}</h2><p>إدارة فواتير الصادرة والواردة من بوابة الفواتير الإلكترونية</p></div>
 <div class="erp-topbar-right"><a href="https://invoicing.eta.gov.eg/" target="_blank" style="background:linear-gradient(135deg,rgba(0,206,201,.18),rgba(108,92,231,.12));border:1px solid rgba(0,206,201,.35);border-radius:12px;padding:.5rem 1.2rem;color:#00cec9;font-size:.82rem;font-weight:700;text-decoration:none;cursor:pointer;transition:all .3s;display:inline-flex;align-items:center;gap:.5rem;">🔗 فتح بوابة الفواتير الإلكترونية</a></div></div>""", unsafe_allow_html=True)
 
@@ -1460,12 +1451,11 @@ elif page=="📄 Portal الفواتير الإلكترونية":
 
         if st.session_state.get(f"show_details_{label_type}"):
             detail_recs=st.session_state.get(f"detail_records_{label_type}",[])
-            modal_html=f"""<div style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);z-index:9998;"></div>
-            <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:90%;max-width:800px;max-height:85vh;overflow-y:auto;background:#0d0d22;border:1px solid rgba(108,92,231,.3);border-radius:16px;padding:1.5rem;z-index:9999;box-shadow:0 20px 60px rgba(0,0,0,.8);scrollbar-width:thin;scrollbar-color:#6c5ce7 #0d0d22;">
+            st.markdown(f"""<div style="background:linear-gradient(135deg,rgba(108,92,231,.12),rgba(0,206,201,.08));border:2px solid rgba(108,92,231,.3);border-radius:16px;padding:1.5rem;margin:1rem 0;box-shadow:0 8px 32px rgba(108,92,231,.2);">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;border-bottom:1px solid rgba(255,255,255,.06);padding-bottom:.8rem;">
                 <h3 style="color:#fff;margin:0;font-size:1.1rem;">تفاصيل فواتير الفترة ({len(detail_recs)} فاتورة)</h3>
-                <a href="?close_modal={label_type}" style="color:#ff6b6b;font-size:1.3rem;font-weight:700;text-decoration:none;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:8px;background:rgba(255,107,107,.1);border:1px solid rgba(255,107,107,.2);transition:all .2s;" onmouseover="this.style.background='rgba(255,107,107,.3)'" onmouseout="this.style.background='rgba(255,107,107,.1)'">✕</a>
-            </div>"""
+            </div>
+            </div>""",unsafe_allow_html=True)
             for idx,r in enumerate(detail_recs):
                 st_status=r.get('الحالة',r.get('__status__',''))
                 if st_status in ['مقبولة','مستلمة']:
@@ -1479,7 +1469,7 @@ elif page=="📄 Portal الفواتير الإلكترونية":
                 inv_total=r.get('الإجمالي (بعد الضريبة)',r.get('الإجمالي',0))
                 inv_date=r.get('تاريخ الإصدار','')
                 uuid_val=r.get('UUID','—')
-                modal_html+=f"""<div style="background:rgba(30,30,56,.8);border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:.7rem 1rem;margin-bottom:.5rem;">
+                st.markdown(f"""<div style="background:rgba(30,30,56,.8);border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:.7rem 1rem;margin-bottom:.5rem;">
                 <div style="display:flex;justify-content:space-between;align-items:center;">
                     <div>
                         <div style="color:#fff;font-weight:700;font-size:.88rem;">{supplier}</div>
@@ -1495,9 +1485,10 @@ elif page=="📄 Portal الفواتير الإلكترونية":
                         <span style="color:{bulb_color};font-size:.75rem;font-weight:600;">{st_status}</span>
                     </div>
                 </div>
-            </div>"""
-            modal_html+="</div>"
-            st.markdown(modal_html,unsafe_allow_html=True)
+            </div>""",unsafe_allow_html=True)
+            if st.button("✕ إغلاق",key=f"close_details_{label_type}"):
+                st.session_state[f"show_details_{label_type}"]=False
+                st.rerun()
 
         if all_records:
             st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>تحميل جماعي</h3></div>',unsafe_allow_html=True)
