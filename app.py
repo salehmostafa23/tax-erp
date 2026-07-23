@@ -569,13 +569,12 @@ def gen_vat_word(supplier_name, tax_number, results, export_date_str, request_da
 st.components.v1.html("""
 <script>
 (function(){
-var obs=new MutationObserver(function(){
+function setup(){
 try{
 var p=window.parent.document;
-if(!p)return;
 var badge=p.querySelector('.erp-badge');
-if(!badge)return;
-if(p.getElementById('sb-toggle'))return;
+if(!badge)return false;
+if(p.getElementById('sb-toggle'))return true;
 var b=p.createElement('button');
 b.id='sb-toggle';
 b.textContent='☰ القائمة';
@@ -584,14 +583,18 @@ b.onmouseover=function(){b.style.background='rgba(108,92,231,.3)';};
 b.onmouseout=function(){b.style.background='rgba(108,92,231,.15)';};
 b.onclick=function(){
 var btn=p.querySelector('button[data-testid="stSidebarCollapseButton"]');
-if(btn)btn.click();
+if(btn){btn.style.display='block';btn.click();}
 };
 badge.parentNode.insertBefore(b,badge.nextSibling);
-obs.disconnect();
-}catch(e){}
-});
-obs.observe(document.body,{childList:true,subtree:true});
-setTimeout(function(){obs.disconnect();},10000);
+return true;
+}catch(e){return false;}
+}
+var tries=0;
+var t=setInterval(function(){
+tries++;
+if(tries>40){clearInterval(t);return;}
+if(setup())clearInterval(t);
+},500);
 })();
 </script>
 """, height=0, width=0)
