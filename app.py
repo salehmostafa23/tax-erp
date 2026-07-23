@@ -18,7 +18,7 @@ DATA_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # ====================== USERS ======================
 USERS_FILE=os.path.join(DATA_DIR,"users.json")
-ALL_PAGES=["🏠 الرئيسية","📋 نموذج 41","💰 القيمة المضافة","🛒 فواتير الماركت"]
+ALL_PAGES=["🏠 الرئيسية","📋 نموذج 41","💰 القيمة المضافة","🛒 فواتير الماركت","📄 Portal الفواتير الإلكترونية"]
 ADMIN_PAGE="👥 إدارة المستخدمين"
 
 def _hash_pw(pw,salt="tax_erp_salt_2024"):
@@ -262,6 +262,8 @@ with st.sidebar:
 # ====================== DATA ======================
 FORM41_FILE = os.path.join(DATA_DIR, "form41_data.json")
 VAT_FILE = os.path.join(DATA_DIR, "vat_data.json")
+PORTAL_OUT_FILE = os.path.join(DATA_DIR, "portal_outgoing.json")
+PORTAL_IN_FILE = os.path.join(DATA_DIR, "portal_incoming.json")
 
 def _gh_key(f):
     return os.path.basename(f)
@@ -769,16 +771,20 @@ if page == "🏠 الرئيسية":
     f41 = load_data(FORM41_FILE); vat = load_data(VAT_FILE)
     f41_n = sum(len(r.get('records',[])) for r in f41)
     vat_n = sum(len(r.get('records',[])) for r in vat)
+    portal_out = load_data(PORTAL_OUT_FILE); portal_in = load_data(PORTAL_IN_FILE)
+    portal_out_n = sum(r.get('records_count',len(r.get('records',[]))) for r in portal_out)
+    portal_in_n = sum(r.get('records_count',len(r.get('records',[]))) for r in portal_in)
 
     st.markdown(f"""<div class="erp-topbar"><div><h2>{page}</h2><p>مرحباً بك في لوحة التحكم</p></div>
 <div class="erp-topbar-right"><span class="erp-badge">📊 Dashboard</span><a href="https://invoicing.eta.gov.eg/" target="_blank" style="background:rgba(0,206,201,.12);border:1px solid rgba(0,206,201,.3);border-radius:10px;padding:.35rem .9rem;color:#00cec9;font-size:.72rem;font-weight:600;text-decoration:none;cursor:pointer;transition:all .3s;">portal الفواتير الإلكترونية</a></div></div>""", unsafe_allow_html=True)
 
     st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>نظرة عامة</h3></div>', unsafe_allow_html=True)
-    c1,c2,c3,c4=st.columns(4)
+    c1,c2,c3,c4,c5=st.columns(5)
     with c1: st.markdown(f'<div class="erp-stat s-blue"><div class="erp-stat-label">نموذج 41</div><div class="erp-stat-value">{f41_n}</div><div class="erp-stat-sub">{len(f41)} رفع</div></div>', unsafe_allow_html=True)
     with c2: st.markdown(f'<div class="erp-stat s-cyan"><div class="erp-stat-label">القيمة المضافة</div><div class="erp-stat-value">{vat_n}</div><div class="erp-stat-sub">{len(vat)} رفع</div></div>', unsafe_allow_html=True)
-    with c3: st.markdown('<div class="erp-stat s-orange"><div class="erp-stat-label">فواتير الماركت</div><div class="erp-stat-value">-</div><div class="erp-stat-sub">خطوات متعددة</div></div>', unsafe_allow_html=True)
-    with c4: st.markdown(f'<div class="erp-stat s-green"><div class="erp-stat-label">الإجمالي</div><div class="erp-stat-value">{f41_n+vat_n}</div><div class="erp-stat-sub">سجل</div></div>', unsafe_allow_html=True)
+    with c3: st.markdown(f'<div class="erp-stat s-orange"><div class="erp-stat-label">فواتير صادرة</div><div class="erp-stat-value">{portal_out_n}</div><div class="erp-stat-sub">{len(portal_out)} رفع</div></div>', unsafe_allow_html=True)
+    with c4: st.markdown(f'<div class="erp-stat s-pink"><div class="erp-stat-label">فواتير واردة</div><div class="erp-stat-value">{portal_in_n}</div><div class="erp-stat-sub">{len(portal_in)} رفع</div></div>', unsafe_allow_html=True)
+    with c5: st.markdown(f'<div class="erp-stat s-green"><div class="erp-stat-label">الإجمالي</div><div class="erp-stat-value">{f41_n+vat_n+portal_out_n+portal_in_n}</div><div class="erp-stat-sub">سجل</div></div>', unsafe_allow_html=True)
 
     # F41 batches
     if f41:
@@ -1225,3 +1231,138 @@ elif page=="🛒 فواتير الماركت":
             st.markdown(f'<div class="erp-empty"><div class="erp-empty-icon">⏳</div><h3>بانتظار إكمال الخطوات</h3><p>يرجى رفع: {" + ".join(miss)}</p></div>',unsafe_allow_html=True)
             if st.button("← السابق",key="prev3b"):
                 st.session_state['mkt_step']=2;st.rerun()
+
+# ====================== PORTAL ELECTRONIC INVOICES ======================
+elif page=="📄 Portal الفواتير الإلكترونية":
+    if not user_has_permission(page): st.error("لا تملك صلاحية الوصول");st.stop()
+
+    st.markdown(f"""<div class="erp-topbar"><div><h2>{page}</h2><p>إدارة فواتير الصراد والوارد من بوابة الفواتير الإلكترونية</p></div>
+<div class="erp-topbar-right"><a href="https://invoicing.eta.gov.eg/" target="_blank" style="background:linear-gradient(135deg,rgba(0,206,201,.18),rgba(108,92,231,.12));border:1px solid rgba(0,206,201,.35);border-radius:12px;padding:.5rem 1.2rem;color:#00cec9;font-size:.82rem;font-weight:700;text-decoration:none;cursor:pointer;transition:all .3s;display:inline-flex;align-items:center;gap:.5rem;">🔗 فتح بوابة الفواتير الإلكترونية</a></div></div>""", unsafe_allow_html=True)
+
+    portal_sub=st.radio("portal_tabs",["📤 فواتير الصادرة","📥 فواتير الوارد"],horizontal=True,label_visibility="collapsed")
+
+    if portal_sub=="📤 فواتير الصادرة":
+        st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>فواتير الصادرة</h3></div>',unsafe_allow_html=True)
+        st.markdown("""<div class="erp-card"><div class="erp-card-header">
+            <div class="erp-card-icon" style="background:linear-gradient(135deg,rgba(108,92,231,.15),rgba(108,92,231,.03));">📤</div>
+            <div><h3>رفع بيانات فواتير الصادرة</h3><p>ارفع ملف Excel يحتوي على بيانات الفواتير الصادرة</p></div>
+        </div></div>""",unsafe_allow_html=True)
+
+        out_data=load_data(PORTAL_OUT_FILE)
+
+        st.markdown('<div class="erp-card">',unsafe_allow_html=True)
+        up_out=st.file_uploader("ارفع ملف الفواتير الصادرة",type=['xlsx','xls'],key="portal_out_up",label_visibility="collapsed")
+        if up_out:
+            try:
+                df_out=pd.read_excel(up_out,engine='openpyxl')
+                st.markdown(f'<div style="margin:.5rem 0;padding:.6rem 1rem;border-radius:10px;background:rgba(0,184,148,.08);border:1px solid rgba(0,184,148,.15);color:#55efc4;font-size:.82rem;">✓ تم رفع {len(df_out)} فاتورة</div>',unsafe_allow_html=True)
+                st.dataframe(df_out,use_container_width=True,height=300)
+                c1,c2,c3=st.columns(3)
+                with c1: out_period=st.text_input("الفترة (شهر/سنة)",key="out_period",placeholder="07/2025")
+                with c2: out_type=st.selectbox("نوع الفاتورة",["فاتورة بيع","إشعار دائن","إشعار مدين"],key="out_type")
+                with c3: out_status=st.selectbox("الحالة",["مرسلة","معلقة","مقبولة","مرفوضة"],key="out_status")
+                if st.button("💾 حفظ بيانات الفواتير الصادرة",key="save_out",type="primary"):
+                    record={
+                        "id":str(uuid.uuid4()),
+                        "upload_date":datetime.now().isoformat(),
+                        "period":out_period,
+                        "invoice_type":out_type,
+                        "status":out_status,
+                        "file_name":up_out.name,
+                        "records":df_out.to_dict('records'),
+                        "records_count":len(df_out)
+                    }
+                    out_data.append(record)
+                    save_data(PORTAL_OUT_FILE,out_data)
+                    st.success("تم الحفظ بنجاح!");st.rerun()
+            except Exception as e: st.error(f"خطأ: {e}")
+        st.markdown('</div>',unsafe_allow_html=True)
+
+        if out_data:
+            st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>الفواتير الصادرة المحفوظة</h3></div>',unsafe_allow_html=True)
+            for idx,rec in enumerate(out_data):
+                recs_count=rec.get('records_count',len(rec.get('records',[])))
+                status=rec.get('status','')
+                s_color='#55efc4' if status=='مقبولة' else '#fdcb6e' if status=='مرسلة' or status=='معلقة' else '#ff6b6b' if status=='مرفوضة' else '#74b9ff'
+                st.markdown(f"""<div class="erp-card" style="margin-bottom:.8rem;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <div>
+                            <div style="color:#fff;font-weight:700;font-size:.95rem;">{rec.get('file_name','')}</div>
+                            <div style="display:flex;gap:1rem;margin-top:.4rem;flex-wrap:wrap;">
+                                <span style="color:var(--text2);font-size:.75rem;">📅 {rec.get('period','-')}</span>
+                                <span style="color:var(--text2);font-size:.75rem;">📋 {rec.get('invoice_type','-')}</span>
+                                <span style="color:var(--text2);font-size:.75rem;">📊 {recs_count} فاتورة</span>
+                                <span style="color:{s_color};font-size:.75rem;font-weight:600;">● {status}</span>
+                                <span style="color:var(--text2);font-size:.7rem;">🕐 {_fmt_date_dmy(rec.get('upload_date',''))}</span>
+                            </div>
+                        </div>
+                        <div style="display:flex;gap:.5rem;">
+                            <span style="background:rgba(108,92,231,.15);border:1px solid rgba(108,92,231,.2);border-radius:8px;padding:.2rem .6rem;color:#a29bfe;font-size:.7rem;">صادر</span>
+                        </div>
+                    </div>
+                </div>""",unsafe_allow_html=True)
+            if st.button("🗑️ حذف جميع الفواتير الصادرة",key="del_all_out",type="secondary"):
+                save_data(PORTAL_OUT_FILE,[]);st.success("تم الحذف");st.rerun()
+
+    elif portal_sub=="📥 فواتير الوارد":
+        st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>فواتير الوارد</h3></div>',unsafe_allow_html=True)
+        st.markdown("""<div class="erp-card"><div class="erp-card-header">
+            <div class="erp-card-icon" style="background:linear-gradient(135deg,rgba(0,206,201,.15),rgba(0,206,201,.03));">📥</div>
+            <div><h3>رفع بيانات فواتير الوارد</h3><p>ارفع ملف Excel يحتوي على بيانات فواتير الوارد</p></div>
+        </div></div>""",unsafe_allow_html=True)
+
+        in_data=load_data(PORTAL_IN_FILE)
+
+        st.markdown('<div class="erp-card">',unsafe_allow_html=True)
+        up_in=st.file_uploader("ارفع ملف فواتير الوارد",type=['xlsx','xls'],key="portal_in_up",label_visibility="collapsed")
+        if up_in:
+            try:
+                df_in=pd.read_excel(up_in,engine='openpyxl')
+                st.markdown(f'<div style="margin:.5rem 0;padding:.6rem 1rem;border-radius:10px;background:rgba(0,184,148,.08);border:1px solid rgba(0,184,148,.15);color:#55efc4;font-size:.82rem;">✓ تم رفع {len(df_in)} فاتورة</div>',unsafe_allow_html=True)
+                st.dataframe(df_in,use_container_width=True,height=300)
+                c1,c2,c3=st.columns(3)
+                with c1: in_period=st.text_input("الفترة (شهر/سنة)",key="in_period",placeholder="07/2025")
+                with c2: in_type=st.selectbox("نوع الفاتورة",["فاتورة شراء","إشعار دائن وارد","إشعار مدين وارد"],key="in_type")
+                with c3: in_status=st.selectbox("الحالة",["مستلمة","معلقة","مقبولة","مرفوضة"],key="in_status")
+                if st.button("💾 حفظ بيانات فواتير الوارد",key="save_in",type="primary"):
+                    record={
+                        "id":str(uuid.uuid4()),
+                        "upload_date":datetime.now().isoformat(),
+                        "period":in_period,
+                        "invoice_type":in_type,
+                        "status":in_status,
+                        "file_name":up_in.name,
+                        "records":df_in.to_dict('records'),
+                        "records_count":len(df_in)
+                    }
+                    in_data.append(record)
+                    save_data(PORTAL_IN_FILE,in_data)
+                    st.success("تم الحفظ بنجاح!");st.rerun()
+            except Exception as e: st.error(f"خطأ: {e}")
+        st.markdown('</div>',unsafe_allow_html=True)
+
+        if in_data:
+            st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>فواتير الوارد المحفوظة</h3></div>',unsafe_allow_html=True)
+            for idx,rec in enumerate(in_data):
+                recs_count=rec.get('records_count',len(rec.get('records',[])))
+                status=rec.get('status','')
+                s_color='#55efc4' if status=='مقبولة' else '#fdcb6e' if status=='مستلمة' or status=='معلقة' else '#ff6b6b' if status=='مرفوضة' else '#74b9ff'
+                st.markdown(f"""<div class="erp-card" style="margin-bottom:.8rem;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <div>
+                            <div style="color:#fff;font-weight:700;font-size:.95rem;">{rec.get('file_name','')}</div>
+                            <div style="display:flex;gap:1rem;margin-top:.4rem;flex-wrap:wrap;">
+                                <span style="color:var(--text2);font-size:.75rem;">📅 {rec.get('period','-')}</span>
+                                <span style="color:var(--text2);font-size:.75rem;">📋 {rec.get('invoice_type','-')}</span>
+                                <span style="color:var(--text2);font-size:.75rem;">📊 {recs_count} فاتورة</span>
+                                <span style="color:{s_color};font-size:.75rem;font-weight:600;">● {status}</span>
+                                <span style="color:var(--text2);font-size:.7rem;">🕐 {_fmt_date_dmy(rec.get('upload_date',''))}</span>
+                            </div>
+                        </div>
+                        <div style="display:flex;gap:.5rem;">
+                            <span style="background:rgba(0,206,201,.15);border:1px solid rgba(0,206,201,.2);border-radius:8px;padding:.2rem .6rem;color:#00cec9;font-size:.7rem;">وارد</span>
+                        </div>
+                    </div>
+                </div>""",unsafe_allow_html=True)
+            if st.button("🗑️ حذف جميع فواتير الوارد",key="del_all_in",type="secondary"):
+                save_data(PORTAL_IN_FILE,[]);st.success("تم الحذف");st.rerun()
