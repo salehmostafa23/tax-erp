@@ -1445,35 +1445,52 @@ elif page=="📄 Portal الفواتير الإلكترونية":
             all_records.extend(recs)
 
         if st.button("📋 تفاصيل فواتير الفترة",key=f"detail_btn_{label_type}",type="primary"):
-            st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>تفاصيل الفواتير</h3></div>',unsafe_allow_html=True)
-            for idx,r in enumerate(all_records):
+            st.session_state[f"show_details_{label_type}"]=True
+            st.session_state[f"detail_records_{label_type}"]=all_records
+            st.rerun()
+
+        if st.session_state.get(f"show_details_{label_type}"):
+            detail_recs=st.session_state.get(f"detail_records_{label_type}",[])
+            modal_html=f"""<div style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);z-index:9998;"></div>
+            <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:90%;max-width:800px;max-height:85vh;overflow-y:auto;background:#0d0d22;border:1px solid rgba(108,92,231,.3);border-radius:16px;padding:1.5rem;z-index:9999;box-shadow:0 20px 60px rgba(0,0,0,.8);">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+                <h3 style="color:#fff;margin:0;font-size:1.1rem;">تفاصيل فواتير الفترة ({len(detail_recs)} فاتورة)</h3>
+            </div>"""
+            for idx,r in enumerate(detail_recs):
                 st_status=r.get('الحالة',r.get('__status__',''))
                 if st_status in ['مقبولة','مستلمة']:
-                    bulb_color='#55efc4';status_text=st_status
+                    bulb_color='#55efc4'
                 elif st_status in ['ملغاة','مرفوضة']:
-                    bulb_color='#ff6b6b';status_text=st_status
+                    bulb_color='#ff6b6b'
                 else:
-                    bulb_color='#fdcb6e';status_text=st_status
+                    bulb_color='#fdcb6e'
                 supplier=r.get('الطرف الآخر',r.get('اسم المصدر',r.get('اسم المستلم','-')))
                 inv_type=r.get('نوع الفاتورة',r.get('__type__',''))
                 inv_total=r.get('الإجمالي (بعد الضريبة)',r.get('الإجمالي',0))
                 inv_date=r.get('تاريخ الإصدار','')
-                st.markdown(f"""<div class="erp-card" style="margin-bottom:.5rem;padding:.8rem 1rem;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;">
-                        <div>
-                            <div style="color:#fff;font-weight:700;font-size:.9rem;">{supplier}</div>
-                            <div style="display:flex;gap:.8rem;margin-top:.3rem;flex-wrap:wrap;">
-                                <span style="color:var(--text2);font-size:.75rem;">📋 {inv_type}</span>
-                                <span style="color:var(--text2);font-size:.75rem;">📅 {inv_date}</span>
-                                <span style="color:#a29bfe;font-size:.8rem;font-weight:600;">الإجمالي: {fmt(inv_total)}</span>
-                            </div>
+                uuid_val=r.get('UUID','—')
+                modal_html+=f"""<div style="background:rgba(30,30,56,.8);border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:.7rem 1rem;margin-bottom:.5rem;">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <div>
+                        <div style="color:#fff;font-weight:700;font-size:.88rem;">{supplier}</div>
+                        <div style="display:flex;gap:.8rem;margin-top:.3rem;flex-wrap:wrap;">
+                            <span style="color:var(--text2);font-size:.72rem;">📋 {inv_type}</span>
+                            <span style="color:var(--text2);font-size:.72rem;">📅 {inv_date}</span>
+                            <span style="color:#a29bfe;font-size:.78rem;font-weight:600;">الإجمالي: {fmt(inv_total)}</span>
                         </div>
-                        <div style="display:flex;align-items:center;gap:.5rem;">
-                            <span style="color:{bulb_color};font-size:.8rem;font-weight:600;">● {status_text}</span>
-                            <div style="width:12px;height:12px;border-radius:50%;background:{bulb_color};box-shadow:0 0 8px {bulb_color};"></div>
-                        </div>
+                        <div style="color:var(--text2);font-size:.68rem;margin-top:.2rem;font-family:monospace;">UUID: {uuid_val}</div>
                     </div>
-                </div>""",unsafe_allow_html=True)
+                    <div style="display:flex;align-items:center;gap:.4rem;">
+                        <div style="width:10px;height:10px;border-radius:50%;background:{bulb_color};box-shadow:0 0 8px {bulb_color};"></div>
+                        <span style="color:{bulb_color};font-size:.75rem;font-weight:600;">{st_status}</span>
+                    </div>
+                </div>
+            </div>"""
+            modal_html+="</div>"
+            st.markdown(modal_html,unsafe_allow_html=True)
+            if st.button("✖ إغلاق",key=f"close_details_{label_type}"):
+                st.session_state[f"show_details_{label_type}"]=False
+                st.rerun()
 
         st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>النتائج</h3></div>',unsafe_allow_html=True)
         for idx,rec in enumerate(filtered):
