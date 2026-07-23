@@ -582,19 +582,25 @@ b.style.cssText='background:rgba(108,92,231,.15);border:1px solid rgba(108,92,23
 b.onmouseover=function(){b.style.background='rgba(108,92,231,.3)';};
 b.onmouseout=function(){b.style.background='rgba(108,92,231,.15)';};
 b.onclick=function(){
-var btn=p.querySelector('button[data-testid="stSidebarCollapseButton"]');
-if(btn){btn.style.display='block';btn.click();}
+var sb=p.querySelector('[data-testid="stSidebar"]');
+if(!sb)return;
+var cur=sb.style.transform||window.parent.getComputedStyle(sb).transform||'';
+if(cur==='none'||cur===''||cur==='matrix(1, 0, 0, 1, 0, 0)'){
+sb.style.setProperty('transform','translateX(-100%)','important');
+sb.style.setProperty('transition','transform .3s ease','important');
+}else{
+sb.style.setProperty('transform','none','important');
+sb.style.setProperty('transition','transform .3s ease','important');
+}
 };
 badge.parentNode.insertBefore(b,badge.nextSibling);
 return true;
 }catch(e){return false;}
 }
-var tries=0;
 var t=setInterval(function(){
-tries++;
-if(tries>40){clearInterval(t);return;}
 if(setup())clearInterval(t);
 },500);
+setTimeout(function(){clearInterval(t);},20000);
 })();
 </script>
 """, height=0, width=0)
