@@ -6,8 +6,10 @@ import uuid
 import shutil
 import math
 import hashlib
-from datetime import datetime
+import requests as http_requests
+from datetime import datetime, timedelta
 from io import BytesIO
+import base64
 import openpyxl
 from github_storage import gh_read, gh_write
 
@@ -57,6 +59,95 @@ def user_has_permission(page):
     if not u: return False
     if u.get('role')=='admin': return True
     return page in u.get('permissions',[])
+
+# ====================== ETA API ======================
+ETA_IDENTITY_URL = "https://id.eta.gov.eg/connect/token"
+ETA_API_BASE = "https://api.invoicing.eta.gov.eg"
+ETA_DOC_TYPE_MAP = {"i":"فاتورة بيع","c":"إشعار دائن","d":"إشعار مدين","ii":"فاتورة استيراد","ei":"فاتورة تصدير","ec":"إشعار دائن تصدير","ed":"إشعار مدين تصدير"}
+ETA_STATUS_MAP = {"Valid":"مقبولة","Invalid":"مرفوضة","Submitted":"مرسلة","Rejected":"مرفوضة","Cancelled":"ملغاة"}
+
+def eta_login(client_id, client_secret):
+    cred = f"{client_id}:{client_secret}"
+    encoded = base64.b64encode(cred.encode()).decode()
+    headers = {"Authorization": f"Basic {encoded}", "Content-Type": "application/x-www-form-urlencoded"}
+    data = {"grant_type": "client_credentials"}
+    r = http_requests.post(ETA_IDENTITY_URL, headers=headers, data=data, timeout=30, verify=False)
+    if r.status_code == 200:
+        return r.json().get("access_token"), None
+    try:
+        err = r.json()
+        return None, err.get("error_description", err.get("error", r.text[:200]))
+    except:
+        return None, f"HTTP {r.status_code}: {r.text[:200]}"
+
+def eta_search_docs(token, direction, date_from, date_to, page_size=100):
+    url = f"{ETA_API_BASE}/api/v1.0/documents/search"
+    headers = {"Authorization": f"Bearer {token}"}
+    params = {
+        "submissionDateFrom": date_from.strftime("%Y-%m-%dT00:00:00"),
+        "submissionDateTo": date_to.strftime("%Y-%m-%dT23:59:59"),
+        "direction": direction,
+        "pageSize": page_size
+    }
+    all_docs = []
+    continuation = None
+    while True:
+        if continuation:
+            params["continuationToken"] = continuation
+        r = http_requests.get(url, headers=headers, params=params, timeout=30, verify=False)
+        if r.status_code != 200:
+            try:
+                err = r.json()
+                return None, err.get("error_description", err.get("error", f"HTTP {r.status_code}"))
+            except:
+                return None, f"HTTP {r.status_code}: {r.text[:200]}"
+        body = r.json()
+        docs = body.get("result", [])
+        all_docs.extend(docs)
+        meta = body.get("metadata", {})
+        continuation = meta.get("continuationToken", "")
+        if not continuation or continuation == "EndofResultSet":
+            break
+    return all_docs, None
+
+def eta_doc_to_record(doc, direction):
+    uuid_val = doc.get("uuid", "")
+    internal_id = doc.get("internalId", "")
+    type_name = doc.get("typeName", "i")
+    status_raw = doc.get("status", "")
+    status = ETA_STATUS_MAP.get(status_raw, status_raw)
+    issue_date = doc.get("dateTimeIssued", "")
+    submit_date = doc.get("dateTimeReceived", "")
+    issuer_id = doc.get("issuerId", "")
+    issuer_name = doc.get("issuerName", "")
+    receiver_id = doc.get("receiverId", "")
+    receiver_name = doc.get("receiverName", "")
+    total_sales = float(doc.get("totalSales", 0) or 0)
+    total_discount = float(doc.get("totalDiscount", 0) or 0)
+    net_amount = float(doc.get("netAmount", 0) or 0)
+    total = float(doc.get("total", 0) or 0)
+    if direction == "Sent":
+        period = issue_date[:7].replace("-", "/") if issue_date else ""
+        counterparty = receiver_name
+        counterparty_id = receiver_id
+    else:
+        period = issue_date[:7].replace("-", "/") if issue_date else ""
+        counterparty = issuer_name
+        counterparty_id = issuer_id
+    return {
+        "UUID": uuid_val, "internalId": internal_id,
+        "نوع الفاتورة": ETA_DOC_TYPE_MAP.get(type_name, type_name),
+        "الحالة": status, "تاريخ الإصدار": issue_date[:10] if issue_date else "",
+        "تاريخ الإرسال": submit_date[:10] if submit_date else "",
+        "رقم التسجيل (المصدر)": issuer_id, "اسم المصدر": issuer_name,
+        "رقم التسجيل (المستلم)": receiver_id, "اسم المستلم": receiver_name,
+        "الطرف الآخر": counterparty, "رقم التسجيل (الطرف الآخر)": counterparty_id,
+        "إجمالي المبيعات": total_sales, "الخصم": total_discount,
+        "الصافي": net_amount, "الإجمالي": total
+    }, {"uuid": uuid_val, "upload_date": submit_date or datetime.now().isoformat(),
+        "period": period, "invoice_type": ETA_DOC_TYPE_MAP.get(type_name, type_name),
+        "status": status, "file_name": f"ETA_{uuid_val[:12]}.json",
+        "source": "eta_api", "records": [], "records_count": 1}
 
 # ====================== LOGIN ======================
 if 'current_user' not in st.session_state:
@@ -1239,7 +1330,7 @@ elif page=="📄 Portal الفواتير الإلكترونية":
     st.markdown(f"""<div class="erp-topbar"><div><h2>{page}</h2><p>إدارة فواتير الصادرة والواردة من بوابة الفواتير الإلكترونية</p></div>
 <div class="erp-topbar-right"><a href="https://invoicing.eta.gov.eg/" target="_blank" style="background:linear-gradient(135deg,rgba(0,206,201,.18),rgba(108,92,231,.12));border:1px solid rgba(0,206,201,.35);border-radius:12px;padding:.5rem 1.2rem;color:#00cec9;font-size:.82rem;font-weight:700;text-decoration:none;cursor:pointer;transition:all .3s;display:inline-flex;align-items:center;gap:.5rem;">🔗 فتح بوابة الفواتير الإلكترونية</a></div></div>""", unsafe_allow_html=True)
 
-    portal_sub=st.radio("portal_tabs",["📤 فواتير الصادرة","📥 فواتير الوارد"],horizontal=True,label_visibility="collapsed")
+    portal_sub=st.radio("portal_tabs",["🔗 ربط مباشر مع البورتال","📤 فواتير الصادرة","📥 فواتير الوارد"],horizontal=True,label_visibility="collapsed")
 
     def _portal_dashboard(data,label,color_icon,label_type):
         if not data:
@@ -1359,7 +1450,126 @@ elif page=="📄 Portal الفواتير الإلكترونية":
                     day_buf.seek(0)
                     st.download_button(f"📅 تحميل فواتير يوم {sel_date} ({len(day_recs)} فاتورة) — Excel",data=day_buf.getvalue(),file_name=f"invoices_{sel_date}.xlsx",mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",key=f"dl_day_{label_type}")
 
-    if portal_sub=="📤 فواتير الصادرة":
+    if portal_sub=="🔗 ربط مباشر مع البورتال":
+        st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>ربط مباشر مع بوابة الفواتير الإلكترونية</h3></div>',unsafe_allow_html=True)
+
+        st.markdown("""<div class="erp-card" style="margin-bottom:1rem;">
+            <div class="erp-card-header">
+                <div class="erp-card-icon" style="background:linear-gradient(135deg,rgba(0,206,201,.15),rgba(0,206,201,.03));">🔗</div>
+                <div><h3>بيانات الاتصال مع البورتال</h3>
+                <p style="color:var(--text2);font-size:.78rem;margin:0;">أدخل Client ID و Client Secret من حسابك في بوابة الفواتير الإلكترونية</p></div>
+            </div>
+        </div>""",unsafe_allow_html=True)
+
+        st.markdown("""<div style="padding:.8rem 1rem;border-radius:10px;background:rgba(253,203,110,.06);border:1px solid rgba(253,203,110,.15);margin-bottom:1rem;font-size:.78rem;color:#fdcb6e;">
+            💡 <strong>كيف تحصل على البيانات:</strong><br>
+            1. سجل دخول على <a href="https://profile.eta.gov.eg" target="_blank" style="color:#74b9ff;">profile.eta.gov.eg</a><br>
+            2. روح على قسم "Manage My Account" أو "API Credentials"<br>
+            3. هتلاقي <strong>Client ID</strong> و <strong>Client Secret</strong><br>
+            4. لو مش لاقيهم، اتصل على 16395 أو راسل einvoice_support@efinance.com.eg
+        </div>""",unsafe_allow_html=True)
+
+        with st.form("eta_credentials_form"):
+            c1,c2=st.columns(2)
+            with c1:
+                eta_client_id=st.text_input("Client ID",value=st.session_state.get("eta_client_id",""),placeholder="أدخل Client ID")
+            with c2:
+                eta_client_secret=st.text_input("Client Secret",value=st.session_state.get("eta_client_secret",""),type="password",placeholder="أدخل Client Secret")
+            st.markdown('<div style="color:var(--text2);font-size:.75rem;margin:.3rem 0;">📅 الاتصال آمن — البيانات مش بتتتسجل في أي مكان</div>',unsafe_allow_html=True)
+            submitted=st.form_submit_button("🔐 الاتصال بالبورتال",type="primary")
+
+        if submitted:
+            if not eta_client_id or not eta_client_secret:
+                st.error("أدخل Client ID و Client Secret")
+            else:
+                with st.spinner("جاري الاتصال بالبورتال..."):
+                    token,err=eta_login(eta_client_id,eta_client_secret)
+                if err:
+                    st.error(f"❌ فشل الاتصال: {err}")
+                else:
+                    st.session_state["eta_token"]=token
+                    st.session_state["eta_client_id"]=eta_client_id
+                    st.session_state["eta_client_secret"]=eta_client_secret
+                    st.success("✅ تم الاتصال بالبورتال بنجاح!")
+                    st.rerun()
+
+        if st.session_state.get("eta_token"):
+            st.markdown('<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(85,239,196,.06);border:1px solid rgba(85,239,196,.15);color:#55efc4;font-size:.82rem;margin:.5rem 0;">✅ متصلاً بالبورتال — جاهز لجلب الفواتير</div>',unsafe_allow_html=True)
+
+            st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>جلب الفواتير من البورتال</h3></div>',unsafe_allow_html=True)
+
+            st.markdown("""<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(116,185,255,.06);border:1px solid rgba(116,185,255,.15);color:#74b9ff;font-size:.78rem;margin-bottom:1rem;">
+                📌 الحد الأقصى للفترة هو 30 يوم — هجلب الفواتير ونحفظها تلقائياً
+            </div>""",unsafe_allow_html=True)
+
+            today=datetime.now()
+            default_from=today-timedelta(days=30)
+            c1,c2,c3=st.columns(3)
+            with c1:
+                date_from=st.date_input("من تاريخ",value=default_from,key="eta_from")
+            with c2:
+                date_to=st.date_input("إلى تاريخ",value=today,key="eta_to")
+            with c3:
+                st.write("");st.write("")
+                fetch_sent=st.checkbox("📥 جلب الصادرة",value=True,key="eta_fetch_sent")
+                fetch_received=st.checkbox("📤 جلب الوارد",value=True,key="eta_fetch_received")
+
+            if st.button("🔄 جلب الفواتير من البورتال",type="primary",key="eta_fetch_btn"):
+                token=st.session_state["eta_token"]
+                total_fetched=0
+                errors=[]
+
+                if fetch_sent:
+                    with st.spinner("جاري جلب الفواتير الصادرة..."):
+                        docs,err=eta_search_docs(token,"Sent",date_from,date_to)
+                    if err:
+                        errors.append(f"الصادرة: {err}")
+                    else:
+                        records=[eta_doc_to_record(d,"Sent") for d in docs]
+                        out_data=load_data(PORTAL_OUT_FILE)
+                        for _,(rec,meta) in enumerate(records):
+                            meta["records"]=[rec]
+                            meta["records_count"]=1
+                            out_data.append(meta)
+                        save_data(PORTAL_OUT_FILE,out_data)
+                        total_fetched+=len(records)
+                        st.success(f"✅ تم جلب {len(records)} فاتورة صادرة")
+
+                if fetch_received:
+                    with st.spinner("جاري جلب فواتير الوارد..."):
+                        docs,err=eta_search_docs(token,"Received",date_from,date_to)
+                    if err:
+                        errors.append(f"الوارد: {err}")
+                    else:
+                        records=[eta_doc_to_record(d,"Received") for d in docs]
+                        in_data=load_data(PORTAL_IN_FILE)
+                        for _,(rec,meta) in enumerate(records):
+                            meta["records"]=[rec]
+                            meta["records_count"]=1
+                            in_data.append(meta)
+                        save_data(PORTAL_IN_FILE,in_data)
+                        total_fetched+=len(records)
+                        st.success(f"✅ تم جلب {len(records)} فاتورة وارد")
+
+                if errors:
+                    for e in errors:
+                        st.error(f"⚠️ {e}")
+                if total_fetched>0:
+                    st.success(f"🎉 تم جلب {total_fetched} فاتورة بنجاح!")
+                    st.balloons()
+
+            if st.button("🚪 قطع الاتصال",key="eta_disconnect"):
+                for k in ["eta_token","eta_client_id","eta_client_secret"]:
+                    if k in st.session_state: del st.session_state[k]
+                st.success("تم قطع الاتصال");st.rerun()
+        else:
+            st.markdown("""<div class="erp-card" style="text-align:center;padding:2rem;">
+                <div style="font-size:3rem;margin-bottom:1rem;">🔗</div>
+                <h3 style="color:#fff;margin:0;">لم تتم بعد الاتصال بالبورتال</h3>
+                <p style="color:var(--text2);font-size:.85rem;margin:.5rem 0;">أدخل بياناتك من البورتال المصري للاتصال وجلب الفواتير تلقائياً</p>
+            </div>""",unsafe_allow_html=True)
+
+    elif portal_sub=="📤 فواتير الصادرة":
         st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>فواتير الصادرة</h3></div>',unsafe_allow_html=True)
 
         out_data=load_data(PORTAL_OUT_FILE)
