@@ -1563,8 +1563,7 @@ elif page=="📄 Portal الفواتير الإلكترونية":
                     for e in errors:
                         st.error(f"⚠️ {e}")
                 if total_fetched>0:
-                    st.success(f"🎉 تم جلب {total_fetched} فاتورة بنجاح!")
-                    st.balloons()
+                    st.success(f"تم جلب {total_fetched} فاتورة بنجاح!")
 
             if st.button("🚪 قطع الاتصال",key="eta_disconnect"):
                 for k in ["eta_token","eta_client_id","eta_client_secret"]:
@@ -1583,42 +1582,63 @@ elif page=="📄 Portal الفواتير الإلكترونية":
         out_data=load_data(PORTAL_OUT_FILE)
         _portal_dashboard(out_data,"الصادرة","s-orange","out")
 
-        st.markdown("""<div class="erp-card"><div class="erp-card-header">
-            <div class="erp-card-icon" style="background:linear-gradient(135deg,rgba(108,92,231,.15),rgba(108,92,231,.03));">📤</div>
-            <div><h3>رفع بيانات فواتير الصادرة</h3><p>ارفع ملف Excel يحتوي على بيانات الفواتير الصادرة</p></div>
-        </div></div>""",unsafe_allow_html=True)
-
-        st.markdown('<div class="erp-card">',unsafe_allow_html=True)
-        up_out=st.file_uploader("ارفع ملف الفواتير الصادرة",type=['xlsx','xls'],key="portal_out_up",label_visibility="collapsed")
-        if up_out:
-            try:
-                df_out=pd.read_excel(up_out,engine='openpyxl')
-                st.markdown(f'<div style="margin:.5rem 0;padding:.6rem 1rem;border-radius:10px;background:rgba(0,184,148,.08);border:1px solid rgba(0,184,148,.15);color:#55efc4;font-size:.82rem;">✓ تم رفع {len(df_out)} فاتورة</div>',unsafe_allow_html=True)
-                st.dataframe(df_out,use_container_width=True,height=300)
-                c1,c2,c3=st.columns(3)
-                with c1: out_period=st.text_input("الفترة (شهر/سنة)",key="out_period",placeholder="07/2025")
-                with c2: out_type=st.selectbox("نوع الفاتورة",["فاتورة بيع","إشعار دائن","إشعار مدين"],key="out_type")
-                with c3: out_status=st.selectbox("الحالة",["مرسلة","معلقة","مقبولة","مرفوضة"],key="out_status")
-                if st.button("💾 حفظ بيانات الفواتير الصادرة",key="save_out",type="primary"):
-                    record={
-                        "id":str(uuid.uuid4()),
-                        "upload_date":datetime.now().isoformat(),
-                        "period":out_period,
-                        "invoice_type":out_type,
-                        "status":out_status,
-                        "file_name":up_out.name,
-                        "records":df_out.to_dict('records'),
-                        "records_count":len(df_out)
-                    }
-                    out_data.append(record)
-                    save_data(PORTAL_OUT_FILE,out_data)
-                    st.success("تم الحفظ بنجاح!");st.rerun()
-            except Exception as e: st.error(f"خطأ: {e}")
-        st.markdown('</div>',unsafe_allow_html=True)
-
         _portal_filter_and_download(out_data,"out")
 
         if out_data:
+            st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>تحميل حزمة فواتير الصادرة</h3></div>',unsafe_allow_html=True)
+            st.markdown('<div class="erp-card">',unsafe_allow_html=True)
+            periods_list=[]
+            for r in out_data:
+                p=r.get('period','')
+                if p and p not in periods_list: periods_list.append(p)
+            periods_list=sorted(periods_list,reverse=True)
+            c1,c2,c3=st.columns(3)
+            with c1:
+                dl_period=st.selectbox("اختر الفترة",options=["الكل"]+periods_list,key="out_dl_period")
+            with c2:
+                dl_type=st.selectbox("نوع الفاتورة",["الكل","فاتورة بيع","إشعار دائن","إشعار مدين"],key="out_dl_type")
+            with c3:
+                dl_format=st.selectbox("صيغة التحميل",["Excel","PDF"],key="out_dl_format")
+            filtered_dl=[]
+            for r in out_data:
+                if dl_period!="الكل" and r.get('period','')!=dl_period: continue
+                if dl_type!="الكل" and r.get('invoice_type','')!=dl_type: continue
+                for rec in r.get('records',[]):
+                    filtered_dl.append(rec)
+            if filtered_dl:
+                st.success(f"{len(filtered_dl)} فاتورة جاهزة للتحميل")
+                if st.button("📥 تحميل الحزمة",key="out_dl_btn",type="primary"):
+                    import zipfile
+                    zip_buf=BytesIO()
+                    with zipfile.ZipFile(zip_buf,'w',zipfile.ZIP_DEFLATED) as zf:
+                        if dl_format=="Excel":
+                            df_bundle=pd.DataFrame(filtered_dl)
+                            buf=BytesIO()
+                            df_bundle.to_excel(buf,index=False,engine='xlsxwriter')
+                            buf.seek(0)
+                            zf.writestr(f"invoices_out_{dl_period.replace('/','_') if dl_period!='الكل' else 'all'}.xlsx",buf.getvalue())
+                        else:
+                            from docx import Document
+                            doc=Document()
+                            doc.add_heading('فواتير الصادرة',0)
+                            tbl=doc.add_table(rows=1,cols=len(filtered_dl[0].keys()) if filtered_dl else 0,style='Table Grid')
+                            if filtered_dl:
+                                for i,k in enumerate(filtered_dl[0].keys()):
+                                    tbl.rows[0].cells[i].text=str(k)
+                                for row_data in filtered_dl:
+                                    row=tbl.add_row()
+                                    for i,k in enumerate(filtered_dl[0].keys()):
+                                        row.cells[i].text=str(row_data.get(k,''))
+                            buf=BytesIO()
+                            doc.save(buf)
+                            buf.seek(0)
+                            zf.writestr(f"invoices_out_{dl_period.replace('/','_') if dl_period!='الكل' else 'all'}.docx",buf.getvalue())
+                    zip_buf.seek(0)
+                    st.download_button("📦 تحميل الملف المضغوط",data=zip_buf.getvalue(),file_name=f"invoices_out_{dl_period.replace('/','_') if dl_period!='الكل' else 'all'}.zip",mime="application/zip",key="out_zip_dl")
+            else:
+                st.info("لا توجد فواتير تطابق الاختيار")
+            st.markdown('</div>',unsafe_allow_html=True)
+
             st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>الفواتير الصادرة المحفوظة</h3></div>',unsafe_allow_html=True)
             for idx,rec in enumerate(out_data):
                 recs_count=rec.get('records_count',len(rec.get('records',[])))
@@ -1650,42 +1670,63 @@ elif page=="📄 Portal الفواتير الإلكترونية":
         in_data=load_data(PORTAL_IN_FILE)
         _portal_dashboard(in_data,"الواردة","s-cyan","in")
 
-        st.markdown("""<div class="erp-card"><div class="erp-card-header">
-            <div class="erp-card-icon" style="background:linear-gradient(135deg,rgba(0,206,201,.15),rgba(0,206,201,.03));">📥</div>
-            <div><h3>رفع بيانات فواتير الوارد</h3><p>ارفع ملف Excel يحتوي على بيانات فواتير الوارد</p></div>
-        </div></div>""",unsafe_allow_html=True)
-
-        st.markdown('<div class="erp-card">',unsafe_allow_html=True)
-        up_in=st.file_uploader("ارفع ملف فواتير الوارد",type=['xlsx','xls'],key="portal_in_up",label_visibility="collapsed")
-        if up_in:
-            try:
-                df_in=pd.read_excel(up_in,engine='openpyxl')
-                st.markdown(f'<div style="margin:.5rem 0;padding:.6rem 1rem;border-radius:10px;background:rgba(0,184,148,.08);border:1px solid rgba(0,184,148,.15);color:#55efc4;font-size:.82rem;">✓ تم رفع {len(df_in)} فاتورة</div>',unsafe_allow_html=True)
-                st.dataframe(df_in,use_container_width=True,height=300)
-                c1,c2,c3=st.columns(3)
-                with c1: in_period=st.text_input("الفترة (شهر/سنة)",key="in_period",placeholder="07/2025")
-                with c2: in_type=st.selectbox("نوع الفاتورة",["فاتورة شراء","إشعار دائن وارد","إشعار مدين وارد"],key="in_type")
-                with c3: in_status=st.selectbox("الحالة",["مستلمة","معلقة","مقبولة","مرفوضة"],key="in_status")
-                if st.button("💾 حفظ بيانات فواتير الوارد",key="save_in",type="primary"):
-                    record={
-                        "id":str(uuid.uuid4()),
-                        "upload_date":datetime.now().isoformat(),
-                        "period":in_period,
-                        "invoice_type":in_type,
-                        "status":in_status,
-                        "file_name":up_in.name,
-                        "records":df_in.to_dict('records'),
-                        "records_count":len(df_in)
-                    }
-                    in_data.append(record)
-                    save_data(PORTAL_IN_FILE,in_data)
-                    st.success("تم الحفظ بنجاح!");st.rerun()
-            except Exception as e: st.error(f"خطأ: {e}")
-        st.markdown('</div>',unsafe_allow_html=True)
-
         _portal_filter_and_download(in_data,"in")
 
         if in_data:
+            st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>تحميل حزمة فواتير الوارد</h3></div>',unsafe_allow_html=True)
+            st.markdown('<div class="erp-card">',unsafe_allow_html=True)
+            periods_list=[]
+            for r in in_data:
+                p=r.get('period','')
+                if p and p not in periods_list: periods_list.append(p)
+            periods_list=sorted(periods_list,reverse=True)
+            c1,c2,c3=st.columns(3)
+            with c1:
+                dl_period=st.selectbox("اختر الفترة",options=["الكل"]+periods_list,key="in_dl_period")
+            with c2:
+                dl_type=st.selectbox("نوع الفاتورة",["الكل","فاتورة شراء","إشعار دائن وارد","إشعار مدين وارد"],key="in_dl_type")
+            with c3:
+                dl_format=st.selectbox("صيغة التحميل",["Excel","PDF"],key="in_dl_format")
+            filtered_dl=[]
+            for r in in_data:
+                if dl_period!="الكل" and r.get('period','')!=dl_period: continue
+                if dl_type!="الكل" and r.get('invoice_type','')!=dl_type: continue
+                for rec in r.get('records',[]):
+                    filtered_dl.append(rec)
+            if filtered_dl:
+                st.success(f"{len(filtered_dl)} فاتورة جاهزة للتحميل")
+                if st.button("📥 تحميل الحزمة",key="in_dl_btn",type="primary"):
+                    import zipfile
+                    zip_buf=BytesIO()
+                    with zipfile.ZipFile(zip_buf,'w',zipfile.ZIP_DEFLATED) as zf:
+                        if dl_format=="Excel":
+                            df_bundle=pd.DataFrame(filtered_dl)
+                            buf=BytesIO()
+                            df_bundle.to_excel(buf,index=False,engine='xlsxwriter')
+                            buf.seek(0)
+                            zf.writestr(f"invoices_in_{dl_period.replace('/','_') if dl_period!='الكل' else 'all'}.xlsx",buf.getvalue())
+                        else:
+                            from docx import Document
+                            doc=Document()
+                            doc.add_heading('فواتير الوارد',0)
+                            tbl=doc.add_table(rows=1,cols=len(filtered_dl[0].keys()) if filtered_dl else 0,style='Table Grid')
+                            if filtered_dl:
+                                for i,k in enumerate(filtered_dl[0].keys()):
+                                    tbl.rows[0].cells[i].text=str(k)
+                                for row_data in filtered_dl:
+                                    row=tbl.add_row()
+                                    for i,k in enumerate(filtered_dl[0].keys()):
+                                        row.cells[i].text=str(row_data.get(k,''))
+                            buf=BytesIO()
+                            doc.save(buf)
+                            buf.seek(0)
+                            zf.writestr(f"invoices_in_{dl_period.replace('/','_') if dl_period!='الكل' else 'all'}.docx",buf.getvalue())
+                    zip_buf.seek(0)
+                    st.download_button("📦 تحميل الملف المضغوط",data=zip_buf.getvalue(),file_name=f"invoices_in_{dl_period.replace('/','_') if dl_period!='الكل' else 'all'}.zip",mime="application/zip",key="in_zip_dl")
+            else:
+                st.info("لا توجد فواتير تطابق الاختيار")
+            st.markdown('</div>',unsafe_allow_html=True)
+
             st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>فواتير الوارد المحفوظة</h3></div>',unsafe_allow_html=True)
             for idx,rec in enumerate(in_data):
                 recs_count=rec.get('records_count',len(rec.get('records',[])))
