@@ -1236,19 +1236,139 @@ elif page=="🛒 فواتير الماركت":
 elif page=="📄 Portal الفواتير الإلكترونية":
     if not user_has_permission(page): st.error("لا تملك صلاحية الوصول");st.stop()
 
-    st.markdown(f"""<div class="erp-topbar"><div><h2>{page}</h2><p>إدارة فواتير الصراد والوارد من بوابة الفواتير الإلكترونية</p></div>
+    st.markdown(f"""<div class="erp-topbar"><div><h2>{page}</h2><p>إدارة فواتير الصادرة والواردة من بوابة الفواتير الإلكترونية</p></div>
 <div class="erp-topbar-right"><a href="https://invoicing.eta.gov.eg/" target="_blank" style="background:linear-gradient(135deg,rgba(0,206,201,.18),rgba(108,92,231,.12));border:1px solid rgba(0,206,201,.35);border-radius:12px;padding:.5rem 1.2rem;color:#00cec9;font-size:.82rem;font-weight:700;text-decoration:none;cursor:pointer;transition:all .3s;display:inline-flex;align-items:center;gap:.5rem;">🔗 فتح بوابة الفواتير الإلكترونية</a></div></div>""", unsafe_allow_html=True)
 
     portal_sub=st.radio("portal_tabs",["📤 فواتير الصادرة","📥 فواتير الوارد"],horizontal=True,label_visibility="collapsed")
 
+    def _portal_dashboard(data,label,color_icon,label_type):
+        if not data:
+            st.info(f"لا توجد فواتير {label} بعد");return
+        now=datetime.now()
+        recent=[r for r in data if (now-datetime.fromisoformat(str(r.get('upload_date',''))[:19])).days<=30]
+        total_recent=sum(r.get('records_count',len(r.get('records',[]))) for r in recent)
+        valid_statuses=['مقبولة','مستلمة']
+        invalid_statuses=['مرفوضة','ملغاة']
+        n_valid=sum(1 for r in recent if r.get('status','') in valid_statuses)
+        n_invalid=sum(1 for r in recent if r.get('status','') in invalid_statuses)
+        n_total_batches=len(recent)
+        total_all=sum(r.get('records_count',len(r.get('records',[]))) for r in data)
+        s1,s2,s3,s4=st.columns(4)
+        with s1: st.markdown(f'<div class="erp-stat {color_icon}"><div class="erp-stat-label">إجمالي {label} (30 يوم)</div><div class="erp-stat-value">{total_recent}</div><div class="erp-stat-sub">{n_total_batches} رفع</div></div>',unsafe_allow_html=True)
+        with s2: st.markdown(f'<div class="erp-stat s-green"><div class="erp-stat-label">الفواتير الصحيحة</div><div class="erp-stat-value">{n_valid}</div><div class="erp-stat-sub">رفعات مقبولة</div></div>',unsafe_allow_html=True)
+        with s3: st.markdown(f'<div class="erp-stat s-red"><div class="erp-stat-label">الفواتير الملغاة</div><div class="erp-stat-value">{n_invalid}</div><div class="erp-stat-sub">رفعات مرفوضة</div></div>',unsafe_allow_html=True)
+        with s4: st.markdown(f'<div class="erp-stat s-blue"><div class="erp-stat-label">الإجمالي الكلي</div><div class="erp-stat-value">{total_all}</div><div class="erp-stat-sub">كل الفترات</div></div>',unsafe_allow_html=True)
+
+    def _portal_filter_and_download(data,label_type):
+        if not data: return
+        import zipfile, tempfile
+        st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>بحث وتصفية الفواتير</h3></div>',unsafe_allow_html=True)
+        periods_list=[]
+        for r in data:
+            p=r.get('period','')
+            if p and p not in periods_list: periods_list.append(p)
+        c1,c2=st.columns(2)
+        with c1:
+            sel_period=st.selectbox("اختر الفترة (شهر/سنة)",options=["الكل"]+periods_list,key=f"fp_{label_type}")
+        with c2:
+            avail_dates=[]
+            for r in data:
+                ud=str(r.get('upload_date',''))[:10]
+                if sel_period!="الكل" and r.get('period','')!=sel_period: continue
+                if ud and ud not in avail_dates: avail_dates.append(ud)
+            avail_dates=sorted(avail_dates,reverse=True)
+            sel_date=st.selectbox("اختر يوم معين",options=["الكل"]+avail_dates,key=f"fd_{label_type}")
+
+        filtered=[]
+        for r in data:
+            if sel_period!="الكل" and r.get('period','')!=sel_period: continue
+            if sel_date!="الكل" and str(r.get('upload_date',''))[:10]!=sel_date: continue
+            filtered.append(r)
+
+        if not filtered:
+            st.info("لا توجد فواتير تطابق البحث");return
+
+        total_recs=sum(r.get('records_count',len(r.get('records',[]))) for r in filtered)
+        st.success(f"تم العثور على {len(filtered)} رفع يحتوي على {total_recs} فاتورة")
+
+        st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>النتائج</h3></div>',unsafe_allow_html=True)
+        all_records=[]
+        for idx,rec in enumerate(filtered):
+            recs=rec.get('records',[])
+            status=rec.get('status','')
+            s_color='#55efc4' if status in ['مقبولة','مستلمة'] else '#fdcb6e' if status in ['مرسلة','معلقة'] else '#ff6b6b'
+            with st.expander(f"📎 {rec.get('file_name','')} — {rec.get('period','-')} — {len(recs)} فاتورة — {status}",expanded=False):
+                st.dataframe(pd.DataFrame(recs),use_container_width=True,height=250)
+                dc1,dc2,dc3=st.columns(3)
+                with dc1:
+                    df_rec=pd.DataFrame(recs)
+                    buf=BytesIO()
+                    df_rec.to_excel(buf,index=False,engine='xlsxwriter')
+                    buf.seek(0)
+                    st.download_button(f"📥 تحميل هذا الرفع (Excel)",data=buf.getvalue(),file_name=f"{rec.get('file_name','invoice')}_{rec.get('period','')}.xlsx",mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",key=f"dl_{label_type}_{idx}")
+                with dc2:
+                    for ri,row in enumerate(recs[:5]):
+                        row_buf=BytesIO()
+                        pd.DataFrame([row]).to_excel(row_buf,index=False,engine='xlsxwriter')
+                        row_buf.seek(0)
+                for r in recs:
+                    r['__period__']=rec.get('period','')
+                    r['__type__']=rec.get('invoice_type','')
+                    r['__status__']=rec.get('status','')
+                    r['__upload_date__']=str(rec.get('upload_date',''))[:10]
+                    r['__file_name__']=rec.get('file_name','')
+                all_records.extend(recs)
+
+        if all_records:
+            st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>تحميل جماعي</h3></div>',unsafe_allow_html=True)
+            gc1,gc2=st.columns(2)
+            with gc1:
+                all_df=pd.DataFrame(all_records)
+                excel_buf=BytesIO()
+                all_df.to_excel(excel_buf,index=False,engine='xlsxwriter')
+                excel_buf.seek(0)
+                st.download_button(f"📊 تحميل تفاصيل كل الفواتير ({len(all_records)} فاتورة) — Excel",data=excel_buf.getvalue(),file_name=f"all_{label_type}_{sel_period.replace('/','_') if sel_period!='الكل' else 'all'}.xlsx",mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",key=f"dl_all_{label_type}",type="primary")
+            with gc2:
+                zip_buf=BytesIO()
+                with zipfile.ZipFile(zip_buf,'w',zipfile.ZIP_DEFLATED) as zf:
+                    date_groups={}
+                    for rec in filtered:
+                        ud=str(rec.get('upload_date',''))[:10]
+                        if ud not in date_groups: date_groups[ud]=[]
+                        date_groups[ud].append(rec)
+                    for ud,recs in sorted(date_groups.items()):
+                        for ri,rec in enumerate(recs):
+                            fname=f"{ud}/{rec.get('file_name','invoice')}_{ri+1}.xlsx"
+                            row_df=pd.DataFrame(rec.get('records',[]))
+                            row_buf=BytesIO()
+                            row_df.to_excel(row_buf,index=False,engine='xlsxwriter')
+                            zf.writestr(fname,row_buf.getvalue())
+                    for ud,recs in sorted(date_groups.items()):
+                        day_df=pd.DataFrame([r for rec in recs for r in rec.get('records',[])])
+                        day_buf=BytesIO()
+                        day_df.to_excel(day_buf,index=False,engine='xlsxwriter')
+                        zf.writestr(f"{ud}/summary_{ud}.xlsx",day_buf.getvalue())
+                zip_buf.seek(0)
+                st.download_button(f"📦 تحميل مضغوط — كل الفواتير ({len(filtered)} رفع)",data=zip_buf.getvalue(),file_name=f"{label_type}_all_{sel_period.replace('/','_') if sel_period!='الكل' else 'all'}.zip",mime="application/zip",key=f"dl_zip_{label_type}")
+
+            if sel_date!="الكل":
+                day_recs=[r for r in all_records if r.get('__upload_date__')==sel_date]
+                if day_recs:
+                    day_buf=BytesIO()
+                    pd.DataFrame(day_recs).to_excel(day_buf,index=False,engine='xlsxwriter')
+                    day_buf.seek(0)
+                    st.download_button(f"📅 تحميل فواتير يوم {sel_date} ({len(day_recs)} فاتورة) — Excel",data=day_buf.getvalue(),file_name=f"invoices_{sel_date}.xlsx",mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",key=f"dl_day_{label_type}")
+
     if portal_sub=="📤 فواتير الصادرة":
         st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>فواتير الصادرة</h3></div>',unsafe_allow_html=True)
+
+        out_data=load_data(PORTAL_OUT_FILE)
+        _portal_dashboard(out_data,"الصادرة","s-orange","out")
+
         st.markdown("""<div class="erp-card"><div class="erp-card-header">
             <div class="erp-card-icon" style="background:linear-gradient(135deg,rgba(108,92,231,.15),rgba(108,92,231,.03));">📤</div>
             <div><h3>رفع بيانات فواتير الصادرة</h3><p>ارفع ملف Excel يحتوي على بيانات الفواتير الصادرة</p></div>
         </div></div>""",unsafe_allow_html=True)
-
-        out_data=load_data(PORTAL_OUT_FILE)
 
         st.markdown('<div class="erp-card">',unsafe_allow_html=True)
         up_out=st.file_uploader("ارفع ملف الفواتير الصادرة",type=['xlsx','xls'],key="portal_out_up",label_visibility="collapsed")
@@ -1278,12 +1398,14 @@ elif page=="📄 Portal الفواتير الإلكترونية":
             except Exception as e: st.error(f"خطأ: {e}")
         st.markdown('</div>',unsafe_allow_html=True)
 
+        _portal_filter_and_download(out_data,"out")
+
         if out_data:
             st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>الفواتير الصادرة المحفوظة</h3></div>',unsafe_allow_html=True)
             for idx,rec in enumerate(out_data):
                 recs_count=rec.get('records_count',len(rec.get('records',[])))
                 status=rec.get('status','')
-                s_color='#55efc4' if status=='مقبولة' else '#fdcb6e' if status=='مرسلة' or status=='معلقة' else '#ff6b6b' if status=='مرفوضة' else '#74b9ff'
+                s_color='#55efc4' if status=='مقبولة' else '#fdcb6e' if status in ['مرسلة','معلقة'] else '#ff6b6b' if status=='مرفوضة' else '#74b9ff'
                 st.markdown(f"""<div class="erp-card" style="margin-bottom:.8rem;">
                     <div style="display:flex;justify-content:space-between;align-items:center;">
                         <div>
@@ -1306,12 +1428,14 @@ elif page=="📄 Portal الفواتير الإلكترونية":
 
     elif portal_sub=="📥 فواتير الوارد":
         st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>فواتير الوارد</h3></div>',unsafe_allow_html=True)
+
+        in_data=load_data(PORTAL_IN_FILE)
+        _portal_dashboard(in_data,"الواردة","s-cyan","in")
+
         st.markdown("""<div class="erp-card"><div class="erp-card-header">
             <div class="erp-card-icon" style="background:linear-gradient(135deg,rgba(0,206,201,.15),rgba(0,206,201,.03));">📥</div>
             <div><h3>رفع بيانات فواتير الوارد</h3><p>ارفع ملف Excel يحتوي على بيانات فواتير الوارد</p></div>
         </div></div>""",unsafe_allow_html=True)
-
-        in_data=load_data(PORTAL_IN_FILE)
 
         st.markdown('<div class="erp-card">',unsafe_allow_html=True)
         up_in=st.file_uploader("ارفع ملف فواتير الوارد",type=['xlsx','xls'],key="portal_in_up",label_visibility="collapsed")
@@ -1341,12 +1465,14 @@ elif page=="📄 Portal الفواتير الإلكترونية":
             except Exception as e: st.error(f"خطأ: {e}")
         st.markdown('</div>',unsafe_allow_html=True)
 
+        _portal_filter_and_download(in_data,"in")
+
         if in_data:
             st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>فواتير الوارد المحفوظة</h3></div>',unsafe_allow_html=True)
             for idx,rec in enumerate(in_data):
                 recs_count=rec.get('records_count',len(rec.get('records',[])))
                 status=rec.get('status','')
-                s_color='#55efc4' if status=='مقبولة' else '#fdcb6e' if status=='مستلمة' or status=='معلقة' else '#ff6b6b' if status=='مرفوضة' else '#74b9ff'
+                s_color='#55efc4' if status=='مقبولة' else '#fdcb6e' if status in ['مستلمة','معلقة'] else '#ff6b6b' if status=='مرفوضة' else '#74b9ff'
                 st.markdown(f"""<div class="erp-card" style="margin-bottom:.8rem;">
                     <div style="display:flex;justify-content:space-between;align-items:center;">
                         <div>
