@@ -126,6 +126,9 @@ def eta_doc_to_record(doc, direction):
     total_discount = float(doc.get("totalDiscount", 0) or 0)
     net_amount = float(doc.get("netAmount", 0) or 0)
     total = float(doc.get("total", 0) or 0)
+    extra = doc.get("extraAdditionalData", {})
+    tax_total = float(extra.get("taxTotal", 0) or 0) if isinstance(extra, dict) else 0
+    payer_name = extra.get("payerName", "") if isinstance(extra, dict) else ""
     if direction == "Sent":
         period = issue_date[:7].replace("-", "/") if issue_date else ""
         counterparty = receiver_name
@@ -134,20 +137,68 @@ def eta_doc_to_record(doc, direction):
         period = issue_date[:7].replace("-", "/") if issue_date else ""
         counterparty = issuer_name
         counterparty_id = issuer_id
-    return {
+    rec = {
         "UUID": uuid_val, "internalId": internal_id,
         "نوع الفاتورة": ETA_DOC_TYPE_MAP.get(type_name, type_name),
-        "الحالة": status, "تاريخ الإصدار": issue_date[:10] if issue_date else "",
+        "الحالة": status,
+        "تاريخ الإصدار": issue_date[:10] if issue_date else "",
         "تاريخ الإرسال": submit_date[:10] if submit_date else "",
         "رقم التسجيل (المصدر)": issuer_id, "اسم المصدر": issuer_name,
         "رقم التسجيل (المستلم)": receiver_id, "اسم المستلم": receiver_name,
         "الطرف الآخر": counterparty, "رقم التسجيل (الطرف الآخر)": counterparty_id,
-        "إجمالي المبيعات": total_sales, "الخصم": total_discount,
-        "الصافي": net_amount, "الإجمالي": total
-    }, {"uuid": uuid_val, "upload_date": submit_date or datetime.now().isoformat(),
+        "إجمالي المبيعات (قبل الخصم)": total_sales, "الخصم": total_discount,
+        "الصافي (قبل الضريبة)": net_amount, "ضريبة القيمة المضافة": tax_total,
+        "الإجمالي (بعد الضريبة)": total
+    }
+    meta = {"uuid": uuid_val, "upload_date": submit_date or datetime.now().isoformat(),
         "period": period, "invoice_type": ETA_DOC_TYPE_MAP.get(type_name, type_name),
         "status": status, "file_name": f"ETA_{uuid_val[:12]}.json",
         "source": "eta_api", "records": [], "records_count": 1}
+    return rec, meta
+
+def _generate_pdf_for_records(records, title="فواتير"):
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.lib.units import cm
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    buf = BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4, rightMargin=1.5*cm, leftMargin=1.5*cm, topMargin=1.5*cm, bottomMargin=1.5*cm)
+    styles = getSampleStyleSheet()
+    try:
+        pdfmetrics.registerFont(TTFont('Arabic', 'C:/Windows/Fonts/arial.ttf'))
+        arabic_style = ParagraphStyle('Arabic', parent=styles['Normal'], fontName='Arabic', fontSize=8, leading=12, alignment=1)
+        title_style = ParagraphStyle('TitleA', parent=styles['Title'], fontName='Arabic', fontSize=14, alignment=1)
+    except:
+        arabic_style = ParagraphStyle('Normal', parent=styles['Normal'], fontSize=8, leading=12, alignment=1)
+        title_style = styles['Title']
+    elements = []
+    elements.append(Paragraph(title, title_style))
+    elements.append(Spacer(1, 0.5*cm))
+    for idx, rec in enumerate(records):
+        rec_status = rec.get('الحالة', '')
+        status_color = '#55efc4' if rec_status in ['مقبولة', 'مستلمة'] else '#ff6b6b'
+        elements.append(Paragraph(f"فاتورة #{idx+1} — الطرف الآخر: {rec.get('الطرف الآخر', '-')} — الإجمالي: {rec.get('الإجمالي (بعد الضريبة)', 0)} — الحالة: {rec_status}", arabic_style))
+        elements.append(Spacer(1, 0.2*cm))
+        data_rows = []
+        data_rows.append([Paragraph(str(k), arabic_style) for k in rec.keys()])
+        data_rows.append([Paragraph(str(v), arabic_style) for v in rec.values()])
+        t = Table(data_rows, repeatRows=1)
+        t.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#6c5ce7')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTSIZE', (0, 0), (-1, -1), 7),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f0f0f8')]),
+        ]))
+        elements.append(t)
+        elements.append(Spacer(1, 0.5*cm))
+    doc.build(elements)
+    buf.seek(0)
+    return buf
 
 # ====================== LOGIN ======================
 if 'current_user' not in st.session_state:
@@ -1382,73 +1433,89 @@ elif page=="📄 Portal الفواتير الإلكترونية":
         total_recs=sum(r.get('records_count',len(r.get('records',[]))) for r in filtered)
         st.success(f"تم العثور على {len(filtered)} رفع يحتوي على {total_recs} فاتورة")
 
-        st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>النتائج</h3></div>',unsafe_allow_html=True)
         all_records=[]
+        for rec in filtered:
+            recs=rec.get('records',[])
+            for r in recs:
+                r['__period__']=rec.get('period','')
+                r['__type__']=rec.get('invoice_type','')
+                r['__status__']=rec.get('status','')
+                r['__upload_date__']=str(rec.get('upload_date',''))[:10]
+                r['__file_name__']=rec.get('file_name','')
+            all_records.extend(recs)
+
+        if st.button("📋 تفاصيل فواتير الفترة",key=f"detail_btn_{label_type}",type="primary"):
+            st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>تفاصيل الفواتير</h3></div>',unsafe_allow_html=True)
+            for idx,r in enumerate(all_records):
+                st_status=r.get('الحالة',r.get('__status__',''))
+                if st_status in ['مقبولة','مستلمة']:
+                    bulb_color='#55efc4';status_text=st_status
+                elif st_status in ['ملغاة','مرفوضة']:
+                    bulb_color='#ff6b6b';status_text=st_status
+                else:
+                    bulb_color='#fdcb6e';status_text=st_status
+                supplier=r.get('الطرف الآخر',r.get('اسم المصدر',r.get('اسم المستلم','-')))
+                inv_type=r.get('نوع الفاتورة',r.get('__type__',''))
+                inv_total=r.get('الإجمالي (بعد الضريبة)',r.get('الإجمالي',0))
+                inv_date=r.get('تاريخ الإصدار','')
+                st.markdown(f"""<div class="erp-card" style="margin-bottom:.5rem;padding:.8rem 1rem;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <div>
+                            <div style="color:#fff;font-weight:700;font-size:.9rem;">{supplier}</div>
+                            <div style="display:flex;gap:.8rem;margin-top:.3rem;flex-wrap:wrap;">
+                                <span style="color:var(--text2);font-size:.75rem;">📋 {inv_type}</span>
+                                <span style="color:var(--text2);font-size:.75rem;">📅 {inv_date}</span>
+                                <span style="color:#a29bfe;font-size:.8rem;font-weight:600;">الإجمالي: {fmt(inv_total)}</span>
+                            </div>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:.5rem;">
+                            <span style="color:{bulb_color};font-size:.8rem;font-weight:600;">● {status_text}</span>
+                            <div style="width:12px;height:12px;border-radius:50%;background:{bulb_color};box-shadow:0 0 8px {bulb_color};"></div>
+                        </div>
+                    </div>
+                </div>""",unsafe_allow_html=True)
+
+        st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>النتائج</h3></div>',unsafe_allow_html=True)
         for idx,rec in enumerate(filtered):
             recs=rec.get('records',[])
             status=rec.get('status','')
             s_color='#55efc4' if status in ['مقبولة','مستلمة'] else '#fdcb6e' if status in ['مرسلة','معلقة'] else '#ff6b6b'
             with st.expander(f"📎 {rec.get('file_name','')} — {rec.get('period','-')} — {len(recs)} فاتورة — {status}",expanded=False):
                 st.dataframe(pd.DataFrame(recs),use_container_width=True,height=250)
-                dc1,dc2,dc3=st.columns(3)
+                dc1,dc2=st.columns(2)
                 with dc1:
                     df_rec=pd.DataFrame(recs)
                     buf=BytesIO()
                     df_rec.to_excel(buf,index=False,engine='xlsxwriter')
                     buf.seek(0)
                     st.download_button(f"📥 تحميل هذا الرفع (Excel)",data=buf.getvalue(),file_name=f"{rec.get('file_name','invoice')}_{rec.get('period','')}.xlsx",mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",key=f"dl_{label_type}_{idx}")
-                with dc2:
-                    for ri,row in enumerate(recs[:5]):
-                        row_buf=BytesIO()
-                        pd.DataFrame([row]).to_excel(row_buf,index=False,engine='xlsxwriter')
-                        row_buf.seek(0)
-                for r in recs:
-                    r['__period__']=rec.get('period','')
-                    r['__type__']=rec.get('invoice_type','')
-                    r['__status__']=rec.get('status','')
-                    r['__upload_date__']=str(rec.get('upload_date',''))[:10]
-                    r['__file_name__']=rec.get('file_name','')
-                all_records.extend(recs)
 
         if all_records:
             st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>تحميل جماعي</h3></div>',unsafe_allow_html=True)
-            gc1,gc2=st.columns(2)
+            gc1,gc2,gc3=st.columns(3)
             with gc1:
                 all_df=pd.DataFrame(all_records)
                 excel_buf=BytesIO()
                 all_df.to_excel(excel_buf,index=False,engine='xlsxwriter')
                 excel_buf.seek(0)
-                st.download_button(f"📊 تحميل تفاصيل كل الفواتير ({len(all_records)} فاتورة) — Excel",data=excel_buf.getvalue(),file_name=f"all_{label_type}_{sel_period.replace('/','_') if sel_period!='الكل' else 'all'}.xlsx",mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",key=f"dl_all_{label_type}",type="primary")
+                st.download_button(f"📊 تحميل Excel ({len(all_records)} فاتورة)",data=excel_buf.getvalue(),file_name=f"all_{label_type}_{sel_period.replace('/','_') if sel_period!='الكل' else 'all'}.xlsx",mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",key=f"dl_all_{label_type}",type="primary")
             with gc2:
+                pdf_buf=_generate_pdf_for_records(all_records,f"فواتير {'الصادرة' if label_type=='out' else 'الواردة'} — {sel_period if sel_period!='الكل' else 'الكل'}")
+                st.download_button(f"📄 تحميل PDF ({len(all_records)} فاتورة)",data=pdf_buf.getvalue(),file_name=f"invoices_{label_type}_{sel_period.replace('/','_') if sel_period!='الكل' else 'all'}.pdf",mime="application/pdf",key=f"dl_all_pdf_{label_type}")
+            with gc3:
                 zip_buf=BytesIO()
                 with zipfile.ZipFile(zip_buf,'w',zipfile.ZIP_DEFLATED) as zf:
-                    date_groups={}
-                    for rec in filtered:
-                        ud=str(rec.get('upload_date',''))[:10]
-                        if ud not in date_groups: date_groups[ud]=[]
-                        date_groups[ud].append(rec)
-                    for ud,recs in sorted(date_groups.items()):
-                        for ri,rec in enumerate(recs):
-                            fname=f"{ud}/{rec.get('file_name','invoice')}_{ri+1}.xlsx"
-                            row_df=pd.DataFrame(rec.get('records',[]))
-                            row_buf=BytesIO()
-                            row_df.to_excel(row_buf,index=False,engine='xlsxwriter')
-                            zf.writestr(fname,row_buf.getvalue())
-                    for ud,recs in sorted(date_groups.items()):
-                        day_df=pd.DataFrame([r for rec in recs for r in rec.get('records',[])])
-                        day_buf=BytesIO()
-                        day_df.to_excel(day_buf,index=False,engine='xlsxwriter')
-                        zf.writestr(f"{ud}/summary_{ud}.xlsx",day_buf.getvalue())
+                    for ri,r in enumerate(all_records):
+                        pdf_inv=_generate_pdf_for_records([r],f"فاتورة #{ri+1}")
+                        fname=f"invoices_{ri+1}_{r.get('الطرف الآخر','unknown')}.pdf"
+                        zf.writestr(fname,pdf_inv.getvalue())
+                    all_df2=pd.DataFrame(all_records)
+                    excel_buf2=BytesIO()
+                    all_df2.to_excel(excel_buf2,index=False,engine='xlsxwriter')
+                    excel_buf2.seek(0)
+                    zf.writestr("summary.xlsx",excel_buf2.getvalue())
                 zip_buf.seek(0)
-                st.download_button(f"📦 تحميل مضغوط — كل الفواتير ({len(filtered)} رفع)",data=zip_buf.getvalue(),file_name=f"{label_type}_all_{sel_period.replace('/','_') if sel_period!='الكل' else 'all'}.zip",mime="application/zip",key=f"dl_zip_{label_type}")
-
-            if sel_date!="الكل":
-                day_recs=[r for r in all_records if r.get('__upload_date__')==sel_date]
-                if day_recs:
-                    day_buf=BytesIO()
-                    pd.DataFrame(day_recs).to_excel(day_buf,index=False,engine='xlsxwriter')
-                    day_buf.seek(0)
-                    st.download_button(f"📅 تحميل فواتير يوم {sel_date} ({len(day_recs)} فاتورة) — Excel",data=day_buf.getvalue(),file_name=f"invoices_{sel_date}.xlsx",mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",key=f"dl_day_{label_type}")
+                st.download_button(f"📦 تحميل مضغوط ({len(all_records)} فاتورة PDF+Excel)",data=zip_buf.getvalue(),file_name=f"invoices_{label_type}_{sel_period.replace('/','_') if sel_period!='الكل' else 'all'}.zip",mime="application/zip",key=f"dl_zip_{label_type}")
 
     if portal_sub=="🔗 ربط مباشر مع البورتال":
         st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>ربط مباشر مع بوابة الفواتير الإلكترونية</h3></div>',unsafe_allow_html=True)
@@ -1618,21 +1685,8 @@ elif page=="📄 Portal الفواتير الإلكترونية":
                             buf.seek(0)
                             zf.writestr(f"invoices_out_{dl_period.replace('/','_') if dl_period!='الكل' else 'all'}.xlsx",buf.getvalue())
                         else:
-                            from docx import Document
-                            doc=Document()
-                            doc.add_heading('فواتير الصادرة',0)
-                            tbl=doc.add_table(rows=1,cols=len(filtered_dl[0].keys()) if filtered_dl else 0,style='Table Grid')
-                            if filtered_dl:
-                                for i,k in enumerate(filtered_dl[0].keys()):
-                                    tbl.rows[0].cells[i].text=str(k)
-                                for row_data in filtered_dl:
-                                    row=tbl.add_row()
-                                    for i,k in enumerate(filtered_dl[0].keys()):
-                                        row.cells[i].text=str(row_data.get(k,''))
-                            buf=BytesIO()
-                            doc.save(buf)
-                            buf.seek(0)
-                            zf.writestr(f"invoices_out_{dl_period.replace('/','_') if dl_period!='الكل' else 'all'}.docx",buf.getvalue())
+                            pdf_buf=_generate_pdf_for_records(filtered_dl,f"فواتير الصادرة — {dl_period if dl_period!='الكل' else 'الكل'}")
+                            zf.writestr(f"invoices_out_{dl_period.replace('/','_') if dl_period!='الكل' else 'all'}.pdf",pdf_buf.getvalue())
                     zip_buf.seek(0)
                     st.download_button("📦 تحميل الملف المضغوط",data=zip_buf.getvalue(),file_name=f"invoices_out_{dl_period.replace('/','_') if dl_period!='الكل' else 'all'}.zip",mime="application/zip",key="out_zip_dl")
             else:
@@ -1706,21 +1760,8 @@ elif page=="📄 Portal الفواتير الإلكترونية":
                             buf.seek(0)
                             zf.writestr(f"invoices_in_{dl_period.replace('/','_') if dl_period!='الكل' else 'all'}.xlsx",buf.getvalue())
                         else:
-                            from docx import Document
-                            doc=Document()
-                            doc.add_heading('فواتير الوارد',0)
-                            tbl=doc.add_table(rows=1,cols=len(filtered_dl[0].keys()) if filtered_dl else 0,style='Table Grid')
-                            if filtered_dl:
-                                for i,k in enumerate(filtered_dl[0].keys()):
-                                    tbl.rows[0].cells[i].text=str(k)
-                                for row_data in filtered_dl:
-                                    row=tbl.add_row()
-                                    for i,k in enumerate(filtered_dl[0].keys()):
-                                        row.cells[i].text=str(row_data.get(k,''))
-                            buf=BytesIO()
-                            doc.save(buf)
-                            buf.seek(0)
-                            zf.writestr(f"invoices_in_{dl_period.replace('/','_') if dl_period!='الكل' else 'all'}.docx",buf.getvalue())
+                            pdf_buf=_generate_pdf_for_records(filtered_dl,f"فواتير الوارد — {dl_period if dl_period!='الكل' else 'الكل'}")
+                            zf.writestr(f"invoices_in_{dl_period.replace('/','_') if dl_period!='الكل' else 'all'}.pdf",pdf_buf.getvalue())
                     zip_buf.seek(0)
                     st.download_button("📦 تحميل الملف المضغوط",data=zip_buf.getvalue(),file_name=f"invoices_in_{dl_period.replace('/','_') if dl_period!='الكل' else 'all'}.zip",mime="application/zip",key="in_zip_dl")
             else:
