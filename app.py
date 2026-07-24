@@ -318,14 +318,14 @@ button[data-testid="stSidebarCollapseButton"],div[data-testid="stSidebarCollapse
 section[data-testid="stSidebar"]>div:first-child{padding-top:0!important;}
 section[data-testid="stSidebar"] [data-testid="stSidebarContent"]{overflow-y:auto!important;max-height:calc(100vh - 2rem)!important;}
 section[data-testid="stSidebar"] .stMarkdown p,section[data-testid="stSidebar"] .stMarkdown span,section[data-testid="stSidebar"] label,section[data-testid="stSidebar"] .stRadio>div>label{color:rgba(255,255,255,0.55)!important;font-size:.8rem!important;font-family:'Inter','Cairo',sans-serif!important;}
-section[data-testid="stSidebar"] [data-baseweb="select"]{background:rgba(108,92,231,0.12)!important;border:2px solid rgba(108,92,231,0.3)!important;border-radius:8px!important;}
-section[data-testid="stSidebar"] [data-baseweb="select"] span{color:rgba(255,255,255,0.85)!important;font-size:.8rem!important;}
-section[data-testid="stSidebar"] .stRadio>div>div>label{background:rgba(108,92,231,0.12)!important;border:2px solid rgba(108,92,231,0.3)!important;border-radius:8px!important;padding:.55rem 1rem!important;margin:3px 4px!important;transition:all .35s cubic-bezier(.4,0,.2,1)!important;position:relative!important;overflow:hidden!important;display:flex!important;align-items:center!important;gap:.6rem!important;}
-section[data-testid="stSidebar"] .stRadio>div>div>label:hover{background:rgba(108,92,231,0.2)!important;border:2px solid rgba(108,92,231,0.4)!important;color:rgba(255,255,255,.9)!important;}
-section[data-testid="stSidebar"] .stRadio>div>div:has(input:checked)>label{background:rgba(108,92,231,0.3)!important;border:2px solid rgba(108,92,231,0.7)!important;border-radius:8px!important;box-shadow:0 0 20px rgba(108,92,231,0.2)!important;color:#fff!important;font-weight:700!important;padding:.55rem 1rem!important;margin:3px 4px!important;}
 section[data-testid="stSidebar"] .stRadio>div>div>label::before{display:none!important;}
 section[data-testid="stSidebar"] .stRadio>div>div>label::after{display:none!important;}
 section[data-testid="stSidebar"] .stRadio>div{gap:0!important;}
+section[data-testid="stSidebar"] .stRadio{gap:0!important;}
+section[data-testid="stSidebar"] [data-testid="stRadio"]>div{gap:0!important;}
+section[data-testid="stSidebar"] .stRadio>div>div>label{background:rgba(108,92,231,0.1)!important;border:1px solid rgba(108,92,231,0.2)!important;border-radius:8px!important;padding:.3rem .7rem!important;margin:2px 4px!important;display:flex!important;align-items:center!important;gap:.5rem!important;font-size:.75rem!important;}
+section[data-testid="stSidebar"] .stRadio>div>div>label:hover{background:rgba(108,92,231,0.2)!important;border-color:rgba(108,92,231,0.4)!important;color:rgba(255,255,255,.9)!important;}
+section[data-testid="stSidebar"] .stRadio>div>div:has(input:checked)>label{background:rgba(108,92,231,0.25)!important;border:1px solid rgba(108,92,231,0.6)!important;color:#fff!important;font-weight:700!important;box-shadow:0 0 12px rgba(108,92,231,0.15)!important;}
 section[data-testid="stSidebar"] hr{border-color:rgba(108,92,231,.06)!important;}
 section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p{margin:0!important;}
 
@@ -457,7 +457,7 @@ with st.sidebar:
         pass
     nav_pages=[p for p in ALL_PAGES if p in cu.get('permissions',[]) or cu.get('role')=='admin']
     if cu.get('role')=='admin': nav_pages.append(ADMIN_PAGE)
-    page=st.sidebar.selectbox("التنقل",nav_pages,label_visibility="visible",key="nav_select")
+    page=st.radio("nav",nav_pages,label_visibility="collapsed",index=0,key="nav_v2")
     st.markdown("<div style='height:1px;background:linear-gradient(90deg,transparent,rgba(108,92,231,.1),transparent);margin:1.2rem .8rem;'></div>", unsafe_allow_html=True)
     st.markdown(f"""<div style="padding:.7rem 1rem;border-radius:14px;background:rgba(108,92,231,.04);border:1px solid rgba(108,92,231,.06);margin:0 .5rem;text-align:center;">
         <p style="color:rgba(255,255,255,.6);font-size:.65rem;margin:0 0 .2rem;">المستخدم: <strong style="color:#a29bfe;">{cu.get('display_name','')}</strong></p>
