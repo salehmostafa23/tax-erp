@@ -312,7 +312,8 @@ div[data-testid="stToolbar"]{display:none!important;}
 .block-container{padding:1rem 2rem 2rem 2rem!important;max-width:100%!important;}
 
 /* SIDEBAR */
-section[data-testid="stSidebar"]{background:linear-gradient(180deg,#050510 0%,#0b0b24 40%,#080820 100%)!important;border-left:1px solid rgba(108,92,231,0.08)!important;box-shadow:8px 0 60px rgba(0,0,0,0.7)!important;position:relative!important;}
+section[data-testid="stSidebar"]{background:linear-gradient(180deg,#050510 0%,#0b0b24 40%,#080820 100%)!important;border-left:1px solid rgba(108,92,231,0.08)!important;box-shadow:8px 0 60px rgba(0,0,0,0.7)!important;position:relative!important;overflow-y:auto!important;}
+section[data-testid="stSidebar"] [data-testid="stSidebarContent"]{overflow-y:auto!important;max-height:100vh!important;}
 section[data-testid="stSidebar"][aria-expanded="false"]{position:relative!important;transform:none!important;margin-left:0!important;}
 button[data-testid="stSidebarCollapseButton"],div[data-testid="stSidebarCollapseButton"],[data-testid="stSidebarCollapseButton"]{display:none!important;pointer-events:none!important;visibility:hidden!important;opacity:0!important;width:0!important;height:0!important;padding:0!important;margin:0!important;overflow:hidden!important;}
 section[data-testid="stSidebar"]>div:first-child{padding-top:0!important;}
