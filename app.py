@@ -159,7 +159,7 @@ def eta_doc_to_record(doc, direction):
     return rec, meta
 
 def _generate_pdf_for_records(records, title="فواتير"):
-    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.pagesizes import A4, landscape
     from reportlab.lib import colors
     from reportlab.lib.units import cm
     from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
@@ -167,37 +167,43 @@ def _generate_pdf_for_records(records, title="فواتير"):
     from reportlab.pdfbase import pdfmetrics
     from reportlab.pdfbase.ttfonts import TTFont
     buf = BytesIO()
-    doc = SimpleDocTemplate(buf, pagesize=A4, rightMargin=1.5*cm, leftMargin=1.5*cm, topMargin=1.5*cm, bottomMargin=1.5*cm)
+    page_w, page_h = landscape(A4)
+    doc = SimpleDocTemplate(buf, pagesize=landscape(A4), rightMargin=1*cm, leftMargin=1*cm, topMargin=1*cm, bottomMargin=1*cm)
     styles = getSampleStyleSheet()
     try:
         pdfmetrics.registerFont(TTFont('Arabic', 'C:/Windows/Fonts/arial.ttf'))
-        arabic_style = ParagraphStyle('Arabic', parent=styles['Normal'], fontName='Arabic', fontSize=8, leading=12, alignment=1)
+        arabic_style = ParagraphStyle('Arabic', parent=styles['Normal'], fontName='Arabic', fontSize=7, leading=10, alignment=1)
         title_style = ParagraphStyle('TitleA', parent=styles['Title'], fontName='Arabic', fontSize=14, alignment=1)
     except:
-        arabic_style = ParagraphStyle('Normal', parent=styles['Normal'], fontSize=8, leading=12, alignment=1)
+        arabic_style = ParagraphStyle('Normal', parent=styles['Normal'], fontSize=7, leading=10, alignment=1)
         title_style = styles['Title']
     elements = []
     elements.append(Paragraph(title, title_style))
-    elements.append(Spacer(1, 0.5*cm))
+    elements.append(Spacer(1, 0.3*cm))
+    key_fields = ['نوع الفاتورة','الحالة','تاريخ الإصدار','الطرف الآخر','رقم التسجيل (الطرف الآخر)','إجمالي المبيعات (قبل الخصم)','الخصم','الصافي ( trước الضريبة)','ضريبة القيمة المضافة','الإجمالي (بعد الضريبة)','UUID']
     for idx, rec in enumerate(records):
         rec_status = rec.get('الحالة', '')
-        status_color = '#55efc4' if rec_status in ['مقبولة', 'مستلمة'] else '#ff6b6b'
-        elements.append(Paragraph(f"فاتورة #{idx+1} — الطرف الآخر: {rec.get('الطرف الآخر', '-')} — الإجمالي: {rec.get('الإجمالي (بعد الضريبة)', 0)} — الحالة: {rec_status}", arabic_style))
-        elements.append(Spacer(1, 0.2*cm))
-        data_rows = []
-        data_rows.append([Paragraph(str(k), arabic_style) for k in rec.keys()])
-        data_rows.append([Paragraph(str(v), arabic_style) for v in rec.values()])
-        t = Table(data_rows, repeatRows=1)
-        t.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#6c5ce7')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('FONTSIZE', (0, 0), (-1, -1), 7),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f0f0f8')]),
-        ]))
-        elements.append(t)
-        elements.append(Spacer(1, 0.5*cm))
+        elements.append(Paragraph(f"فاتورة #{idx+1} — {rec.get('الطرف الآخر', '-')} — الإجمالي: {rec.get('الإجمالي (بعد الضريبة)', 0)} — الحالة: {rec_status}", arabic_style))
+        elements.append(Spacer(1, 0.15*cm))
+        pairs = []
+        for k in rec.keys():
+            v = rec.get(k, '')
+            pairs.append([Paragraph(str(k), arabic_style), Paragraph(str(v)[:60], arabic_style)])
+        if pairs:
+            usable_w = page_w - 2*cm
+            t = Table(pairs, colWidths=[usable_w*0.4, usable_w*0.6])
+            t.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#6c5ce7')),
+                ('TEXTCOLOR', (0, 0), (0, -1), colors.white),
+                ('FONTSIZE', (0, 0), (-1, -1), 7),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cccccc')),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('ROWBACKGROUNDS', (1, 0), (1, -1), [colors.white, colors.HexColor('#f0f0f8')]),
+                ('TOPPADDING', (0, 0), (-1, -1), 3),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+            ]))
+            elements.append(t)
+        elements.append(Spacer(1, 0.4*cm))
     doc.build(elements)
     buf.seek(0)
     return buf
