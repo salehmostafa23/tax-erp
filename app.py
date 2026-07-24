@@ -405,9 +405,11 @@ section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p{margin:0!
 .stButton>button:hover{border-color:rgba(108,92,231,.25)!important;background:rgba(108,92,231,.08)!important;}
 
 /* TABS */
-.stTabs [data-baseweb="tab-list"]{gap:4px;background:rgba(22,22,40,.4)!important;padding:4px!important;border-radius:12px!important;border:1px solid var(--border)!important;}
-.stTabs [data-baseweb="tab"]{padding:10px 20px!important;border-radius:10px!important;font-weight:600!important;font-size:.82rem!important;color:var(--text2)!important;background:transparent!important;}
+.stTabs [data-baseweb="tab-list"]{gap:4px;background:rgba(22,22,40,.4)!important;padding:4px!important;border-radius:12px!important;border:1px solid var(--border)!important;overflow-x:auto!important;flex-wrap:nowrap!important;}
+.stTabs [data-baseweb="tab"]{padding:8px 14px!important;border-radius:10px!important;font-weight:600!important;font-size:.78rem!important;color:var(--text2)!important;background:transparent!important;white-space:nowrap!important;flex-shrink:0!important;}
 .stTabs [aria-selected="true"]{background:var(--surface)!important;color:var(--accent2)!important;box-shadow:0 2px 10px rgba(0,0,0,.2)!important;border:1px solid rgba(108,92,231,.15)!important;}
+.stTabs [data-baseweb="tab-border"]{display:none!important;}
+.stTabs [data-baseweb="tab-highlight"]{background:var(--accent)!important;}
 
 .stDataFrame{border-radius:12px!important;overflow:hidden!important;border:1px solid var(--border)!important;}
 .stAlert{border-radius:10px!important;}
@@ -1487,7 +1489,7 @@ elif page=="📄 Portal الفواتير الإلكترونية":
     st.markdown(f"""<div class="erp-topbar"><div><h2>{page}</h2><p>إدارة فواتير الصادرة والواردة من بوابة الفواتير الإلكترونية</p></div>
 <div class="erp-topbar-right"><a href="https://invoicing.eta.gov.eg/" target="_blank" style="background:linear-gradient(135deg,rgba(0,206,201,.18),rgba(108,92,231,.12));border:1px solid rgba(0,206,201,.35);border-radius:12px;padding:.5rem 1.2rem;color:#00cec9;font-size:.82rem;font-weight:700;text-decoration:none;cursor:pointer;transition:all .3s;display:inline-flex;align-items:center;gap:.5rem;">🔗 فتح بوابة الفواتير الإلكترونية</a></div></div>""", unsafe_allow_html=True)
 
-    _tab1,_tab2,_tab3,_tab4=st.tabs(["🔗 الربط","📤 الصادرة","📥 الوارد","🏷️ الاستعلام عن الأكواد"])
+    _tab1,_tab2,_tab3,_tab4=st.tabs(["🔗 الربط","📤 الصادرة","📥 الوارد","🏷️ أكواد"])
 
     def _portal_dashboard(data,label,color_icon,label_type):
         if not data:
