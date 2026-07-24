@@ -12,6 +12,7 @@ from io import BytesIO
 import base64
 import time
 import openpyxl
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from github_storage import gh_read, gh_write
 
 st.set_page_config(page_title="Tax Management System", page_icon="🏢", layout="wide", initial_sidebar_state="expanded")
@@ -1837,24 +1838,40 @@ elif page=="📄 Portal الفواتير الإلكترونية":
                 else:
                     dl_label="الكل"
                 if st.button("📥 تحميل الحزمة",key="out_dl_btn",type="primary"):
-                    import zipfile,time
+                    import zipfile
                     token=st.session_state.get("eta_token","")
+                    progress=st.progress(0,text="جاري تحميل الفواتير (سريع)...")
+                    pdf_map={}
+                    done_count=[0]
+                    def _fetch_pdf(rec_i):
+                        ri,rec=rec_i
+                        uuid_val=rec.get('UUID','')
+                        supplier=rec.get('الطرف الآخر',rec.get('اسم المصدر',rec.get('اسم المستلم',f'inv_{ri+1}')))
+                        safe=''.join(c if c.isalnum() or c in '_-' else '_' for c in str(supplier))[:30]
+                        if token and uuid_val:
+                            pdf_buf,err=eta_get_document_pdf(token,uuid_val)
+                            if not err and pdf_buf:
+                                return ri,safe,pdf_buf,True
+                        return ri,safe,None,False
+                    with ThreadPoolExecutor(max_workers=5) as pool:
+                        futures=[pool.submit(_fetch_pdf,(ri,rec)) for ri,rec in enumerate(filtered_dl)]
+                        for f in as_completed(futures):
+                            done_count[0]+=1
+                            progress.progress(min(done_count[0]/len(filtered_dl),1.0),text=f"{done_count[0]}/{len(filtered_dl)} فاتورة...")
+                            ri,safe,pdf_buf,ok=f.result()
+                            if ok:
+                                pdf_map[ri]=(safe,pdf_buf)
                     zip_buf=BytesIO()
-                    progress=st.progress(0,text="جاري تحميل الفواتير...")
                     with zipfile.ZipFile(zip_buf,'w',zipfile.ZIP_DEFLATED) as zf:
                         for ri,rec in enumerate(filtered_dl):
-                            progress.progress((ri+1)/len(filtered_dl),text=f"فاتورة {ri+1}/{len(filtered_dl)}")
                             uuid_val=rec.get('UUID','')
                             supplier=rec.get('الطرف الآخر',rec.get('اسم المصدر',rec.get('اسم المستلم',f'inv_{ri+1}')))
                             safe_supplier=''.join(c if c.isalnum() or c in '_-' else '_' for c in str(supplier))[:30]
-                            if token and uuid_val:
-                                pdf_buf,err=eta_get_document_pdf(token,uuid_val)
-                                if not err and pdf_buf:
-                                    zf.writestr(f"فاتورة_{ri+1}_{safe_supplier}.pdf",pdf_buf.getvalue())
-                                    time.sleep(2.1)
-                                    continue
-                            pdf_inv=_generate_pdf_for_records([rec],f"فاتورة #{ri+1} — {supplier}")
-                            zf.writestr(f"فاتورة_{ri+1}_{safe_supplier}.pdf",pdf_inv.getvalue())
+                            if ri in pdf_map:
+                                zf.writestr(f"فاتورة_{ri+1}_{pdf_map[ri][0]}.pdf",pdf_map[ri][1].getvalue())
+                            else:
+                                pdf_inv=_generate_pdf_for_records([rec],f"فاتورة #{ri+1} — {supplier}")
+                                zf.writestr(f"فاتورة_{ri+1}_{safe_supplier}.pdf",pdf_inv.getvalue())
                         df_bundle=pd.DataFrame(_fix_vat_in_records(filtered_dl))
                         buf=BytesIO()
                         df_bundle.to_excel(buf,index=False,engine='xlsxwriter')
@@ -1917,24 +1934,40 @@ elif page=="📄 Portal الفواتير الإلكترونية":
                 else:
                     dl_label="الكل"
                 if st.button("📥 تحميل الحزمة",key="in_dl_btn",type="primary"):
-                    import zipfile,time
+                    import zipfile
                     token=st.session_state.get("eta_token","")
+                    progress=st.progress(0,text="جاري تحميل الفواتير (سريع)...")
+                    pdf_map={}
+                    done_count=[0]
+                    def _fetch_in_pdf(rec_i):
+                        ri,rec=rec_i
+                        uuid_val=rec.get('UUID','')
+                        supplier=rec.get('الطرف الآخر',rec.get('اسم المصدر',rec.get('اسم المستلم',f'inv_{ri+1}')))
+                        safe=''.join(c if c.isalnum() or c in '_-' else '_' for c in str(supplier))[:30]
+                        if token and uuid_val:
+                            pdf_buf,err=eta_get_document_pdf(token,uuid_val)
+                            if not err and pdf_buf:
+                                return ri,safe,pdf_buf,True
+                        return ri,safe,None,False
+                    with ThreadPoolExecutor(max_workers=5) as pool:
+                        futures=[pool.submit(_fetch_in_pdf,(ri,rec)) for ri,rec in enumerate(filtered_dl)]
+                        for f in as_completed(futures):
+                            done_count[0]+=1
+                            progress.progress(min(done_count[0]/len(filtered_dl),1.0),text=f"{done_count[0]}/{len(filtered_dl)} فاتورة...")
+                            ri,safe,pdf_buf,ok=f.result()
+                            if ok:
+                                pdf_map[ri]=(safe,pdf_buf)
                     zip_buf=BytesIO()
-                    progress=st.progress(0,text="جاري تحميل الفواتير...")
                     with zipfile.ZipFile(zip_buf,'w',zipfile.ZIP_DEFLATED) as zf:
                         for ri,rec in enumerate(filtered_dl):
-                            progress.progress((ri+1)/len(filtered_dl),text=f"فاتورة {ri+1}/{len(filtered_dl)}")
                             uuid_val=rec.get('UUID','')
                             supplier=rec.get('الطرف الآخر',rec.get('اسم المصدر',rec.get('اسم المستلم',f'inv_{ri+1}')))
                             safe_supplier=''.join(c if c.isalnum() or c in '_-' else '_' for c in str(supplier))[:30]
-                            if token and uuid_val:
-                                pdf_buf,err=eta_get_document_pdf(token,uuid_val)
-                                if not err and pdf_buf:
-                                    zf.writestr(f"فاتورة_{ri+1}_{safe_supplier}.pdf",pdf_buf.getvalue())
-                                    time.sleep(2.1)
-                                    continue
-                            pdf_inv=_generate_pdf_for_records([rec],f"فاتورة #{ri+1} — {supplier}")
-                            zf.writestr(f"فاتورة_{ri+1}_{safe_supplier}.pdf",pdf_inv.getvalue())
+                            if ri in pdf_map:
+                                zf.writestr(f"فاتورة_{ri+1}_{pdf_map[ri][0]}.pdf",pdf_map[ri][1].getvalue())
+                            else:
+                                pdf_inv=_generate_pdf_for_records([rec],f"فاتورة #{ri+1} — {supplier}")
+                                zf.writestr(f"فاتورة_{ri+1}_{safe_supplier}.pdf",pdf_inv.getvalue())
                         df_bundle=pd.DataFrame(_fix_vat_in_records(filtered_dl))
                         buf=BytesIO()
                         df_bundle.to_excel(buf,index=False,engine='xlsxwriter')
@@ -1982,26 +2015,28 @@ elif page=="📄 Portal الفواتير الإلكترونية":
                 elif not all_uuids:
                     st.info("لا توجد فواتير مرفوعة (صادرة أو وارد)")
                 else:
-                    progress=st.progress(0,text=f"جاري تحميل أكواد {len(all_uuids)} فاتورة...")
+                    progress=st.progress(0,text=f"جاري تحميل أكواد {len(all_uuids)} فاتورة (سريع)...")
                     new_codes=[]
                     errors=0
-                    for idx,u in enumerate(all_uuids):
-                        progress.progress((idx+1)/len(all_uuids),text=f"فاتورة {idx+1}/{len(all_uuids)} — {u['uuid'][:15]}...")
-                        doc,err=eta_get_document_details(token,u['uuid'])
-                        if err or not doc:
-                            errors+=1
-                            continue
-                        document=doc.get('document',{})
-                        invoice_lines=document.get('invoiceLines',[])
-                        for line in invoice_lines:
-                            item_code=line.get('itemCode','')
-                            item_desc=line.get('description','')
-                            internal_code=line.get('internalCode','')
-                            new_codes.append({
-                                'uuid':u['uuid'],'direction':'صادرة' if u['direction']=='out' else 'واردة','counterparty':u['name'],
-                                'itemCode':item_code,'internalCode':internal_code,'description':item_desc
-                            })
-                        time.sleep(2.1)
+                    done_count=[0]
+                    def _fetch_one(uu):
+                        d,e=eta_get_document_details(token,uu['uuid'])
+                        return uu,d,e
+                    with ThreadPoolExecutor(max_workers=5) as pool:
+                        futures={pool.submit(_fetch_one,u):u for u in all_uuids}
+                        for f in as_completed(futures):
+                            done_count[0]+=1
+                            progress.progress(min(done_count[0]/len(all_uuids),1.0),text=f"{done_count[0]}/{len(all_uuids)} فاتورة...")
+                            uu,doc,err=f.result()
+                            if err or not doc:
+                                errors+=1
+                                continue
+                            document=doc.get('document',{})
+                            for line in document.get('invoiceLines',[]):
+                                new_codes.append({
+                                    'uuid':uu['uuid'],'direction':'صادرة' if uu['direction']=='out' else 'واردة','counterparty':uu['name'],
+                                    'itemCode':line.get('itemCode',''),'internalCode':line.get('internalCode',''),'description':line.get('description','')
+                                })
                     if new_codes:
                         merged=list(codes_db)+new_codes
                         unique=[]
@@ -2078,34 +2113,32 @@ elif page=="🏷️ الاستعلام عن الأكواد":
             elif not unfetched:
                 st.success("جميع الفواتير تم استخراج أكوادها بالفعل!")
             else:
-                progress=st.progress(0,text=f"جاري استخراج الأكواد من {len(unfetched)} فاتورة...")
+                progress=st.progress(0,text=f"جاري استخراج الأكواد من {len(unfetched)} فاتورة (سريع)...")
                 new_codes=[]
                 errors=0
-                for idx,u in enumerate(unfetched):
-                    progress.progress((idx+1)/len(unfetched),text=f"فاتورة {idx+1}/{len(unfetched)} — {u['uuid'][:12]}...")
-                    doc,err=eta_get_document_details(token,u['uuid'])
-                    if err or not doc:
-                        errors+=1
-                        continue
-                    document=doc.get('document',{})
-                    invoice_lines=document.get('invoiceLines',[])
-                    for line in invoice_lines:
-                        item_code=line.get('itemCode','')
-                        item_desc=line.get('description','')
-                        internal_code=line.get('internalCode','')
-                        item_type=line.get('itemType','')
-                        quantity=line.get('quantity',0)
-                        unit_type=line.get('unitType','')
-                        unit_val=line.get('unitValue',{})
-                        unit_price=unit_val.get('amountEGP',0) if isinstance(unit_val,dict) else 0
-                        sales_total=line.get('salesTotal',0)
-                        new_codes.append({
-                            'uuid':u['uuid'],'direction':'صادر' if u['direction']=='out' else 'وارد',
-                            'counterparty':u['name'],'itemCode':item_code,'internalCode':internal_code,
-                            'description':item_desc,'itemType':item_type,
-                            'quantity':quantity,'unitType':unit_type,'unitPrice':unit_price,'salesTotal':sales_total
-                        })
-                    time.sleep(2.1)
+                done_count=[0]
+                def _fetch_standalone(uu):
+                    d,e=eta_get_document_details(token,uu['uuid'])
+                    return uu,d,e
+                with ThreadPoolExecutor(max_workers=5) as pool:
+                    futures={pool.submit(_fetch_standalone,u):u for u in unfetched}
+                    for f in as_completed(futures):
+                        done_count[0]+=1
+                        progress.progress(min(done_count[0]/len(unfetched),1.0),text=f"{done_count[0]}/{len(unfetched)} فاتورة...")
+                        uu,doc,err=f.result()
+                        if err or not doc:
+                            errors+=1
+                            continue
+                        document=doc.get('document',{})
+                        for line in document.get('invoiceLines',[]):
+                            unit_val=line.get('unitValue',{})
+                            new_codes.append({
+                                'uuid':uu['uuid'],'direction':'صادر' if uu['direction']=='out' else 'وارد',
+                                'counterparty':uu['name'],'itemCode':line.get('itemCode',''),'internalCode':line.get('internalCode',''),
+                                'description':line.get('description',''),'itemType':line.get('itemType',''),
+                                'quantity':line.get('quantity',0),'unitType':line.get('unitType',''),
+                                'unitPrice':unit_val.get('amountEGP',0) if isinstance(unit_val,dict) else 0,'salesTotal':line.get('salesTotal',0)
+                            })
                 if new_codes:
                     codes_db.extend(new_codes)
                     codes_db_unique=[]
