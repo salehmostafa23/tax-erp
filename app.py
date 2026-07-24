@@ -20,7 +20,7 @@ DATA_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # ====================== USERS ======================
 USERS_FILE=os.path.join(DATA_DIR,"users.json")
-ALL_PAGES=["🏠 الرئيسية","📋 نموذج 41","💰 القيمة المضافة","🛒 فواتير الماركت","📄 Portal الفواتير الإلكترونية"]
+ALL_PAGES=["🏠 الرئيسية","📋 نموذج 41","💰 القيمة المضافة","🛒 فواتير الماركت","📄 Portal الفواتير الإلكترونية","🔍 الاستعلام عن ممول"]
 ADMIN_PAGE="👥 إدارة المستخدمين"
 
 def _hash_pw(pw,salt="tax_erp_salt_2024"):
@@ -145,7 +145,7 @@ def eta_doc_to_record(doc, direction):
         "رقم التسجيل (المستلم)": receiver_id, "اسم المستلم": receiver_name,
         "الطرف الآخر": counterparty, "رقم التسجيل (الطرف الآخر)": counterparty_id,
         "إجمالي المبيعات (قبل الخصم)": total_sales, "الخصم": total_discount,
-        "الصافي (قبل الضريبة)": net_amount, "ضريبة القيمة المضافة": tax_total,
+        "ضريبة القيمة المضافة": tax_total,
         "الإجمالي (بعد الضريبة)": total
     }
     meta = {"uuid": uuid_val, "upload_date": submit_date or datetime.now().isoformat(),
@@ -165,6 +165,23 @@ def eta_get_document_pdf(token, uuid_val):
         buf.seek(0)
         return buf, None
     return None, f"HTTP {r.status_code}"
+
+def _fix_vat_in_records(records):
+    fixed=[]
+    for r in records:
+        r=dict(r)
+        total=_sf(r.get('الإجمالي (بعد الضريبة)',0))
+        net=_sf(r.get('الصافي (قبل الضريبة)',0))
+        current_vat=_sf(r.get('ضريبة القيمة المضافة',0))
+        if not current_vat and total and net and total>net:
+            r['ضريبة القيمة المضافة']=round(total-net,2)
+        elif not current_vat and total and net and abs(total-net)<0.01:
+            sales=_sf(r.get('إجمالي المبيعات (قبل الخصم)',0))
+            disc=_sf(r.get('الخصم',0))
+            if sales and disc and sales>disc:
+                r['ضريبة القيمة المضافة']=round(total-(sales-disc),2)
+        fixed.append(r)
+    return fixed
 
 def _generate_pdf_for_records(records, title="فواتير"):
     from reportlab.lib.pagesizes import A4, landscape
@@ -1544,6 +1561,7 @@ elif page=="📄 Portal الفواتير الإلكترونية":
                 st.rerun()
 
         if all_records:
+            all_records=_fix_vat_in_records(all_records)
             st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>تحميل جماعي</h3></div>',unsafe_allow_html=True)
             gc1,gc2,gc3=st.columns(3)
             with gc1:
@@ -1762,7 +1780,7 @@ elif page=="📄 Portal الفواتير الإلكترونية":
                                     continue
                             pdf_inv=_generate_pdf_for_records([rec],f"فاتورة #{ri+1} — {supplier}")
                             zf.writestr(f"فاتورة_{ri+1}_{safe_supplier}.pdf",pdf_inv.getvalue())
-                        df_bundle=pd.DataFrame(filtered_dl)
+                        df_bundle=pd.DataFrame(_fix_vat_in_records(filtered_dl))
                         buf=BytesIO()
                         df_bundle.to_excel(buf,index=False,engine='xlsxwriter')
                         buf.seek(0)
@@ -1842,7 +1860,7 @@ elif page=="📄 Portal الفواتير الإلكترونية":
                                     continue
                             pdf_inv=_generate_pdf_for_records([rec],f"فاتورة #{ri+1} — {supplier}")
                             zf.writestr(f"فاتورة_{ri+1}_{safe_supplier}.pdf",pdf_inv.getvalue())
-                        df_bundle=pd.DataFrame(filtered_dl)
+                        df_bundle=pd.DataFrame(_fix_vat_in_records(filtered_dl))
                         buf=BytesIO()
                         df_bundle.to_excel(buf,index=False,engine='xlsxwriter')
                         buf.seek(0)
@@ -1856,3 +1874,161 @@ elif page=="📄 Portal الفواتير الإلكترونية":
 
             if st.button("🗑️ حذف جميع فواتير الوارد",key="del_all_in",type="secondary"):
                 save_data(PORTAL_IN_FILE,[]);st.success("تم الحذف");st.rerun()
+
+# ====================== الاستعلام عن ممول ======================
+elif page=="🔍 الاستعلام عن ممول":
+    if not user_has_permission(page): st.error("لا تملك صلاحية الوصول");st.stop()
+
+    st.markdown(f"""<div class="erp-topbar"><div><h2>{page}</h2><p>البحث عن ممولين بالسجل الضريبي أو الاسم</p></div>
+<div class="erp-topbar-right"><span class="erp-badge">🔍 بحث</span></div></div>""",unsafe_allow_html=True)
+
+    def _build_suppliers_db():
+        suppliers={}
+        f41=load_data(FORM41_FILE)
+        for rec in f41:
+            for r in rec.get('records',[]):
+                tax_num=str(r.get('رقم التسجيل الضريبي','')).strip()
+                name=str(r.get('اسم الممول','')).strip()
+                if tax_num and name:
+                    if tax_num not in suppliers:
+                        suppliers[tax_num]={'tax_number':tax_num,'names':set(),'sources':set(),'total_deals':0,'total_discount':0}
+                    suppliers[tax_num]['names'].add(name)
+                    suppliers[tax_num]['sources'].add('نموذج 41')
+                    suppliers[tax_num]['total_deals']+=_sf(r.get('القيمة الإجمالية للتعامل',0))
+                    suppliers[tax_num]['total_discount']+=_sf(r.get('المحصل لحساب الضريبة',0))
+        vat_data=load_data(VAT_FILE)
+        for rec in vat_data:
+            for r in rec.get('records',[]):
+                tax_num=str(r.get('رقم التسجيل الضريبي','')).strip()
+                name=str(r.get('اسم الممول','')).strip()
+                if tax_num and name:
+                    if tax_num not in suppliers:
+                        suppliers[tax_num]={'tax_number':tax_num,'names':set(),'sources':set(),'total_deals':0,'total_discount':0}
+                    suppliers[tax_num]['names'].add(name)
+                    suppliers[tax_num]['sources'].add('القيمة المضافة')
+                    suppliers[tax_num]['total_deals']+=_sf(r.get('20% قيمة مضافة',0))
+                    suppliers[tax_num]['total_discount']+=_sf(r.get('ضريبة الجدول',0))
+        portal_out=load_data(PORTAL_OUT_FILE)
+        for rec in portal_out:
+            for r in rec.get('records',[]):
+                tax_num=str(r.get('رقم التسجيل (المستلم)','') or r.get('رقم التسجيل (المصدر)','')).strip()
+                name=str(r.get('اسم المستلم','') or r.get('اسم المصدر','')).strip()
+                if not tax_num:
+                    tax_num=str(r.get('رقم التسجيل (الطرف الآخر)','')).strip()
+                if not name:
+                    name=str(r.get('الطرف الآخر','')).strip()
+                if tax_num and name:
+                    if tax_num not in suppliers:
+                        suppliers[tax_num]={'tax_number':tax_num,'names':set(),'sources':set(),'total_deals':0,'total_discount':0}
+                    suppliers[tax_num]['names'].add(name)
+                    suppliers[tax_num]['sources'].add('فواتير صادرة')
+                    suppliers[tax_num]['total_deals']+=_sf(r.get('الإجمالي (بعد الضريبة)',0))
+                    suppliers[tax_num]['total_discount']+=_sf(r.get('الخصم',0))
+        portal_in=load_data(PORTAL_IN_FILE)
+        for rec in portal_in:
+            for r in rec.get('records',[]):
+                tax_num=str(r.get('رقم التسجيل (المصدر)','') or r.get('رقم التسجيل (المستلم)','')).strip()
+                name=str(r.get('اسم المصدر','') or r.get('اسم المستلم','')).strip()
+                if not tax_num:
+                    tax_num=str(r.get('رقم التسجيل (الطرف الآخر)','')).strip()
+                if not name:
+                    name=str(r.get('الطرف الآخر','')).strip()
+                if tax_num and name:
+                    if tax_num not in suppliers:
+                        suppliers[tax_num]={'tax_number':tax_num,'names':set(),'sources':set(),'total_deals':0,'total_discount':0}
+                    suppliers[tax_num]['names'].add(name)
+                    suppliers[tax_num]['sources'].add('فواتير واردة')
+                    suppliers[tax_num]['total_deals']+=_sf(r.get('الإجمالي (بعد الضريبة)',0))
+                    suppliers[tax_num]['total_discount']+=_sf(r.get('الخصم',0))
+        result=[]
+        for tax_num,data in suppliers.items():
+            data['names']=list(data['names'])
+            data['sources']=list(data['sources'])
+            result.append(data)
+        return result
+
+    suppliers_db=_build_suppliers_db()
+
+    st.markdown(f"""<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(116,185,255,.06);border:1px solid rgba(116,185,255,.15);color:#74b9ff;font-size:.82rem;margin-bottom:1rem;">
+        📊 قاعدة البيانات تحتوي على <strong>{len(suppliers_db)}</strong> ممول من جميع المصادر
+    </div>""",unsafe_allow_html=True)
+
+    search_mode=st.radio("search_mode",["🔍 بحث بالسجل الضريبي","📝 بحث بالاسم"],horizontal=True,label_visibility="collapsed")
+
+    if search_mode=="🔍 بحث بالسجل الضريبي":
+        st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>بحث بالسجل الضريبي</h3></div>',unsafe_allow_html=True)
+        st.markdown('<div class="erp-card">',unsafe_allow_html=True)
+        tax_input=st.text_input("أدخل رقم التسجيل الضريبي",key="sup_tax_q",placeholder="مثال: 123-456-789")
+        if st.button("🔍 بحث",key="sup_tax_btn",type="primary"):
+            if not tax_input.strip():
+                st.warning("أدخل رقم التسجيل الضريبي")
+            else:
+                query=tax_input.strip()
+                results=[s for s in suppliers_db if query in s['tax_number']]
+                if results:
+                    st.success(f"تم العثور على {len(results)} ممول")
+                    for s in results:
+                        names_html=" • ".join([f'<span style="color:#a29bfe;">{n}</span>' for n in s['names']])
+                        sources_html=" • ".join([f'<span style="background:rgba(108,92,231,.15);border:1px solid rgba(108,92,231,.2);border-radius:6px;padding:.15rem .5rem;color:#a29bfe;font-size:.7rem;">{src}</span>' for src in s['sources']])
+                        st.markdown(f"""<div class="erp-card" style="margin-bottom:.8rem;border-left:3px solid #6c5ce7;">
+                            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                                <div>
+                                    <div style="color:#fff;font-weight:700;font-size:1rem;margin-bottom:.3rem;">{names_html}</div>
+                                    <div style="color:var(--text2);font-size:.82rem;margin-bottom:.4rem;">📋 رقم التسجيل: <strong style="color:#00cec9;">{s['tax_number']}</strong></div>
+                                    <div style="margin-bottom:.3rem;">المصادر: {sources_html}</div>
+                                </div>
+                                <div style="text-align:left;">
+                                    <div style="color:#55efc4;font-weight:700;font-size:.9rem;">{fmt(s['total_deals'])}</div>
+                                    <div style="color:var(--text2);font-size:.7rem;">إجمالي التعاملات</div>
+                                </div>
+                            </div>
+                        </div>""",unsafe_allow_html=True)
+                else:
+                    st.info(f"لم يتم العثور على ممول بالرقم: {query}")
+        st.markdown('</div>',unsafe_allow_html=True)
+
+    else:
+        st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>بحث بالاسم</h3></div>',unsafe_allow_html=True)
+        st.markdown('<div class="erp-card">',unsafe_allow_html=True)
+        name_input=st.text_input("اكتب جزء من اسم الممول",key="sup_name_q",placeholder="مثال: شركة")
+        if st.button("🔍 بحث",key="sup_name_btn",type="primary"):
+            if not name_input.strip():
+                st.warning("أدخل اسم الممول")
+            else:
+                query=name_input.strip()
+                results=[]
+                for s in suppliers_db:
+                    for n in s['names']:
+                        if query in n:
+                            results.append(s)
+                            break
+                if results:
+                    st.success(f"تم العثور على {len(results)} ممول")
+                    for s in results:
+                        names_html=" • ".join([f'<span style="color:#a29bfe;">{n}</span>' for n in s['names']])
+                        sources_html=" • ".join([f'<span style="background:rgba(108,92,231,.15);border:1px solid rgba(108,92,231,.2);border-radius:6px;padding:.15rem .5rem;color:#a29bfe;font-size:.7rem;">{src}</span>' for src in s['sources']])
+                        st.markdown(f"""<div class="erp-card" style="margin-bottom:.8rem;border-left:3px solid #6c5ce7;">
+                            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                                <div>
+                                    <div style="color:#fff;font-weight:700;font-size:1rem;margin-bottom:.3rem;">{names_html}</div>
+                                    <div style="color:var(--text2);font-size:.82rem;margin-bottom:.4rem;">📋 رقم التسجيل: <strong style="color:#00cec9;">{s['tax_number']}</strong></div>
+                                    <div style="margin-bottom:.3rem;">المصادر: {sources_html}</div>
+                                </div>
+                                <div style="text-align:left;">
+                                    <div style="color:#55efc4;font-weight:700;font-size:.9rem;">{fmt(s['total_deals'])}</div>
+                                    <div style="color:var(--text2);font-size:.7rem;">إجمالي التعاملات</div>
+                                </div>
+                            </div>
+                        </div>""",unsafe_allow_html=True)
+                else:
+                    st.info(f"لم يتم العثور على ممول بالاسم: {query}")
+        st.markdown('</div>',unsafe_allow_html=True)
+
+    if suppliers_db:
+        st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot"></div><h3>جميع الممولين</h3></div>',unsafe_allow_html=True)
+        sup_df=pd.DataFrame([{'رقم التسجيل الضريبي':s['tax_number'],'الاسم':' • '.join(s['names']),'المصادر':' • '.join(s['sources']),'إجمالي التعاملات':s['total_deals'],'إجمالي الخصومات':s['total_discount']} for s in suppliers_db])
+        st.dataframe(sup_df,use_container_width=True,height=400)
+        excel_buf=BytesIO()
+        sup_df.to_excel(excel_buf,index=False,engine='xlsxwriter')
+        excel_buf.seek(0)
+        st.download_button("📊 تحميل قائمة الممولين",data=excel_buf.getvalue(),file_name="suppliers.xlsx",mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",key="dl_sup")
