@@ -312,8 +312,7 @@ div[data-testid="stToolbar"]{display:none!important;}
 .block-container{padding:1rem 2rem 2rem 2rem!important;max-width:100%!important;}
 
 /* SIDEBAR */
-section[data-testid="stSidebar"]{background:linear-gradient(180deg,#050510 0%,#0b0b24 40%,#080820 100%)!important;border-left:1px solid rgba(108,92,231,0.08)!important;box-shadow:8px 0 60px rgba(0,0,0,0.7)!important;position:relative!important;overflow-y:auto!important;}
-section[data-testid="stSidebar"] [data-testid="stSidebarContent"]{overflow-y:auto!important;max-height:100vh!important;}
+section[data-testid="stSidebar"]{background:linear-gradient(180deg,#050510 0%,#0b0b24 40%,#080820 100%)!important;border-left:1px solid rgba(108,92,231,0.08)!important;box-shadow:8px 0 60px rgba(0,0,0,0.7)!important;position:relative!important;}
 section[data-testid="stSidebar"][aria-expanded="false"]{position:relative!important;transform:none!important;margin-left:0!important;}
 button[data-testid="stSidebarCollapseButton"],div[data-testid="stSidebarCollapseButton"],[data-testid="stSidebarCollapseButton"]{display:none!important;pointer-events:none!important;visibility:hidden!important;opacity:0!important;width:0!important;height:0!important;padding:0!important;margin:0!important;overflow:hidden!important;}
 section[data-testid="stSidebar"]>div:first-child{padding-top:0!important;}
@@ -439,17 +438,20 @@ with st.sidebar:
     """, unsafe_allow_html=True)
     st.markdown("<p style='color:rgba(255,255,255,.18);font-size:.55rem;font-weight:700;letter-spacing:3px;padding:.3rem .8rem;margin:.3rem 0 .5rem;text-transform:uppercase;'>القائمة</p>", unsafe_allow_html=True)
     cu=get_current_user()
-    if cu and cu.get('role')=='admin':
-        cur_perms=cu.get('permissions',[])
-        if ADMIN_PAGE not in cur_perms: cur_perms.append(ADMIN_PAGE)
-        missing=[p for p in ALL_PAGES if p not in cur_perms]
-        if missing:
-            cu['permissions']=cur_perms+missing
-            users=load_users()
-            for u in users:
-                if u.get('username')==cu.get('username'):
-                    u['permissions']=cu['permissions']
-            save_users(users)
+    try:
+        if cu and cu.get('role')=='admin':
+            cur_perms=cu.get('permissions',[])
+            if ADMIN_PAGE not in cur_perms: cur_perms.append(ADMIN_PAGE)
+            missing=[p for p in ALL_PAGES if p not in cur_perms]
+            if missing:
+                cu['permissions']=cur_perms+missing
+                users=load_users()
+                for u in users:
+                    if u.get('username')==cu.get('username'):
+                        u['permissions']=cu['permissions']
+                save_users(users)
+    except Exception:
+        pass
     nav_pages=[p for p in ALL_PAGES if p in cu.get('permissions',[]) or cu.get('role')=='admin']
     if cu.get('role')=='admin': nav_pages.append(ADMIN_PAGE)
     page=st.radio("nav",nav_pages,label_visibility="collapsed",index=0)
