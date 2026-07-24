@@ -324,7 +324,9 @@ section[data-testid="stSidebar"] .stRadio>div>div>label:hover{background:rgba(10
 section[data-testid="stSidebar"] .stRadio>div>div:has(input:checked)>label{background:rgba(108,92,231,0.3)!important;border:2px solid rgba(108,92,231,0.7)!important;border-radius:8px!important;box-shadow:0 0 20px rgba(108,92,231,0.2)!important;color:#fff!important;font-weight:700!important;padding:.55rem 1rem!important;margin:3px 4px!important;}
 section[data-testid="stSidebar"] .stRadio>div>div>label::before{display:none!important;}
 section[data-testid="stSidebar"] .stRadio>div>div>label::after{display:none!important;}
-section[data-testid="stSidebar"] .stRadio>div{gap:0!important;}
+section[data-testid="stSidebar"] .stRadio>div{gap:0!important;max-height:none!important;overflow:visible!important;}
+section[data-testid="stSidebar"] .stRadio{max-height:none!important;overflow:visible!important;}
+section[data-testid="stSidebar"] .stRadio>div>div{max-height:none!important;overflow:visible!important;}
 section[data-testid="stSidebar"] hr{border-color:rgba(108,92,231,.06)!important;}
 section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p{margin:0!important;}
 
@@ -456,10 +458,7 @@ with st.sidebar:
         pass
     nav_pages=[p for p in ALL_PAGES if p in cu.get('permissions',[]) or cu.get('role')=='admin']
     if cu.get('role')=='admin': nav_pages.append(ADMIN_PAGE)
-    if len(nav_pages)<=1:
-        page=nav_pages[0]
-    else:
-        page=st.selectbox("nav",nav_pages,label_visibility="collapsed",index=0)
+    page=st.radio("nav",nav_pages,label_visibility="collapsed",index=0,key="nav_radio")
     st.markdown("<div style='height:1px;background:linear-gradient(90deg,transparent,rgba(108,92,231,.1),transparent);margin:1.2rem .8rem;'></div>", unsafe_allow_html=True)
     st.markdown(f"""<div style="padding:.7rem 1rem;border-radius:14px;background:rgba(108,92,231,.04);border:1px solid rgba(108,92,231,.06);margin:0 .5rem;text-align:center;">
         <p style="color:rgba(255,255,255,.6);font-size:.65rem;margin:0 0 .2rem;">المستخدم: <strong style="color:#a29bfe;">{cu.get('display_name','')}</strong></p>
