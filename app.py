@@ -1441,7 +1441,7 @@ elif page=="📄 Portal الفواتير الإلكترونية":
     st.markdown(f"""<div class="erp-topbar"><div><h2>{page}</h2><p>إدارة فواتير الصادرة والواردة من بوابة الفواتير الإلكترونية</p></div>
 <div class="erp-topbar-right"><a href="https://invoicing.eta.gov.eg/" target="_blank" style="background:linear-gradient(135deg,rgba(0,206,201,.18),rgba(108,92,231,.12));border:1px solid rgba(0,206,201,.35);border-radius:12px;padding:.5rem 1.2rem;color:#00cec9;font-size:.82rem;font-weight:700;text-decoration:none;cursor:pointer;transition:all .3s;display:inline-flex;align-items:center;gap:.5rem;">🔗 فتح بوابة الفواتير الإلكترونية</a></div></div>""", unsafe_allow_html=True)
 
-    portal_sub=st.radio("portal_tabs",["🔗 ربط مباشر مع البورتال","📤 فواتير الصادرة","📥 فواتير الوارد","🏷️ الأكواد"],horizontal=True,label_visibility="collapsed")
+    portal_sub=st.radio("portal_tabs",["🔗 الربط","📤 الصادرة","📥 الوارد","🏷️ الأكواد"],horizontal=True,label_visibility="collapsed")
 
     def _portal_dashboard(data,label,color_icon,label_type):
         if not data:
@@ -1616,7 +1616,7 @@ elif page=="📄 Portal الفواتير الإلكترونية":
                 zip_buf.seek(0)
                 st.download_button(f"📦 تحميل مضغوط ({len(all_records)} فاتورة PDF+Excel)",data=zip_buf.getvalue(),file_name=f"invoices_{label_type}_{sel_period.replace('/','_') if sel_period!='الكل' else 'all'}.zip",mime="application/zip",key=f"dl_zip_{label_type}")
 
-    if portal_sub=="🔗 ربط مباشر مع البورتال":
+    if portal_sub=="🔗 الربط":
         st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>ربط مباشر مع بوابة الفواتير الإلكترونية</h3></div>',unsafe_allow_html=True)
 
         eta_cid=os.environ.get("ETA_CLIENT_ID","")
@@ -1742,7 +1742,7 @@ elif page=="📄 Portal الفواتير الإلكترونية":
                 <p style="color:var(--text2);font-size:.85rem;margin:.5rem 0;">أدخل بياناتك من البورتال المصري للاتصال وجلب الفواتير تلقائياً</p>
             </div>""",unsafe_allow_html=True)
 
-    elif portal_sub=="📤 فواتير الصادرة":
+    elif portal_sub=="📤 الصادرة":
         st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>فواتير الصادرة</h3></div>',unsafe_allow_html=True)
 
         out_data=load_data(PORTAL_OUT_FILE)
@@ -1822,7 +1822,7 @@ elif page=="📄 Portal الفواتير الإلكترونية":
             if st.button("🗑️ حذف جميع الفواتير الصادرة",key="del_all_out",type="secondary"):
                 save_data(PORTAL_OUT_FILE,[]);st.success("تم الحذف");st.rerun()
 
-    elif portal_sub=="📥 فواتير الوارد":
+    elif portal_sub=="📥 الوارد":
         st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>فواتير الوارد</h3></div>',unsafe_allow_html=True)
 
         in_data=load_data(PORTAL_IN_FILE)
