@@ -1441,7 +1441,7 @@ elif page=="📄 Portal الفواتير الإلكترونية":
     st.markdown(f"""<div class="erp-topbar"><div><h2>{page}</h2><p>إدارة فواتير الصادرة والواردة من بوابة الفواتير الإلكترونية</p></div>
 <div class="erp-topbar-right"><a href="https://invoicing.eta.gov.eg/" target="_blank" style="background:linear-gradient(135deg,rgba(0,206,201,.18),rgba(108,92,231,.12));border:1px solid rgba(0,206,201,.35);border-radius:12px;padding:.5rem 1.2rem;color:#00cec9;font-size:.82rem;font-weight:700;text-decoration:none;cursor:pointer;transition:all .3s;display:inline-flex;align-items:center;gap:.5rem;">🔗 فتح بوابة الفواتير الإلكترونية</a></div></div>""", unsafe_allow_html=True)
 
-    portal_sub=st.radio("portal_tabs",["🔗 الربط","📤 الصادرة","📥 الوارد","🏷️ الأكواد"],horizontal=True,label_visibility="collapsed")
+    portal_sub=st.radio("portal_tabs",["🔗 الربط","📤 الصادرة","📥 الوارد","🏷️ الأكواد"],label_visibility="collapsed")
 
     def _portal_dashboard(data,label,color_icon,label_type):
         if not data:
