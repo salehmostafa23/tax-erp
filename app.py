@@ -457,7 +457,14 @@ with st.sidebar:
         pass
     nav_pages=[p for p in ALL_PAGES if p in cu.get('permissions',[]) or cu.get('role')=='admin']
     if cu.get('role')=='admin': nav_pages.append(ADMIN_PAGE)
-    page=st.radio("nav",nav_pages,label_visibility="collapsed",index=0,key="nav_v2")
+    if 'selected_page' not in st.session_state or st.session_state.get('selected_page') not in nav_pages:
+        st.session_state['selected_page']=nav_pages[0]
+    for _np in nav_pages:
+        _sel=(st.session_state['selected_page']==_np)
+        if st.button(_np,key=f"navbtn_{_np}",use_container_width=True,type="primary" if _sel else "secondary"):
+            st.session_state['selected_page']=_np
+            st.rerun()
+    page=st.session_state['selected_page']
     st.markdown("<div style='height:1px;background:linear-gradient(90deg,transparent,rgba(108,92,231,.1),transparent);margin:1.2rem .8rem;'></div>", unsafe_allow_html=True)
     st.markdown(f"""<div style="padding:.7rem 1rem;border-radius:14px;background:rgba(108,92,231,.04);border:1px solid rgba(108,92,231,.06);margin:0 .5rem;text-align:center;">
         <p style="color:rgba(255,255,255,.6);font-size:.65rem;margin:0 0 .2rem;">المستخدم: <strong style="color:#a29bfe;">{cu.get('display_name','')}</strong></p>
@@ -844,7 +851,7 @@ if page == ADMIN_PAGE:
         st.error("لا تملك صلاحية الوصول");st.stop()
     st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>إدارة المستخدمين</h3></div>',unsafe_allow_html=True)
     users=load_users()
-    tab_add,tab_list=st.tabs(["➕ إضافة مستخدم","📋 قائمة المستخدمين"])
+    tab_add,tab_list,tab_edit=st.tabs(["➕ إضافة مستخدم","📋 قائمة المستخدمين","✏️ تعديل الصلاحيات"])
     with tab_add:
         with st.form("add_user_form",clear_on_submit=True):
             c1,c2=st.columns(2)
@@ -889,6 +896,32 @@ if page == ADMIN_PAGE:
                             save_users(users);st.success(f"تم حذف {u.get('display_name','')}");st.rerun()
         else:
             st.info("لا يوجد مستخدمون")
+    with tab_edit:
+        editable_users=[u for u in users if u.get('role')!='admin']
+        if not editable_users:
+            st.info("لا يوجد مستخدمون للتعديل")
+        else:
+            edit_user_names=[f"{u.get('display_name','')} (@{u['username']})" for u in editable_users]
+            sel_idx=st.selectbox("اختر المستخدم",range(len(edit_user_names)),format_func=lambda i:edit_user_names[i],key="edit_perm_user")
+            sel_user=editable_users[sel_idx]
+            st.markdown(f'<p style="color:var(--text);font-size:.85rem;margin:.5rem 0;">صلاحيات <strong style="color:var(--accent2);">{sel_user.get("display_name","")}</strong></p>',unsafe_allow_html=True)
+            cur_perms=sel_user.get('permissions',[])
+            new_perms=[]
+            perm_cols=st.columns(3)
+            for i,pg in enumerate(ALL_PAGES):
+                with perm_cols[i%3]:
+                    new_perms.append((pg,st.checkbox(pg,value=pg in cur_perms,key=f"edit_perm_{sel_user['username']}_{i}")))
+            if st.button("💾 حفظ الصلاحيات",key="save_edit_perms",type="primary",use_container_width=True):
+                final_perms=[p for p,c in new_perms if c]
+                for u in users:
+                    if u['username']==sel_user['username']:
+                        u['permissions']=final_perms
+                save_users(users)
+                cu=get_current_user()
+                if cu and cu.get('username')==sel_user['username']:
+                    cu['permissions']=final_perms
+                st.success(f"تم تعديل صلاحيات {sel_user.get('display_name','')} بنجاح!")
+                st.rerun()
     st.stop()
 
 # ====================== HOME ======================
