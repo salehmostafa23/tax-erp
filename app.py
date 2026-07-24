@@ -438,6 +438,17 @@ with st.sidebar:
     """, unsafe_allow_html=True)
     st.markdown("<p style='color:rgba(255,255,255,.18);font-size:.55rem;font-weight:700;letter-spacing:3px;padding:.3rem .8rem;margin:.3rem 0 .5rem;text-transform:uppercase;'>القائمة</p>", unsafe_allow_html=True)
     cu=get_current_user()
+    if cu and cu.get('role')=='admin':
+        cur_perms=cu.get('permissions',[])
+        if ADMIN_PAGE not in cur_perms: cur_perms.append(ADMIN_PAGE)
+        missing=[p for p in ALL_PAGES if p not in cur_perms]
+        if missing:
+            cu['permissions']=cur_perms+missing
+            users=load_users()
+            for u in users:
+                if u.get('username')==cu.get('username'):
+                    u['permissions']=cu['permissions']
+            save_users(users)
     nav_pages=[p for p in ALL_PAGES if p in cu.get('permissions',[]) or cu.get('role')=='admin']
     if cu.get('role')=='admin': nav_pages.append(ADMIN_PAGE)
     page=st.radio("nav",nav_pages,label_visibility="collapsed",index=0)
