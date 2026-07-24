@@ -478,7 +478,7 @@ with st.sidebar:
             <div style="width:5px;height:5px;border-radius:50%;background:#00b894;box-shadow:0 0 6px #00b894;"></div>
             <p style="color:rgba(255,255,255,.5);font-size:.62rem;margin:0;font-weight:500;">متصل</p>
         </div>
-        <p style="color:rgba(255,255,255,.22);font-size:.55rem;margin:0;letter-spacing:1px;">v1.0.0 • Tax Management System</p></div>""", unsafe_allow_html=True)
+        <p style="color:rgba(255,255,255,.22);font-size:.55rem;margin:0;letter-spacing:1px;">v1.1.2 • Tax Management System</p></div>""", unsafe_allow_html=True)
 
 # ====================== DATA ======================
 FORM41_FILE = os.path.join(DATA_DIR, "form41_data.json")
