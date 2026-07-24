@@ -457,7 +457,7 @@ with st.sidebar:
         pass
     nav_pages=[p for p in ALL_PAGES if p in cu.get('permissions',[]) or cu.get('role')=='admin']
     if cu.get('role')=='admin': nav_pages.append(ADMIN_PAGE)
-    page=st.radio("nav",nav_pages,label_visibility="collapsed",index=0,key="nav_radio")
+    page=st.sidebar.selectbox("التنقل",nav_pages,label_visibility="visible",key="nav_select")
     st.markdown("<div style='height:1px;background:linear-gradient(90deg,transparent,rgba(108,92,231,.1),transparent);margin:1.2rem .8rem;'></div>", unsafe_allow_html=True)
     st.markdown(f"""<div style="padding:.7rem 1rem;border-radius:14px;background:rgba(108,92,231,.04);border:1px solid rgba(108,92,231,.06);margin:0 .5rem;text-align:center;">
         <p style="color:rgba(255,255,255,.6);font-size:.65rem;margin:0 0 .2rem;">المستخدم: <strong style="color:#a29bfe;">{cu.get('display_name','')}</strong></p>
