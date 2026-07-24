@@ -1487,7 +1487,7 @@ elif page=="📄 Portal الفواتير الإلكترونية":
     st.markdown(f"""<div class="erp-topbar"><div><h2>{page}</h2><p>إدارة فواتير الصادرة والواردة من بوابة الفواتير الإلكترونية</p></div>
 <div class="erp-topbar-right"><a href="https://invoicing.eta.gov.eg/" target="_blank" style="background:linear-gradient(135deg,rgba(0,206,201,.18),rgba(108,92,231,.12));border:1px solid rgba(0,206,201,.35);border-radius:12px;padding:.5rem 1.2rem;color:#00cec9;font-size:.82rem;font-weight:700;text-decoration:none;cursor:pointer;transition:all .3s;display:inline-flex;align-items:center;gap:.5rem;">🔗 فتح بوابة الفواتير الإلكترونية</a></div></div>""", unsafe_allow_html=True)
 
-    _tab1,_tab2,_tab3=st.tabs(["🔗 الربط","📤 الصادرة","📥 الوارد"])
+    _tab1,_tab2,_tab3,_tab4=st.tabs(["🔗 الربط","📤 الصادرة","📥 الوارد","🏷️ الاستعلام عن الأكواد"])
 
     def _portal_dashboard(data,label,color_icon,label_type):
         if not data:
@@ -1947,6 +1947,95 @@ elif page=="📄 Portal الفواتير الإلكترونية":
 
             if st.button("🗑️ حذف جميع فواتير الوارد",key="del_all_in",type="secondary"):
                 save_data(PORTAL_IN_FILE,[]);st.success("تم الحذف");st.rerun()
+
+    with _tab4:
+        st.markdown('<div class="erp-section"><div class="erp-section-dot" style="background:#74b9ff;box-shadow:0 0 12px #74b9ff;"></div><h3>الاستعلام عن أكواد الأصناف</h3></div>',unsafe_allow_html=True)
+
+        out_data=load_data(PORTAL_OUT_FILE)
+        in_data=load_data(PORTAL_IN_FILE)
+        all_uuids=[]
+        for rec in out_data:
+            for r in rec.get('records',[]):
+                uid=r.get('UUID','')
+                if uid: all_uuids.append({'uuid':uid,'direction':'out','name':r.get('الطرف الآخر','')})
+        for rec in in_data:
+            for r in rec.get('records',[]):
+                uid=r.get('UUID','')
+                if uid: all_uuids.append({'uuid':uid,'direction':'in','name':r.get('الطرف الآخر','')})
+
+        codes_db=load_codes_db()
+        fetched_codes=set(c.get('uuid','') for c in codes_db)
+        unfetched=[u for u in all_uuids if u['uuid'] not in fetched_codes]
+
+        c1,c2=st.columns(2)
+        with c1:
+            st.markdown(f"""<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(116,185,255,.06);border:1px solid rgba(116,185,255,.15);color:#74b9ff;font-size:.82rem;">
+                📦 الفواتير: <strong>{len(all_uuids)}</strong> | تم استخراج: <strong>{len(fetched_codes)}</strong> | متبقي: <strong>{len(unfetched)}</strong> | الأصناف: <strong>{len(codes_db)}</strong>
+            </div>""",unsafe_allow_html=True)
+        with c2:
+            if st.button("🔄 تحميل جميع الأكواد من الفواتير",key="load_all_codes",type="primary",use_container_width=True):
+                token=st.session_state.get("eta_token","")
+                if not token:
+                    st.error("يجب الاتصال بالبورتال أولاً من تاب الربط")
+                elif not all_uuids:
+                    st.info("لا توجد فواتير مرفوعة (صادرة أو وارد)")
+                else:
+                    progress=st.progress(0,text=f"جاري تحميل أكواد {len(all_uuids)} فاتورة...")
+                    new_codes=[]
+                    errors=0
+                    for idx,u in enumerate(all_uuids):
+                        progress.progress((idx+1)/len(all_uuids),text=f"فاتورة {idx+1}/{len(all_uuids)} — {u['uuid'][:15]}...")
+                        doc,err=eta_get_document_details(token,u['uuid'])
+                        if err or not doc:
+                            errors+=1
+                            continue
+                        document=doc.get('document',{})
+                        invoice_lines=document.get('invoiceLines',[])
+                        for line in invoice_lines:
+                            item_code=line.get('itemCode','')
+                            item_desc=line.get('description','')
+                            internal_code=line.get('internalCode','')
+                            new_codes.append({
+                                'uuid':u['uuid'],'direction':'صادرة' if u['direction']=='out' else 'واردة','counterparty':u['name'],
+                                'itemCode':item_code,'internalCode':internal_code,'description':item_desc
+                            })
+                        time.sleep(2.1)
+                    if new_codes:
+                        merged=list(codes_db)+new_codes
+                        unique=[]
+                        seen=set()
+                        for c in merged:
+                            key=(c.get('itemCode',''),c.get('internalCode',''),c.get('description',''))
+                            if key not in seen:
+                                seen.add(key)
+                                unique.append(c)
+                        save_codes_db(unique)
+                        st.success(f"تم تحميل {len(new_codes)} صنف من {len(all_uuids)-errors} فاتورة (أخطاء: {errors}) — إجمالي الأصناف: {len(unique)}")
+                        st.rerun()
+                    else:
+                        st.warning("لم يتم العثور على أصناف في الفواتير")
+                    progress.empty()
+
+        if codes_db:
+            st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot" style="background:#74b9ff;"></div><h3>بحث في الأكواد</h3></div>',unsafe_allow_html=True)
+            q=st.text_input("ابحث بالاسم أو الكود أو الوصف",key="tab4_codes_q",placeholder="مثال: معدات، طبية، أرز...")
+            filtered=codes_db
+            if q.strip():
+                ql=q.strip().lower()
+                filtered=[c for c in codes_db if ql in str(c.get('itemCode','')).lower() or ql in str(c.get('description','')).lower() or ql in str(c.get('internalCode','')).lower() or ql in str(c.get('counterparty','')).lower()]
+            if filtered:
+                df=pd.DataFrame([{'رقم الكود':c.get('itemCode',''),'الكود الداخلي':c.get('internalCode',''),'اسم الصنف / الوصف':c.get('description','')} for c in filtered])
+                df=df.drop_duplicates(subset=['رقم الكود','اسم الصنف / الوصف'])
+                st.dataframe(df,use_container_width=True,hide_index=True)
+                st.caption(f"عرض {len(df)} صنف من أصل {len(codes_db)}")
+            else:
+                st.info("لا توجد نتائج مطابقة" if q.strip() else "اضغط تحميل جميع الأكواد لبدء الاستخراج")
+        else:
+            st.markdown("""<div class="erp-empty" style="padding:2rem;margin-top:1rem;">
+                <div class="erp-empty-icon">🏷️</div>
+                <h3>قاعدة الأكواد فاضية</h3>
+                <p>اضغط "تحميل جميع الأكواد من الفواتير" لاستخراج أكواد الأصناف من جميع الفواتير المرفوعة</p>
+            </div>""",unsafe_allow_html=True)
 
 # ====================== الاستعلام عن الأكواد ======================
 elif page=="🏷️ الاستعلام عن الأكواد":
