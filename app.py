@@ -317,15 +317,11 @@ section[data-testid="stSidebar"][aria-expanded="false"]{position:relative!import
 button[data-testid="stSidebarCollapseButton"],div[data-testid="stSidebarCollapseButton"],[data-testid="stSidebarCollapseButton"]{display:none!important;pointer-events:none!important;visibility:hidden!important;opacity:0!important;width:0!important;height:0!important;padding:0!important;margin:0!important;overflow:hidden!important;}
 section[data-testid="stSidebar"]>div:first-child{padding-top:0!important;}
 section[data-testid="stSidebar"] [data-testid="stSidebarContent"]{overflow-y:auto!important;max-height:calc(100vh - 2rem)!important;}
-section[data-testid="stSidebar"] .stMarkdown p,section[data-testid="stSidebar"] .stMarkdown span,section[data-testid="stSidebar"] label,section[data-testid="stSidebar"] .stRadio>div>label{color:rgba(255,255,255,0.55)!important;font-size:.8rem!important;font-family:'Inter','Cairo',sans-serif!important;}
-section[data-testid="stSidebar"] .stRadio>div>div>label::before{display:none!important;}
-section[data-testid="stSidebar"] .stRadio>div>div>label::after{display:none!important;}
-section[data-testid="stSidebar"] .stRadio>div{gap:0!important;}
-section[data-testid="stSidebar"] .stRadio{gap:0!important;}
-section[data-testid="stSidebar"] [data-testid="stRadio"]>div{gap:0!important;}
-section[data-testid="stSidebar"] .stRadio>div>div>label{background:rgba(108,92,231,0.1)!important;border:1px solid rgba(108,92,231,0.2)!important;border-radius:8px!important;padding:.3rem .7rem!important;margin:2px 4px!important;display:flex!important;align-items:center!important;gap:.5rem!important;font-size:.75rem!important;}
-section[data-testid="stSidebar"] .stRadio>div>div>label:hover{background:rgba(108,92,231,0.2)!important;border-color:rgba(108,92,231,0.4)!important;color:rgba(255,255,255,.9)!important;}
-section[data-testid="stSidebar"] .stRadio>div>div:has(input:checked)>label{background:rgba(108,92,231,0.25)!important;border:1px solid rgba(108,92,231,0.6)!important;color:#fff!important;font-weight:700!important;box-shadow:0 0 12px rgba(108,92,231,0.15)!important;}
+section[data-testid="stSidebar"] .stMarkdown p,section[data-testid="stSidebar"] .stMarkdown span,section[data-testid="stSidebar"] label{color:rgba(255,255,255,0.55)!important;font-size:.8rem!important;font-family:'Inter','Cairo',sans-serif!important;}
+section[data-testid="stSidebar"] button[kind="primary"]{background:linear-gradient(135deg,#6c5ce7,#a29bfe)!important;border:none!important;border-radius:8px!important;padding:.3rem .6rem!important;font-size:.75rem!important;font-weight:700!important;color:#fff!important;min-height:0!important;height:auto!important;margin:1px 4px!important;}
+section[data-testid="stSidebar"] button[kind="secondary"]{background:rgba(108,92,231,0.08)!important;border:1px solid rgba(108,92,231,0.15)!important;border-radius:8px!important;padding:.3rem .6rem!important;font-size:.75rem!important;color:rgba(255,255,255,0.6)!important;min-height:0!important;height:auto!important;margin:1px 4px!important;}
+section[data-testid="stSidebar"] button[kind="secondary"]:hover{background:rgba(108,92,231,0.15)!important;border-color:rgba(108,92,231,0.3)!important;color:rgba(255,255,255,.9)!important;}
+section[data-testid="stSidebar"] [data-testid="stSidebarContent"] [data-testid="stVerticalBlock"]>div{gap:0!important;}
 section[data-testid="stSidebar"] hr{border-color:rgba(108,92,231,.06)!important;}
 section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p{margin:0!important;}
 
