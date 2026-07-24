@@ -788,8 +788,11 @@ def _fmt_date_dmy(val):
     return s
 
 def _sf(v):
-    try: return float(v or 0)
-    except: return 0
+    try:
+        import math
+        f=float(v) if v is not None and v!='' else 0.0
+        return 0.0 if math.isnan(f) or math.isinf(f) else f
+    except: return 0.0
 def meta_html(label, value, color="var(--accent2)"):
     return f"""<div class="erp-meta-item"><div class="erp-meta-k">{label}</div><div class="erp-meta-v" style="color:{color}">{value}</div></div>"""
 
