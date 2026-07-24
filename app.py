@@ -316,6 +316,7 @@ section[data-testid="stSidebar"]{background:linear-gradient(180deg,#050510 0%,#0
 section[data-testid="stSidebar"][aria-expanded="false"]{position:relative!important;transform:none!important;margin-left:0!important;}
 button[data-testid="stSidebarCollapseButton"],div[data-testid="stSidebarCollapseButton"],[data-testid="stSidebarCollapseButton"]{display:none!important;pointer-events:none!important;visibility:hidden!important;opacity:0!important;width:0!important;height:0!important;padding:0!important;margin:0!important;overflow:hidden!important;}
 section[data-testid="stSidebar"]>div:first-child{padding-top:0!important;}
+section[data-testid="stSidebar"] [data-testid="stSidebarContent"]{overflow-y:auto!important;max-height:calc(100vh - 2rem)!important;}
 section[data-testid="stSidebar"] .stMarkdown p,section[data-testid="stSidebar"] .stMarkdown span,section[data-testid="stSidebar"] label,section[data-testid="stSidebar"] .stRadio>div>label{color:rgba(255,255,255,0.55)!important;font-size:.8rem!important;font-family:'Inter','Cairo',sans-serif!important;}
 section[data-testid="stSidebar"] [data-baseweb="select"]{background:rgba(108,92,231,0.12)!important;border:2px solid rgba(108,92,231,0.3)!important;border-radius:8px!important;}
 section[data-testid="stSidebar"] [data-baseweb="select"] span{color:rgba(255,255,255,0.85)!important;font-size:.8rem!important;}
@@ -324,9 +325,7 @@ section[data-testid="stSidebar"] .stRadio>div>div>label:hover{background:rgba(10
 section[data-testid="stSidebar"] .stRadio>div>div:has(input:checked)>label{background:rgba(108,92,231,0.3)!important;border:2px solid rgba(108,92,231,0.7)!important;border-radius:8px!important;box-shadow:0 0 20px rgba(108,92,231,0.2)!important;color:#fff!important;font-weight:700!important;padding:.55rem 1rem!important;margin:3px 4px!important;}
 section[data-testid="stSidebar"] .stRadio>div>div>label::before{display:none!important;}
 section[data-testid="stSidebar"] .stRadio>div>div>label::after{display:none!important;}
-section[data-testid="stSidebar"] .stRadio>div{gap:0!important;max-height:none!important;overflow:visible!important;}
-section[data-testid="stSidebar"] .stRadio{max-height:none!important;overflow:visible!important;}
-section[data-testid="stSidebar"] .stRadio>div>div{max-height:none!important;overflow:visible!important;}
+section[data-testid="stSidebar"] .stRadio>div{gap:0!important;}
 section[data-testid="stSidebar"] hr{border-color:rgba(108,92,231,.06)!important;}
 section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p{margin:0!important;}
 
@@ -429,7 +428,7 @@ section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p{margin:0!
 # ====================== SIDEBAR ======================
 with st.sidebar:
     st.markdown("""
-    <div style="text-align:center;padding:1.8rem 1rem 1.2rem;position:relative;">
+    <div style="text-align:center;padding:1.2rem 1rem .8rem;position:relative;">
         <div style="position:absolute;top:0;left:0;right:0;height:100%;background:radial-gradient(ellipse at center top,rgba(108,92,231,0.08),transparent 70%);pointer-events:none;"></div>
         <div style="width:56px;height:56px;border-radius:18px;background:linear-gradient(135deg,#6c5ce7 0%,#a29bfe 50%,#00cec9 100%);display:inline-flex;align-items:center;justify-content:center;font-size:1.6rem;margin-bottom:.7rem;box-shadow:0 8px 30px rgba(108,92,231,0.45);position:relative;">
             <div style="position:absolute;inset:-2px;border-radius:20px;background:linear-gradient(135deg,#6c5ce7,#a29bfe,#00cec9);z-index:-1;opacity:.3;filter:blur(8px);"></div>
@@ -440,7 +439,7 @@ with st.sidebar:
         <div style="width:40px;height:2px;background:linear-gradient(90deg,transparent,rgba(108,92,231,.4),transparent);margin:.8rem auto 0;border-radius:2px;"></div>
     </div>
     """, unsafe_allow_html=True)
-    st.markdown("<p style='color:rgba(255,255,255,.18);font-size:.55rem;font-weight:700;letter-spacing:3px;padding:.3rem .8rem;margin:.3rem 0 .5rem;text-transform:uppercase;'>القائمة</p>", unsafe_allow_html=True)
+    st.markdown("<p style='color:rgba(255,255,255,.18);font-size:.55rem;font-weight:700;letter-spacing:3px;padding:.2rem .8rem;margin:.2rem 0 .3rem;text-transform:uppercase;'>القائمة</p>", unsafe_allow_html=True)
     cu=get_current_user()
     try:
         if cu and cu.get('role')=='admin':
