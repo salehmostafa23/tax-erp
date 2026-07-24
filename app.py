@@ -84,8 +84,8 @@ def eta_search_docs(token, direction, date_from, date_to, page_size=100):
     url = f"{ETA_API_BASE}/api/v1.0/documents/search"
     headers = {"Authorization": f"Bearer {token}"}
     params = {
-        "submissionDateFrom": date_from.strftime("%Y-%m-%dT00:00:00"),
-        "submissionDateTo": date_to.strftime("%Y-%m-%dT23:59:59"),
+        "issueDateFrom": date_from.strftime("%Y-%m-%dT00:00:00"),
+        "issueDateTo": date_to.strftime("%Y-%m-%dT23:59:59"),
         "direction": direction,
         "pageSize": page_size
     }
@@ -122,15 +122,11 @@ def eta_doc_to_record(doc, direction):
     issuer_name = doc.get("issuerName", "")
     receiver_id = doc.get("receiverId", "")
     receiver_name = doc.get("receiverName", "")
-    total_sales = float(doc.get("totalSalesAmount", 0) or doc.get("totalSales", 0) or 0)
-    total_discount = float(doc.get("discount", 0) or doc.get("totalDiscount", 0) or 0)
+    total_sales = float(doc.get("totalSales", 0) or 0)
+    total_discount = float(doc.get("totalDiscount", 0) or 0)
     net_amount = float(doc.get("netAmount", 0) or 0)
     total = float(doc.get("total", 0) or 0)
-    extra = doc.get("extraAdditionalData", {})
-    tax_total = float(doc.get("taxTotal", 0) or 0)
-    if not tax_total and isinstance(extra, dict):
-        tax_total = float(extra.get("taxTotal", 0) or 0)
-    payer_name = extra.get("payerName", "") if isinstance(extra, dict) else ""
+    tax_total = round(total - net_amount, 2) if total and net_amount else 0
     if direction == "Sent":
         period = issue_date[:7].replace("-", "/") if issue_date else ""
         counterparty = receiver_name
@@ -157,6 +153,18 @@ def eta_doc_to_record(doc, direction):
         "status": status, "file_name": f"ETA_{uuid_val[:12]}.json",
         "source": "eta_api", "records": [], "records_count": 1}
     return rec, meta
+
+def eta_get_document_pdf(token, uuid_val):
+    url = f"{ETA_API_BASE}/api/v1.0/documents/{uuid_val}/pdf"
+    headers = {"Authorization": f"Bearer {token}"}
+    r = http_requests.get(url, headers=headers, timeout=30, verify=False, stream=True)
+    if r.status_code == 200:
+        buf = BytesIO()
+        for chunk in r.iter_content(chunk_size=8192):
+            buf.write(chunk)
+        buf.seek(0)
+        return buf, None
+    return None, f"HTTP {r.status_code}"
 
 def _generate_pdf_for_records(records, title="فواتير"):
     from reportlab.lib.pagesizes import A4, landscape
@@ -1736,12 +1744,22 @@ elif page=="📄 Portal الفواتير الإلكترونية":
                 else:
                     dl_label="الكل"
                 if st.button("📥 تحميل الحزمة",key="out_dl_btn",type="primary"):
-                    import zipfile
+                    import zipfile,time
+                    token=st.session_state.get("eta_token","")
                     zip_buf=BytesIO()
+                    progress=st.progress(0,text="جاري تحميل الفواتير...")
                     with zipfile.ZipFile(zip_buf,'w',zipfile.ZIP_DEFLATED) as zf:
                         for ri,rec in enumerate(filtered_dl):
+                            progress.progress((ri+1)/len(filtered_dl),text=f"فاتورة {ri+1}/{len(filtered_dl)}")
+                            uuid_val=rec.get('UUID','')
                             supplier=rec.get('الطرف الآخر',rec.get('اسم المصدر',rec.get('اسم المستلم',f'inv_{ri+1}')))
                             safe_supplier=''.join(c if c.isalnum() or c in '_-' else '_' for c in str(supplier))[:30]
+                            if token and uuid_val:
+                                pdf_buf,err=eta_get_document_pdf(token,uuid_val)
+                                if not err and pdf_buf:
+                                    zf.writestr(f"فاتورة_{ri+1}_{safe_supplier}.pdf",pdf_buf.getvalue())
+                                    time.sleep(2.1)
+                                    continue
                             pdf_inv=_generate_pdf_for_records([rec],f"فاتورة #{ri+1} — {supplier}")
                             zf.writestr(f"فاتورة_{ri+1}_{safe_supplier}.pdf",pdf_inv.getvalue())
                         df_bundle=pd.DataFrame(filtered_dl)
@@ -1749,34 +1767,13 @@ elif page=="📄 Portal الفواتير الإلكترونية":
                         df_bundle.to_excel(buf,index=False,engine='xlsxwriter')
                         buf.seek(0)
                         zf.writestr("ملخص.xlsx",buf.getvalue())
+                    progress.empty()
                     zip_buf.seek(0)
                     st.download_button("📦 تحميل الملف المضغوط",data=zip_buf.getvalue(),file_name=f"fawatir_sadira_{dl_label.replace('/','_')}.zip",mime="application/zip",key="out_zip_dl")
             else:
                 st.info("لا توجد فواتير تطابق الاختيار")
             st.markdown('</div>',unsafe_allow_html=True)
 
-            st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>الفواتير الصادرة المحفوظة</h3></div>',unsafe_allow_html=True)
-            for idx,rec in enumerate(out_data):
-                recs_count=rec.get('records_count',len(rec.get('records',[])))
-                status=rec.get('status','')
-                s_color='#55efc4' if status=='مقبولة' else '#fdcb6e' if status in ['مرسلة','معلقة'] else '#ff6b6b' if status=='مرفوضة' else '#74b9ff'
-                st.markdown(f"""<div class="erp-card" style="margin-bottom:.8rem;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;">
-                        <div>
-                            <div style="color:#fff;font-weight:700;font-size:.95rem;">{rec.get('file_name','')}</div>
-                            <div style="display:flex;gap:1rem;margin-top:.4rem;flex-wrap:wrap;">
-                                <span style="color:var(--text2);font-size:.75rem;">📅 {rec.get('period','-')}</span>
-                                <span style="color:var(--text2);font-size:.75rem;">📋 {rec.get('invoice_type','-')}</span>
-                                <span style="color:var(--text2);font-size:.75rem;">📊 {recs_count} فاتورة</span>
-                                <span style="color:{s_color};font-size:.75rem;font-weight:600;">● {status}</span>
-                                <span style="color:var(--text2);font-size:.7rem;">🕐 {_fmt_date_dmy(rec.get('upload_date',''))}</span>
-                            </div>
-                        </div>
-                        <div style="display:flex;gap:.5rem;">
-                            <span style="background:rgba(108,92,231,.15);border:1px solid rgba(108,92,231,.2);border-radius:8px;padding:.2rem .6rem;color:#a29bfe;font-size:.7rem;">صادر</span>
-                        </div>
-                    </div>
-                </div>""",unsafe_allow_html=True)
             if st.button("🗑️ حذف جميع الفواتير الصادرة",key="del_all_out",type="secondary"):
                 save_data(PORTAL_OUT_FILE,[]);st.success("تم الحذف");st.rerun()
 
@@ -1827,12 +1824,22 @@ elif page=="📄 Portal الفواتير الإلكترونية":
                 else:
                     dl_label="الكل"
                 if st.button("📥 تحميل الحزمة",key="in_dl_btn",type="primary"):
-                    import zipfile
+                    import zipfile,time
+                    token=st.session_state.get("eta_token","")
                     zip_buf=BytesIO()
+                    progress=st.progress(0,text="جاري تحميل الفواتير...")
                     with zipfile.ZipFile(zip_buf,'w',zipfile.ZIP_DEFLATED) as zf:
                         for ri,rec in enumerate(filtered_dl):
+                            progress.progress((ri+1)/len(filtered_dl),text=f"فاتورة {ri+1}/{len(filtered_dl)}")
+                            uuid_val=rec.get('UUID','')
                             supplier=rec.get('الطرف الآخر',rec.get('اسم المصدر',rec.get('اسم المستلم',f'inv_{ri+1}')))
                             safe_supplier=''.join(c if c.isalnum() or c in '_-' else '_' for c in str(supplier))[:30]
+                            if token and uuid_val:
+                                pdf_buf,err=eta_get_document_pdf(token,uuid_val)
+                                if not err and pdf_buf:
+                                    zf.writestr(f"فاتورة_{ri+1}_{safe_supplier}.pdf",pdf_buf.getvalue())
+                                    time.sleep(2.1)
+                                    continue
                             pdf_inv=_generate_pdf_for_records([rec],f"فاتورة #{ri+1} — {supplier}")
                             zf.writestr(f"فاتورة_{ri+1}_{safe_supplier}.pdf",pdf_inv.getvalue())
                         df_bundle=pd.DataFrame(filtered_dl)
@@ -1840,33 +1847,12 @@ elif page=="📄 Portal الفواتير الإلكترونية":
                         df_bundle.to_excel(buf,index=False,engine='xlsxwriter')
                         buf.seek(0)
                         zf.writestr("ملخص.xlsx",buf.getvalue())
+                    progress.empty()
                     zip_buf.seek(0)
                     st.download_button("📦 تحميل الملف المضغوط",data=zip_buf.getvalue(),file_name=f"fawatir_warida_{dl_label.replace('/','_')}.zip",mime="application/zip",key="in_zip_dl")
             else:
                 st.info("لا توجد فواتير تطابق الاختيار")
             st.markdown('</div>',unsafe_allow_html=True)
 
-            st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>فواتير الوارد المحفوظة</h3></div>',unsafe_allow_html=True)
-            for idx,rec in enumerate(in_data):
-                recs_count=rec.get('records_count',len(rec.get('records',[])))
-                status=rec.get('status','')
-                s_color='#55efc4' if status=='مقبولة' else '#fdcb6e' if status in ['مستلمة','معلقة'] else '#ff6b6b' if status=='مرفوضة' else '#74b9ff'
-                st.markdown(f"""<div class="erp-card" style="margin-bottom:.8rem;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;">
-                        <div>
-                            <div style="color:#fff;font-weight:700;font-size:.95rem;">{rec.get('file_name','')}</div>
-                            <div style="display:flex;gap:1rem;margin-top:.4rem;flex-wrap:wrap;">
-                                <span style="color:var(--text2);font-size:.75rem;">📅 {rec.get('period','-')}</span>
-                                <span style="color:var(--text2);font-size:.75rem;">📋 {rec.get('invoice_type','-')}</span>
-                                <span style="color:var(--text2);font-size:.75rem;">📊 {recs_count} فاتورة</span>
-                                <span style="color:{s_color};font-size:.75rem;font-weight:600;">● {status}</span>
-                                <span style="color:var(--text2);font-size:.7rem;">🕐 {_fmt_date_dmy(rec.get('upload_date',''))}</span>
-                            </div>
-                        </div>
-                        <div style="display:flex;gap:.5rem;">
-                            <span style="background:rgba(0,206,201,.15);border:1px solid rgba(0,206,201,.2);border-radius:8px;padding:.2rem .6rem;color:#00cec9;font-size:.7rem;">وارد</span>
-                        </div>
-                    </div>
-                </div>""",unsafe_allow_html=True)
             if st.button("🗑️ حذف جميع فواتير الوارد",key="del_all_in",type="secondary"):
                 save_data(PORTAL_IN_FILE,[]);st.success("تم الحذف");st.rerun()
