@@ -21,7 +21,7 @@ DATA_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # ====================== USERS ======================
 USERS_FILE=os.path.join(DATA_DIR,"users.json")
-ALL_PAGES=["🏠 الرئيسية","📋 نموذج 41","💰 القيمة المضافة","🛒 فواتير الماركت","📄 Portal الفواتير الإلكترونية","🔍 الاستعلام عن ممول"]
+ALL_PAGES=["🏠 الرئيسية","📋 نموذج 41","💰 القيمة المضافة","🛒 فواتير الماركت","📄 Portal الفواتير الإلكترونية","🔍 الاستعلام عن ممول","🏷️ الاستعلام عن الأكواد"]
 ADMIN_PAGE="👥 إدارة المستخدمين"
 
 def _hash_pw(pw,salt="tax_erp_salt_2024"):
@@ -1441,7 +1441,7 @@ elif page=="📄 Portal الفواتير الإلكترونية":
     st.markdown(f"""<div class="erp-topbar"><div><h2>{page}</h2><p>إدارة فواتير الصادرة والواردة من بوابة الفواتير الإلكترونية</p></div>
 <div class="erp-topbar-right"><a href="https://invoicing.eta.gov.eg/" target="_blank" style="background:linear-gradient(135deg,rgba(0,206,201,.18),rgba(108,92,231,.12));border:1px solid rgba(0,206,201,.35);border-radius:12px;padding:.5rem 1.2rem;color:#00cec9;font-size:.82rem;font-weight:700;text-decoration:none;cursor:pointer;transition:all .3s;display:inline-flex;align-items:center;gap:.5rem;">🔗 فتح بوابة الفواتير الإلكترونية</a></div></div>""", unsafe_allow_html=True)
 
-    _tab1,_tab2,_tab3,_tab4=st.tabs(["🔗 الربط","📤 الصادرة","📥 الوارد","🏷️ الأكواد"])
+    _tab1,_tab2,_tab3=st.tabs(["🔗 الربط","📤 الصادرة","📥 الوارد"])
 
     def _portal_dashboard(data,label,color_icon,label_type):
         if not data:
@@ -1902,153 +1902,158 @@ elif page=="📄 Portal الفواتير الإلكترونية":
             if st.button("🗑️ حذف جميع فواتير الوارد",key="del_all_in",type="secondary"):
                 save_data(PORTAL_IN_FILE,[]);st.success("تم الحذف");st.rerun()
 
-    with _tab4:
-        st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>أكواد الأصناف في الفواتير</h3></div>',unsafe_allow_html=True)
+# ====================== الاستعلام عن الأكواد ======================
+elif page=="🏷️ الاستعلام عن الأكواد":
+    if not user_has_permission(page): st.error("لا تملك صلاحية الوصول");st.stop()
 
-        codes_db=load_codes_db()
-        st.markdown(f"""<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(116,185,255,.06);border:1px solid rgba(116,185,255,.15);color:#74b9ff;font-size:.82rem;margin-bottom:1rem;">
-            📊 قاعدة الأكواد تحتوي على <strong>{len(codes_db)}</strong> صنف
+    st.markdown(f"""<div class="erp-topbar"><div><h2>{page}</h2><p>بحث واستعلام عن أكواد الأصناف في الفواتير الإلكترونية</p></div>
+<div class="erp-topbar-right"><span class="erp-badge">🏷️ أكواد</span></div></div>""", unsafe_allow_html=True)
+
+    codes_db=load_codes_db()
+    st.markdown(f"""<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(116,185,255,.06);border:1px solid rgba(116,185,255,.15);color:#74b9ff;font-size:.82rem;margin-bottom:1rem;">
+        📊 قاعدة الأكواد تحتوي على <strong>{len(codes_db)}</strong> صنف
+    </div>""",unsafe_allow_html=True)
+
+    out_data=load_data(PORTAL_OUT_FILE)
+    in_data=load_data(PORTAL_IN_FILE)
+    all_uuids=[]
+    for rec in out_data:
+        for r in rec.get('records',[]):
+            uid=r.get('UUID','')
+            if uid: all_uuids.append({'uuid':uid,'direction':'out','name':r.get('الطرف الآخر','')})
+    for rec in in_data:
+        for r in rec.get('records',[]):
+            uid=r.get('UUID','')
+            if uid: all_uuids.append({'uuid':uid,'direction':'in','name':r.get('الطرف الآخر','')})
+    fetched_uuids=set(c.get('uuid','') for c in codes_db)
+    unfetched=[u for u in all_uuids if u['uuid'] not in fetched_uuids]
+
+    c1,c2=st.columns(2)
+    with c1:
+        st.markdown(f"""<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(85,239,196,.06);border:1px solid rgba(85,239,196,.15);color:#55efc4;font-size:.82rem;">
+            📦 إجمالي الفواتير: <strong>{len(all_uuids)}</strong> | تم استخراج الأكواد: <strong>{len(fetched_uuids)}</strong> | متبقي: <strong>{len(unfetched)}</strong>
         </div>""",unsafe_allow_html=True)
-
-        out_data=load_data(PORTAL_OUT_FILE)
-        in_data=load_data(PORTAL_IN_FILE)
-        all_uuids=[]
-        for rec in out_data:
-            for r in rec.get('records',[]):
-                uid=r.get('UUID','')
-                if uid: all_uuids.append({'uuid':uid,'direction':'out','name':r.get('الطرف الآخر','')})
-        for rec in in_data:
-            for r in rec.get('records',[]):
-                uid=r.get('UUID','')
-                if uid: all_uuids.append({'uuid':uid,'direction':'in','name':r.get('الطرف الآخر','')})
-        fetched_uuids=set(c.get('uuid','') for c in codes_db)
-        unfetched=[u for u in all_uuids if u['uuid'] not in fetched_uuids]
-
-        c1,c2=st.columns(2)
-        with c1:
-            st.markdown(f"""<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(85,239,196,.06);border:1px solid rgba(85,239,196,.15);color:#55efc4;font-size:.82rem;">
-                📦 إجمالي الفواتير: <strong>{len(all_uuids)}</strong> | تم استخراج الأكواد: <strong>{len(fetched_uuids)}</strong> | متبقي: <strong>{len(unfetched)}</strong>
-            </div>""",unsafe_allow_html=True)
-        with c2:
-            if st.button("🔄 تحديث الأكواد من البورتال",key="refresh_codes",type="primary"):
-                token=st.session_state.get("eta_token","")
-                if not token:
-                    st.error("يجب الاتصال بالبورتال أولاً من تاب الربط المباشر")
-                elif not unfetched:
-                    st.success("جميع الفواتير تم استخراج أكوادها بالفعل!")
-                else:
-                    progress=st.progress(0,text=f"جاري استخراج الأكواد من {len(unfetched)} فاتورة...")
-                    new_codes=[]
-                    errors=0
-                    for idx,u in enumerate(unfetched):
-                        progress.progress((idx+1)/len(unfetched),text=f"فاتورة {idx+1}/{len(unfetched)} — {u['uuid'][:12]}...")
-                        doc,err=eta_get_document_details(token,u['uuid'])
-                        if err or not doc:
-                            errors+=1
-                            continue
-                        document=doc.get('document',{})
-                        invoice_lines=document.get('invoiceLines',[])
-                        for line in invoice_lines:
-                            item_code=line.get('itemCode','')
-                            item_desc=line.get('description','')
-                            internal_code=line.get('internalCode','')
-                            item_type=line.get('itemType','')
-                            quantity=line.get('quantity',0)
-                            unit_type=line.get('unitType','')
-                            unit_val=line.get('unitValue',{})
-                            unit_price=unit_val.get('amountEGP',0) if isinstance(unit_val,dict) else 0
-                            sales_total=line.get('salesTotal',0)
-                            new_codes.append({
-                                'uuid':u['uuid'],'direction':'صادر' if u['direction']=='out' else 'وارد',
-                                'counterparty':u['name'],'itemCode':item_code,'internalCode':internal_code,
-                                'description':item_desc,'itemType':item_type,
-                                'quantity':quantity,'unitType':unit_type,'unitPrice':unit_price,'salesTotal':sales_total
-                            })
-                        time.sleep(2.1)
-                    if new_codes:
-                        codes_db.extend(new_codes)
-                        codes_db_unique=[]
-                        seen=set()
-                        for c in codes_db:
-                            key=(c.get('uuid',''),c.get('itemCode',''),c.get('description',''))
-                            if key not in seen:
-                                seen.add(key)
-                                codes_db_unique.append(c)
-                        save_codes_db(codes_db_unique)
-                        st.success(f"تم استخراج {len(new_codes)} صنف من {len(unfetched)-errors} فاتورة (أخطاء: {errors})")
-                    else:
-                        st.warning("لم يتم العثور على أصناف في الفواتير المدروسة")
-                    progress.empty()
-
-        st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot"></div><h3>بحث عن صنف</h3></div>',unsafe_allow_html=True)
-        st.markdown('<div class="erp-card">',unsafe_allow_html=True)
-        search_query=st.text_input("اكتب كلمة مفتاحية (اسم الصنف أو الوصف أو الكود)",key="codes_search",placeholder="مثال: فلاش، منظف، أرز...")
-        if st.button("🔍 بحث",key="codes_search_btn",type="primary"):
-            if not search_query.strip():
-                st.warning("أدخل كلمة للبحث")
-            elif not codes_db:
-                st.info("قاعدة الأكواد فاضية — اضغط تحديث الأكواد أولاً")
+    with c2:
+        if st.button("🔄 تحديث الأكواد من البورتال",key="refresh_codes",type="primary"):
+            token=st.session_state.get("eta_token","")
+            if not token:
+                st.error("يجب الاتصال بالبورتال أولاً من تاب Portal الفواتير الإلكترونية")
+            elif not unfetched:
+                st.success("جميع الفواتير تم استخراج أكوادها بالفعل!")
             else:
-                q=search_query.strip()
-                results=[]
-                for c in codes_db:
-                    score=0
-                    desc=str(c.get('description','')).lower()
-                    code=str(c.get('itemCode','')).lower()
-                    ic=str(c.get('internalCode','')).lower()
-                    name=str(c.get('counterparty','')).lower()
-                    if q.lower() in desc: score=max(score,10)
-                    if q.lower() in code: score=max(score,8)
-                    if q.lower() in ic: score=max(score,8)
-                    if q.lower() in name: score=max(score,5)
-                    q_words=q.lower().split()
-                    for w in q_words:
-                        if w in desc: score+=3
-                        if w in code: score+=2
-                        if w in ic: score+=2
-                    if score>0:
-                        results.append((score,c))
-                results.sort(key=lambda x:x[0],reverse=True)
-                if results:
-                    st.success(f"تم العثور على {len(results)} نتيجة")
-                    seen_codes=set()
-                    for score,c in results:
-                        item_key=(c.get('itemCode',''),c.get('description',''))
-                        if item_key in seen_codes: continue
-                        seen_codes.add(item_key)
-                        dir_color='#00cec9' if c.get('direction')=='وارد' else '#a29bfe'
-                        dir_label=c.get('direction','')
-                        st.markdown(f"""<div class="erp-card" style="margin-bottom:.6rem;border-left:3px solid {dir_color};">
-                            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-                                <div>
-                                    <div style="color:#fff;font-weight:700;font-size:.92rem;">{c.get('description','—')}</div>
-                                    <div style="display:flex;gap:.8rem;margin-top:.3rem;flex-wrap:wrap;">
-                                        <span style="color:#00cec9;font-size:.78rem;font-weight:600;">📋 كود: {c.get('itemCode','—')}</span>
-                                        <span style="color:#fdcb6e;font-size:.75rem;">رقم داخلي: {c.get('internalCode','—')}</span>
-                                        <span style="color:{dir_color};font-size:.72rem;font-weight:600;">{dir_label}</span>
-                                    </div>
-                                    <div style="color:var(--text2);font-size:.72rem;margin-top:.2rem;">المورد/العميل: {c.get('counterparty','—')}</div>
-                                </div>
-                                <div style="text-align:left;">
-                                    <div style="color:#55efc4;font-weight:700;font-size:.85rem;">{fmt(c.get('salesTotal',0))}</div>
-                                    <div style="color:var(--text2);font-size:.68rem;">الكمية: {c.get('quantity',0)} {c.get('unitType','')}</div>
-                                </div>
-                            </div>
-                        </div>""",unsafe_allow_html=True)
+                progress=st.progress(0,text=f"جاري استخراج الأكواد من {len(unfetched)} فاتورة...")
+                new_codes=[]
+                errors=0
+                for idx,u in enumerate(unfetched):
+                    progress.progress((idx+1)/len(unfetched),text=f"فاتورة {idx+1}/{len(unfetched)} — {u['uuid'][:12]}...")
+                    doc,err=eta_get_document_details(token,u['uuid'])
+                    if err or not doc:
+                        errors+=1
+                        continue
+                    document=doc.get('document',{})
+                    invoice_lines=document.get('invoiceLines',[])
+                    for line in invoice_lines:
+                        item_code=line.get('itemCode','')
+                        item_desc=line.get('description','')
+                        internal_code=line.get('internalCode','')
+                        item_type=line.get('itemType','')
+                        quantity=line.get('quantity',0)
+                        unit_type=line.get('unitType','')
+                        unit_val=line.get('unitValue',{})
+                        unit_price=unit_val.get('amountEGP',0) if isinstance(unit_val,dict) else 0
+                        sales_total=line.get('salesTotal',0)
+                        new_codes.append({
+                            'uuid':u['uuid'],'direction':'صادر' if u['direction']=='out' else 'وارد',
+                            'counterparty':u['name'],'itemCode':item_code,'internalCode':internal_code,
+                            'description':item_desc,'itemType':item_type,
+                            'quantity':quantity,'unitType':unit_type,'unitPrice':unit_price,'salesTotal':sales_total
+                        })
+                    time.sleep(2.1)
+                if new_codes:
+                    codes_db.extend(new_codes)
+                    codes_db_unique=[]
+                    seen=set()
+                    for c in codes_db:
+                        key=(c.get('uuid',''),c.get('itemCode',''),c.get('description',''))
+                        if key not in seen:
+                            seen.add(key)
+                            codes_db_unique.append(c)
+                    save_codes_db(codes_db_unique)
+                    st.success(f"تم استخراج {len(new_codes)} صنف من {len(unfetched)-errors} فاتورة (أخطاء: {errors})")
+                    st.rerun()
                 else:
-                    st.info(f"لم يتم العثور على نتائج لكلمة: {q}")
-        st.markdown('</div>',unsafe_allow_html=True)
+                    st.warning("لم يتم العثور على أصناف في الفواتير المدروسة")
+                progress.empty()
 
-        if codes_db:
-            st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot"></div><h3>جميع الأكواد</h3></div>',unsafe_allow_html=True)
-            codes_df=pd.DataFrame([{'الكود':c.get('itemCode',''),'الكود الداخلي':c.get('internalCode',''),'الوصف':c.get('description',''),
-                'الاتجاه':c.get('direction',''),'المورد/العميل':c.get('counterparty',''),'الكمية':c.get('quantity',0),
-                'وحدة القياس':c.get('unitType',''),'سعر الوحدة':c.get('unitPrice',0),'الإجمالي':c.get('salesTotal',0)} for c in codes_db])
-            st.dataframe(codes_df,use_container_width=True,height=400)
-            excel_buf=BytesIO()
-            codes_df.to_excel(excel_buf,index=False,engine='xlsxwriter')
-            excel_buf.seek(0)
-            st.download_button("📊 تحميل جميع الأكواد",data=excel_buf.getvalue(),file_name="item_codes.xlsx",mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",key="dl_codes")
+    st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot"></div><h3>بحث عن صنف</h3></div>',unsafe_allow_html=True)
+    st.markdown('<div class="erp-card">',unsafe_allow_html=True)
+    search_query=st.text_input("اكتب كلمة مفتاحية (اسم الصنف أو الوصف أو الكود)",key="codes_search",placeholder="مثال: فلاش، منظف، أرز...")
+    if st.button("🔍 بحث",key="codes_search_btn",type="primary"):
+        if not search_query.strip():
+            st.warning("أدخل كلمة للبحث")
+        elif not codes_db:
+            st.info("قاعدة الأكواد فاضية — اضغط تحديث الأكواد أولاً")
+        else:
+            q=search_query.strip()
+            results=[]
+            for c in codes_db:
+                score=0
+                desc=str(c.get('description','')).lower()
+                code=str(c.get('itemCode','')).lower()
+                ic=str(c.get('internalCode','')).lower()
+                name=str(c.get('counterparty','')).lower()
+                if q.lower() in desc: score=max(score,10)
+                if q.lower() in code: score=max(score,8)
+                if q.lower() in ic: score=max(score,8)
+                if q.lower() in name: score=max(score,5)
+                q_words=q.lower().split()
+                for w in q_words:
+                    if w in desc: score+=3
+                    if w in code: score+=2
+                    if w in ic: score+=2
+                if score>0:
+                    results.append((score,c))
+            results.sort(key=lambda x:x[0],reverse=True)
+            if results:
+                st.success(f"تم العثور على {len(results)} نتيجة")
+                seen_codes=set()
+                for score,c in results:
+                    item_key=(c.get('itemCode',''),c.get('description',''))
+                    if item_key in seen_codes: continue
+                    seen_codes.add(item_key)
+                    dir_color='#00cec9' if c.get('direction')=='وارد' else '#a29bfe'
+                    dir_label=c.get('direction','')
+                    st.markdown(f"""<div class="erp-card" style="margin-bottom:.6rem;border-left:3px solid {dir_color};">
+                        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                            <div>
+                                <div style="color:#fff;font-weight:700;font-size:.92rem;">{c.get('description','—')}</div>
+                                <div style="display:flex;gap:.8rem;margin-top:.3rem;flex-wrap:wrap;">
+                                    <span style="color:#00cec9;font-size:.78rem;font-weight:600;">📋 كود: {c.get('itemCode','—')}</span>
+                                    <span style="color:#fdcb6e;font-size:.75rem;">رقم داخلي: {c.get('internalCode','—')}</span>
+                                    <span style="color:{dir_color};font-size:.72rem;font-weight:600;">{dir_label}</span>
+                                </div>
+                                <div style="color:var(--text2);font-size:.72rem;margin-top:.2rem;">المورد/العميل: {c.get('counterparty','—')}</div>
+                            </div>
+                            <div style="text-align:left;">
+                                <div style="color:#55efc4;font-weight:700;font-size:.85rem;">{fmt(c.get('salesTotal',0))}</div>
+                                <div style="color:var(--text2);font-size:.68rem;">الكمية: {c.get('quantity',0)} {c.get('unitType','')}</div>
+                            </div>
+                        </div>
+                    </div>""",unsafe_allow_html=True)
+            else:
+                st.info(f"لم يتم العثور على نتائج لكلمة: {q}")
+    st.markdown('</div>',unsafe_allow_html=True)
+
+    if codes_db:
+        st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot"></div><h3>جميع الأكواد</h3></div>',unsafe_allow_html=True)
+        codes_df=pd.DataFrame([{'الكود':c.get('itemCode',''),'الكود الداخلي':c.get('internalCode',''),'الوصف':c.get('description',''),
+            'الاتجاه':c.get('direction',''),'المورد/العميل':c.get('counterparty',''),'الكمية':c.get('quantity',0),
+            'وحدة القياس':c.get('unitType',''),'سعر الوحدة':c.get('unitPrice',0),'الإجمالي':c.get('salesTotal',0)} for c in codes_db])
+        st.dataframe(codes_df,use_container_width=True,height=400)
+        excel_buf=BytesIO()
+        codes_df.to_excel(excel_buf,index=False,engine='xlsxwriter')
+        excel_buf.seek(0)
+        st.download_button("📊 تحميل جميع الأكواد",data=excel_buf.getvalue(),file_name="item_codes.xlsx",mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",key="dl_codes")
 
 # ====================== الاستعلام عن ممول ======================
 elif page=="🔍 الاستعلام عن ممول":
