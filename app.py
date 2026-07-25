@@ -1541,6 +1541,8 @@ if page == ADMIN_PAGE:
 
 # ====================== HOME ======================
 if page == "🏠 الرئيسية":
+    st.markdown('<style>a[href*="manage"],a[data-testid="stManageApp"],section[data-testid="stSidebar"]+div>a,a[title="Manage app"],div[data-testid="stStatusWidget"]{display:none!important;} div[data-testid="stDecoration"]{display:none!important;}</style>',unsafe_allow_html=True)
+
     # Detail view
     if 'detail_view' in st.session_state:
         dv = st.session_state['detail_view']
@@ -1570,70 +1572,69 @@ if page == "🏠 الرئيسية":
             {meta_html("تاريخ الرفع", _fmt_date_dmy(rec.get('upload_date','')))}
         </div>""", unsafe_allow_html=True)
 
-    cu=get_current_user()
-    st.markdown('<style>a[href*="manage"],a[data-testid="stManageApp"],section[data-testid="stSidebar"]+div>a{display:none!important;}</style>',unsafe_allow_html=True)
-    if cu and cu.get('role')=='admin':
-        st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>تعديل البيانات (Admin)</h3></div>', unsafe_allow_html=True)
-        ec1,ec2=st.columns(2)
-        with ec1: new_pn=st.text_input("رقم المدفوعة",value=rec.get('payment_number',''),key="edit_pn")
-        with ec2:
-            try: pd_val=datetime.fromisoformat(str(rec.get('payment_date',''))[:10]).date() if rec.get('payment_date') else datetime.now().date()
-            except: pd_val=datetime.now().date()
-            new_pd=st.date_input("تاريخ المدفوعة",value=pd_val,key="edit_pd")
-        em1,ey1=st.columns(2)
-        with em1: new_mm=st.selectbox("شهر النموذج",range(1,13),index=rec.get('model_month',7)-1,format_func=lambda x:f"{x} - {MONTHS[x]}",key="edit_mm")
-        with ey1: new_yy=st.selectbox("سنة النموذج",range(2020,2031),index=rec.get('model_year',2025)-2020,key="edit_yy")
-        e1,e2=st.columns(2)
-        with e1:
-            if st.button("💾 حفظ التعديل",key="save_edit",type="primary",use_container_width=True):
-                data[dv['index']]['payment_number']=new_pn
-                data[dv['index']]['payment_date']=new_pd.isoformat()
-                data[dv['index']]['model_month']=new_mm
-                data[dv['index']]['model_year']=new_yy
-                save_data(f,data)
-                st.success("تم التعديل بنجاح!");st.rerun()
-        with e2:
-            if st.button("🗑️ حذف النموذج بالكامل",key="delete_batch",type="secondary",use_container_width=True):
-                st.session_state['confirm_delete_batch']=dv['index']
-                st.session_state['confirm_delete_file']=f
-        if st.session_state.get('confirm_delete_batch')==dv['index'] and st.session_state.get('confirm_delete_file')==f:
-            st.markdown('<div style="padding:.8rem 1rem;border-radius:10px;background:rgba(255,107,107,.08);border:1px solid rgba(255,107,107,.2);margin:.5rem 0;">⚠ هل أنت متأكد من حذف هذا النموذج بالكامل؟ لا يمكن التراجع.</div>', unsafe_allow_html=True)
-            cd1,cd2=st.columns(2)
-            with cd1:
-                if st.button("نعم، احذف",key="confirm_del_yes",type="primary",use_container_width=True):
-                    del_data=load_data(f)
-                    del_data.pop(dv['index'])
-                    save_data(f,del_data)
-                    del st.session_state['confirm_delete_batch']
-                    del st.session_state['confirm_delete_file']
-                    del st.session_state['detail_view']
-                    st.success("تم الحذف!");st.rerun()
-            with cd2:
-                if st.button("إلغاء",key="confirm_del_no",use_container_width=True):
-                    del st.session_state['confirm_delete_batch']
-                    del st.session_state['confirm_delete_file']
-                    st.rerun()
+        cu=get_current_user()
+        if cu and cu.get('role')=='admin':
+            st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>تعديل البيانات (Admin)</h3></div>', unsafe_allow_html=True)
+            ec1,ec2=st.columns(2)
+            with ec1: new_pn=st.text_input("رقم المدفوعة",value=rec.get('payment_number',''),key="edit_pn")
+            with ec2:
+                try: pd_val=datetime.fromisoformat(str(rec.get('payment_date',''))[:10]).date() if rec.get('payment_date') else datetime.now().date()
+                except: pd_val=datetime.now().date()
+                new_pd=st.date_input("تاريخ المدفوعة",value=pd_val,key="edit_pd")
+            em1,ey1=st.columns(2)
+            with em1: new_mm=st.selectbox("شهر النموذج",range(1,13),index=rec.get('model_month',7)-1,format_func=lambda x:f"{x} - {MONTHS[x]}",key="edit_mm")
+            with ey1: new_yy=st.selectbox("سنة النموذج",range(2020,2031),index=rec.get('model_year',2025)-2020,key="edit_yy")
+            e1,e2=st.columns(2)
+            with e1:
+                if st.button("💾 حفظ التعديل",key="save_edit",type="primary",use_container_width=True):
+                    data[dv['index']]['payment_number']=new_pn
+                    data[dv['index']]['payment_date']=new_pd.isoformat()
+                    data[dv['index']]['model_month']=new_mm
+                    data[dv['index']]['model_year']=new_yy
+                    save_data(f,data)
+                    st.success("تم التعديل بنجاح!");st.rerun()
+            with e2:
+                if st.button("🗑️ حذف النموذج بالكامل",key="delete_batch",type="secondary",use_container_width=True):
+                    st.session_state['confirm_delete_batch']=dv['index']
+                    st.session_state['confirm_delete_file']=f
+            if st.session_state.get('confirm_delete_batch')==dv['index'] and st.session_state.get('confirm_delete_file')==f:
+                st.markdown('<div style="padding:.8rem 1rem;border-radius:10px;background:rgba(255,107,107,.08);border:1px solid rgba(255,107,107,.2);margin:.5rem 0;">⚠ هل أنت متأكد من حذف هذا النموذج بالكامل؟ لا يمكن التراجع.</div>', unsafe_allow_html=True)
+                cd1,cd2=st.columns(2)
+                with cd1:
+                    if st.button("نعم، احذف",key="confirm_del_yes",type="primary",use_container_width=True):
+                        del_data=load_data(f)
+                        del_data.pop(dv['index'])
+                        save_data(f,del_data)
+                        del st.session_state['confirm_delete_batch']
+                        del st.session_state['confirm_delete_file']
+                        del st.session_state['detail_view']
+                        st.success("تم الحذف!");st.rerun()
+                with cd2:
+                    if st.button("إلغاء",key="confirm_del_no",use_container_width=True):
+                        del st.session_state['confirm_delete_batch']
+                        del st.session_state['confirm_delete_file']
+                        st.rerun()
 
-    if dv['type'] == 'f41':
-        total_tax = sum(_sf(r.get('المحصل لحساب الضريبة',0)) for r in records)
-        total_val = sum(_sf(r.get('القيمة الإجمالية للتعامل',0)) for r in records)
-        s1,s2,s3 = st.columns(3)
-        with s1: st.markdown(f'<div class="erp-stat s-orange"><div class="erp-stat-label">إجمالي المحصل لحساب الضريبة</div><div class="erp-stat-value">{fmt(total_tax)}</div></div>', unsafe_allow_html=True)
-        with s2: st.markdown(f'<div class="erp-stat s-cyan"><div class="erp-stat-label">إجمالي القيمة الإجمالية للتعامل</div><div class="erp-stat-value">{fmt(total_val)}</div></div>', unsafe_allow_html=True)
-        with s3: st.markdown(f'<div class="erp-stat s-blue"><div class="erp-stat-label">عدد السجلات</div><div class="erp-stat-value">{len(records)}</div></div>', unsafe_allow_html=True)
-    else:
-        tt=sum(_sf(r.get('ضريبة الجدول',0)) for r in records)
-        tv=sum(_sf(r.get('20% قيمة مضافة',0)) for r in records)
-        s1,s2,s3=st.columns(3)
-        with s1: st.markdown(f'<div class="erp-stat s-orange"><div class="erp-stat-label">ضريبة الجدول</div><div class="erp-stat-value">{fmt(tt)}</div></div>', unsafe_allow_html=True)
-        with s2: st.markdown(f'<div class="erp-stat s-pink"><div class="erp-stat-label">20% قيمة مضافة</div><div class="erp-stat-value">{fmt(tv)}</div></div>', unsafe_allow_html=True)
-        with s3: st.markdown(f'<div class="erp-stat s-green"><div class="erp-stat-label">الإجمالي</div><div class="erp-stat-value">{fmt(tt+tv)}</div></div>', unsafe_allow_html=True)
+        if dv['type'] == 'f41':
+            total_tax = sum(_sf(r.get('المحصل لحساب الضريبة',0)) for r in records)
+            total_val = sum(_sf(r.get('القيمة الإجمالية للتعامل',0)) for r in records)
+            s1,s2,s3 = st.columns(3)
+            with s1: st.markdown(f'<div class="erp-stat s-orange"><div class="erp-stat-label">إجمالي المحصل لحساب الضريبة</div><div class="erp-stat-value">{fmt(total_tax)}</div></div>', unsafe_allow_html=True)
+            with s2: st.markdown(f'<div class="erp-stat s-cyan"><div class="erp-stat-label">إجمالي القيمة الإجمالية للتعامل</div><div class="erp-stat-value">{fmt(total_val)}</div></div>', unsafe_allow_html=True)
+            with s3: st.markdown(f'<div class="erp-stat s-blue"><div class="erp-stat-label">عدد السجلات</div><div class="erp-stat-value">{len(records)}</div></div>', unsafe_allow_html=True)
+        else:
+            tt=sum(_sf(r.get('ضريبة الجدول',0)) for r in records)
+            tv=sum(_sf(r.get('20% قيمة مضافة',0)) for r in records)
+            s1,s2,s3=st.columns(3)
+            with s1: st.markdown(f'<div class="erp-stat s-orange"><div class="erp-stat-label">ضريبة الجدول</div><div class="erp-stat-value">{fmt(tt)}</div></div>', unsafe_allow_html=True)
+            with s2: st.markdown(f'<div class="erp-stat s-pink"><div class="erp-stat-label">20% قيمة مضافة</div><div class="erp-stat-value">{fmt(tv)}</div></div>', unsafe_allow_html=True)
+            with s3: st.markdown(f'<div class="erp-stat s-green"><div class="erp-stat-label">الإجمالي</div><div class="erp-stat-value">{fmt(tt+tv)}</div></div>', unsafe_allow_html=True)
 
-    st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>البيانات التفصيلية</h3></div>', unsafe_allow_html=True)
-    st.markdown('<div class="erp-card">', unsafe_allow_html=True)
-    st.dataframe(pd.DataFrame(records), use_container_width=True, height=400)
-    st.markdown('</div>', unsafe_allow_html=True)
-    st.stop()
+        st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>البيانات التفصيلية</h3></div>', unsafe_allow_html=True)
+        st.markdown('<div class="erp-card">', unsafe_allow_html=True)
+        st.dataframe(pd.DataFrame(records), use_container_width=True, height=400)
+        st.markdown('</div>', unsafe_allow_html=True)
+        st.stop()
 
     # Dashboard
     f41 = load_data(FORM41_FILE); vat = load_data(VAT_FILE)
