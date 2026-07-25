@@ -1133,6 +1133,14 @@ def read_form41_excel(f):
         if len(df.columns)<len(target):
             for i in range(len(df.columns),len(target)): df[i]=''
         df.columns=target[:len(df.columns)]
+    def _fmt_pct(v):
+        try:
+            fv=float(v)
+            if 0<fv<1: return f"{round(fv*100)}%"
+            elif fv==int(fv) and fv<100: return f"{int(fv)}%"
+            return str(v)
+        except: return str(v)
+    df['نسبة الخصم']=df['نسبة الخصم'].apply(_fmt_pct)
     return df
 def read_vat_excel(f):
     df=pd.read_excel(f,header=None,engine='openpyxl')
