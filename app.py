@@ -705,6 +705,9 @@ def _standalone_gpc_tab():
             <p style="color:var(--text2);">اضضغط تحديث لتحميل تصنيف Brick من GS1</p>
         </div>""",unsafe_allow_html=True)
 
+GS1_EMAIL="gso.tax@gso.com.eg"
+GS1_PASS="@Ua07ua07"
+
 def _standalone_gs1_tab():
     st.markdown('<div class="erp-section"><div class="erp-section-dot" style="background:#00cec9;box-shadow:0 0 12px #00cec9;"></div><h3>📦 أكواد GS1 — منظمة GS1 مصر</h3></div>',unsafe_allow_html=True)
     if 'gs1_auth' not in st.session_state: st.session_state.gs1_auth=None
@@ -712,25 +715,24 @@ def _standalone_gs1_tab():
     auth=st.session_state.gs1_auth
     if not auth:
         st.markdown("""<div style="padding:.8rem 1rem;border-radius:10px;background:rgba(0,206,201,.06);border:1px solid rgba(0,206,201,.15);color:#00cec9;font-size:.82rem;margin-bottom:1rem;">
-            🔐 سجّل الدخول بحساب GS1 Egypt لعرض المنتجات المسجلة
+            🔐 جاري تسجيل الدخول التلقائي بحساب GS1 Egypt...
         </div>""",unsafe_allow_html=True)
-        c1,c2=st.columns(2)
-        with c1:
-            gs1_email=st.text_input("البريد الإلكتروني",key="gs1_email",placeholder="example@company.com")
-        with c2:
-            gs1_pass=st.text_input("كلمة المرور",key="gs1_pass",type="password",placeholder="••••••••")
-        if st.button("🔐 تسجيل الدخول",key="gs1_login_btn",type="primary",use_container_width=True):
-            if not gs1_email or not gs1_pass:
-                st.warning("أدخل البريد الإلكتروني وكلمة المرور")
-            else:
-                with st.spinner("جاري الاتصال بـ GS1 Egypt..."):
-                    result=_gs1_login(gs1_email,gs1_pass)
-                    if result and result.get('client'):
-                        st.session_state.gs1_auth=result
-                        st.success("تم تسجيل الدخول بنجاح")
-                        st.rerun()
-                    else:
-                        st.error("فشل تسجيل الدخول — تأكد من البيانات")
+        result=_gs1_login(GS1_EMAIL,GS1_PASS)
+        if result and result.get('client'):
+            st.session_state.gs1_auth=result
+            st.success("تم تسجيل الدخول بنجاح")
+            st.rerun()
+        else:
+            st.markdown("""<div style="padding:1rem;border-radius:10px;background:rgba(214,48,49,.08);border:1px solid rgba(214,48,49,.2);color:#ff6b6b;font-size:.85rem;">
+                <strong>⚠️ فشل الاتصال بـ GS1 Egypt API</strong><br><br>
+                حساب mygs1.gs1eg.org يستخدم تسجيل دخول <strong>Microsoft Azure (B2C)</strong> — وهو مختلف عن API الخارجي.<br><br>
+                <strong>لحل المشكلة:</strong> تواصل مع GS1 Egypt للحصول على بيانات API الخارجي (client / token / uid) من خلال:
+                <ul style="margin:.5rem 0;padding-right:1rem;color:#fab1a0;">
+                    <li>البريد: api@gs1eg.org</li>
+                    <li>أو من خلال بوابة mygs1.gs1eg.org → طلب API credentials</li>
+                </ul>
+                بيانات الحساب المحفوظة صحيحة لبوابة mygs1 لكنها لا تعمل مع API الخارجي.
+            </div>""",unsafe_allow_html=True)
     else:
         c1,c2,c3=st.columns([3,3,1])
         with c1:
@@ -743,10 +745,6 @@ def _standalone_gs1_tab():
                     products=_gs1_get_products(auth)
                     st.session_state.gs1_products=products or []
                 st.rerun()
-        if st.button("🚪 تسجيل الخروج",key="gs1_logout"):
-            st.session_state.gs1_auth=None
-            st.session_state.gs1_products=[]
-            st.rerun()
         products=st.session_state.gs1_products
         if not products:
             if st.button("🔄 تحميل المنتجات",key="gs1_load_products",type="primary",use_container_width=True):
