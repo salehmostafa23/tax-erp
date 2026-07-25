@@ -2008,32 +2008,43 @@ elif page=="📄 Portal الفواتير الإلكترونية":
         for rec in out_data:
             for r in rec.get('records',[]):
                 uid=r.get('UUID','')
-                if uid: all_uuids.append({'uuid':uid,'direction':'out','name':r.get('الطرف الآخر','')})
+                issue=str(r.get('تاريخ الإصدار',''))[:10]
+                if uid: all_uuids.append({'uuid':uid,'direction':'out','name':r.get('الطرف الآخر',''),'date':issue})
         for rec in in_data:
             for r in rec.get('records',[]):
                 uid=r.get('UUID','')
-                if uid: all_uuids.append({'uuid':uid,'direction':'in','name':r.get('الطرف الآخر','')})
+                issue=str(r.get('تاريخ الإصدار',''))[:10]
+                if uid: all_uuids.append({'uuid':uid,'direction':'in','name':r.get('الطرف الآخر',''),'date':issue})
+
+        _all_dates=sorted(set(u['date'] for u in all_uuids if u['date']))
+        _min_d=_all_dates[0] if _all_dates else str(datetime.now().date())
+        _max_d=_all_dates[-1] if _all_dates else str(datetime.now().date())
+
+        f1,f2=st.columns(2)
+        with f1:
+            date_from=st.date_input("من تاريخ",value=datetime.strptime(_min_d,'%Y-%m-%d').date() if _min_d else datetime.now().date(),key="codes_date_from")
+        with f2:
+            date_to=st.date_input("إلى تاريخ",value=datetime.strptime(_max_d,'%Y-%m-%d').date() if _max_d else datetime.now().date(),key="codes_date_to")
+
+        df_str=date_from.strftime('%Y-%m-%d')
+        dt_str=date_to.strftime('%Y-%m-%d')
+        period_uuids=[u for u in all_uuids if u['date'] and df_str<=u['date']<=dt_str]
 
         codes_db=load_codes_db()
         fetched_codes=set(c.get('uuid','') for c in codes_db)
-        unfetched=[u for u in all_uuids if u['uuid'] not in fetched_codes]
+        period_unfetched=[u for u in period_uuids if u['uuid'] not in fetched_codes]
 
-        if codes_db and not unfetched:
-            st.markdown(f"""<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(0,184,148,.06);border:1px solid rgba(0,184,148,.15);color:#55efc4;font-size:.82rem;">
-                ✅ جميع الفواتير (<strong>{len(all_uuids)}</strong>) — الأصناف: <strong>{len(codes_db)}</strong>
-            </div>""",unsafe_allow_html=True)
-        else:
-            st.markdown(f"""<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(116,185,255,.06);border:1px solid rgba(116,185,255,.15);color:#74b9ff;font-size:.82rem;">
-                📦 الفواتير: <strong>{len(all_uuids)}</strong> | تم استخراج: <strong>{len(fetched_codes)}</strong> | متبقي: <strong>{len(unfetched)}</strong> | الأصناف: <strong>{len(codes_db)}</strong>
-            </div>""",unsafe_allow_html=True)
+        st.markdown(f"""<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(116,185,255,.06);border:1px solid rgba(116,185,255,.15);color:#74b9ff;font-size:.82rem;">
+            📦 الفترة: <strong>{df_str}</strong> → <strong>{dt_str}</strong> | فواتير الفترة: <strong>{len(period_uuids)}</strong> | متبقي: <strong>{len(period_unfetched)}</strong> | الأصناف المحفوظة: <strong>{len(codes_db)}</strong>
+        </div>""",unsafe_allow_html=True)
 
-        if unfetched:
-            if st.button(f"🔄 تحديث الأكواد ({len(unfetched)} فاتورة جديدة)",key="load_all_codes",type="primary",use_container_width=True):
+        if period_unfetched:
+            if st.button(f"🔄 استخراج أكواد {len(period_unfetched)} فاتورة في الفترة المحددة",key="load_all_codes",type="primary",use_container_width=True):
                 token=st.session_state.get("eta_token","")
                 if not token:
                     st.error("يجب الاتصال بالبورتال أولاً من تاب الربط")
                 else:
-                    progress=st.progress(0,text=f"جاري تحميل أكواد {len(unfetched)} فاتورة (سريع)...")
+                    progress=st.progress(0,text=f"جاري تحميل أكواد {len(period_unfetched)} فاتورة...")
                     new_codes=[]
                     errors=0
                     done_count=[0]
@@ -2041,10 +2052,10 @@ elif page=="📄 Portal الفواتير الإلكترونية":
                         d,e=eta_get_document_details(token,uu['uuid'])
                         return uu,d,e
                     with ThreadPoolExecutor(max_workers=5) as pool:
-                        futures={pool.submit(_fetch_one,u):u for u in unfetched}
+                        futures={pool.submit(_fetch_one,u):u for u in period_unfetched}
                         for f in as_completed(futures):
                             done_count[0]+=1
-                            progress.progress(min(done_count[0]/len(unfetched),1.0),text=f"{done_count[0]}/{len(unfetched)} فاتورة...")
+                            progress.progress(min(done_count[0]/len(period_unfetched),1.0),text=f"{done_count[0]}/{len(period_unfetched)} فاتورة...")
                             uu,doc,err=f.result()
                             if err or not doc:
                                 errors+=1
@@ -2060,9 +2071,7 @@ elif page=="📄 Portal الفواتير الإلكترونية":
                         all_codes=codes_db+new_codes
                         saved=save_codes_db(all_codes)
                         codes_db=saved
-                        fetched_codes=set(c.get('uuid','') for c in codes_db)
-                        unfetched=[u for u in all_uuids if u['uuid'] not in fetched_codes]
-                        st.success(f"تم تحميل {len(new_codes)} صنف من {len(unfetched)+len(new_codes)} فاتورة — إجمالي الأصناف: {len(codes_db)}")
+                        st.success(f"تم تحميل {len(new_codes)} صنف — إجمالي الأصناف: {len(codes_db)}")
                     elif errors:
                         st.warning(f"حدث {errors} خطأ — تأكد من اتصال البورتال")
                     else:
@@ -2082,7 +2091,7 @@ elif page=="📄 Portal الفواتير الإلكترونية":
                 st.caption(f"عرض {len(df)} صنف من أصل {len(codes_db)}")
             else:
                 st.info("لا توجد نتائج مطابقة" if q.strip() else "لا توجد أكواد محفوظة")
-        elif not unfetched:
+        elif not period_unfetched:
             st.markdown("""<div class="erp-empty" style="padding:2rem;margin-top:1rem;">
                 <div class="erp-empty-icon">🏷️</div>
                 <h3>لا توجد فواتير</h3>
