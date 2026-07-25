@@ -255,7 +255,8 @@ def _translate_to_arabic(text):
     try:
         r=http_requests.get('https://translate.googleapis.com/translate_a/single',params={'client':'gtx','sl':'en','tl':'ar','dt':'t','q':text},timeout=10,verify=False)
         if r.status_code==200:
-            result=''.join(part[0] for part in r.json() if part[0])
+            data=r.json()
+            result=''.join(part[0] for part in data[0] if part and part[0])
             if result:
                 _translation_cache[text]=result
                 return result
