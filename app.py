@@ -308,6 +308,7 @@ def _portal_led():
 
 GPC_API_BASE="https://gpc-api.gs1.org/api"
 GPC_DATA_FILE=os.path.join(DATA_DIR,"gpc_database.json")
+GS1_DATA_FILE=os.path.join(DATA_DIR,"gs1_products.json")
 _GPC_HEADERS={
     'Content-Type':'application/json;charset=utf-8',
     'Accept':'application/json, text/plain, */*',
@@ -443,6 +444,16 @@ def _gs1_get_products(auth):
             if not start_after: break
         except: break
     return all_products
+
+def _load_gs1_db():
+    if os.path.exists(GS1_DATA_FILE):
+        try:
+            with open(GS1_DATA_FILE,'r',encoding='utf-8') as f: return json.load(f)
+        except: pass
+    return []
+
+def _save_gs1_db(products):
+    with open(GS1_DATA_FILE,'w',encoding='utf-8') as f: json.dump(products,f,ensure_ascii=False,indent=2,default=str)
 
 def _standalone_portal_tab():
     codes_db=load_codes_db()
@@ -710,70 +721,90 @@ GS1_PASS="@Ua07ua07"
 
 def _standalone_gs1_tab():
     st.markdown('<div class="erp-section"><div class="erp-section-dot" style="background:#00cec9;box-shadow:0 0 12px #00cec9;"></div><h3>📦 أكواد GS1 — منظمة GS1 مصر</h3></div>',unsafe_allow_html=True)
-    if 'gs1_auth' not in st.session_state: st.session_state.gs1_auth=None
-    if 'gs1_products' not in st.session_state: st.session_state.gs1_products=[]
-    auth=st.session_state.gs1_auth
-    if not auth:
-        st.markdown("""<div style="padding:.8rem 1rem;border-radius:10px;background:rgba(0,206,201,.06);border:1px solid rgba(0,206,201,.15);color:#00cec9;font-size:.82rem;margin-bottom:1rem;">
-            🔐 جاري تسجيل الدخول التلقائي بحساب GS1 Egypt...
-        </div>""",unsafe_allow_html=True)
-        result=_gs1_login(GS1_EMAIL,GS1_PASS)
-        if result and result.get('client'):
-            st.session_state.gs1_auth=result
-            st.success("تم تسجيل الدخول بنجاح")
-            st.rerun()
-        else:
-            st.markdown("""<div style="padding:1rem;border-radius:10px;background:rgba(214,48,49,.08);border:1px solid rgba(214,48,49,.2);color:#ff6b6b;font-size:.85rem;">
-                <strong>⚠️ فشل الاتصال بـ GS1 Egypt API</strong><br><br>
-                حساب mygs1.gs1eg.org يستخدم تسجيل دخول <strong>Microsoft Azure (B2C)</strong> — وهو مختلف عن API الخارجي.<br><br>
-                <strong>لحل المشكلة:</strong> تواصل مع GS1 Egypt للحصول على بيانات API الخارجي (client / token / uid) من خلال:
-                <ul style="margin:.5rem 0;padding-right:1rem;color:#fab1a0;">
-                    <li>البريد: api@gs1eg.org</li>
-                    <li>أو من خلال بوابة mygs1.gs1eg.org → طلب API credentials</li>
-                </ul>
-                بيانات الحساب المحفوظة صحيحة لبوابة mygs1 لكنها لا تعمل مع API الخارجي.
-            </div>""",unsafe_allow_html=True)
-    else:
-        c1,c2,c3=st.columns([3,3,1])
-        with c1:
-            st.markdown(f"""<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(0,206,201,.06);border:1px solid rgba(0,206,201,.15);color:#00cec9;font-size:.82rem;">
-                🔗 متصل بـ GS1 Egypt | المنتجات: <strong>{len(st.session_state.gs1_products)}</strong>
-            </div>""",unsafe_allow_html=True)
-        with c3:
-            if st.button("🔄",key="gs1_refresh",help="تحديث المنتجات"):
-                with st.spinner("جاري تحميل المنتجات..."):
-                    products=_gs1_get_products(auth)
-                    st.session_state.gs1_products=products or []
-                st.rerun()
-        products=st.session_state.gs1_products
-        if not products:
-            if st.button("🔄 تحميل المنتجات",key="gs1_load_products",type="primary",use_container_width=True):
-                with st.spinner("جاري تحميل المنتجات من GS1 Egypt..."):
-                    loaded=_gs1_get_products(auth)
-                    st.session_state.gs1_products=loaded or []
-                st.rerun()
-        if products:
-            st.markdown(f'<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot" style="background:#00cec9;"></div><h3>المنتجات المسجلة ({len(products)})</h3></div>',unsafe_allow_html=True)
-            gs1_search=st.text_input("ابحث في المنتجات",key="gs1_search",placeholder="اسم المنتج، باركود، براند...")
-            filtered=products
-            if gs1_search.strip():
-                sq=gs1_search.strip().lower()
-                filtered=[p for p in products if sq in str(p.get('gtin','')).lower() or sq in str(p.get('brand',{}).get('name','')).lower() or sq in str(p.get('product_description_english','')).lower() or sq in str(p.get('product_description_arabic','')).lower() or sq in str(p.get('brand',{}).get('arabic_name','')).lower()]
-            if filtered:
-                gs1_rows=[]
-                for p in filtered:
-                    brand=p.get('brand',{})
-                    gs1_rows.append({'GTIN':p.get('gtin',''),'الاسم بالعربي':p.get('product_description_arabic',''),'الاسم بالإنجليزي':p.get('product_description_english',''),
-                        'البراند (AR)':brand.get('arabic_name',''),'البراند (EN)':brand.get('name',''),
-                        'صافي المحتوى':p.get('net_content',''),'رقم التسجيل':p.get('tax_registration_number','')})
-                gs1_df=pd.DataFrame(gs1_rows)
-                st.dataframe(gs1_df,use_container_width=True,height=400)
+    gs1_db=_load_gs1_db()
+    cu=get_current_user()
+    is_admin=cu and cu.get('role')=='admin'
+    if is_admin:
+        st.markdown('<div class="erp-section" style="margin-bottom:1rem"><div class="erp-section-dot"></div><h3>رفع أكواد GS1</h3></div>',unsafe_allow_html=True)
+        uploaded_file=st.file_uploader("ارفع ملف Excel يحتوي أكواد GS1",type=["xlsx","xls"],key="gs1_upload")
+        if uploaded_file:
+            try:
+                upload_df=pd.read_excel(uploaded_file)
+                required=['Barcode','Description English','Description Arabic']
+                missing=[c for c in required if c not in upload_df.columns]
+                if missing:
+                    st.error(f"الملف ناقص أعمدة: {', '.join(missing)}")
+                else:
+                    new_products=[]
+                    for _,row in upload_df.iterrows():
+                        barcode=str(row.get('Barcode','')).strip()
+                        if not barcode or barcode=='nan': continue
+                        new_products.append({
+                            'barcode':barcode,
+                            'type':str(row.get('Type',''))[:20],
+                            'desc_en':str(row.get('Description English','')),
+                            'desc_ar':str(row.get('Description Arabic','')),
+                            'func_en':str(row.get('Functional Name English','')),
+                            'func_ar':str(row.get('Functional Name Arabic','')),
+                            'variant_en':str(row.get('Variant English','')),
+                            'variant_ar':str(row.get('Variant Arabic','')),
+                            'net_content':str(row.get('Net Content','')),
+                            'sku':str(row.get('Sku Number','')),
+                            'brand_en':str(row.get('Brand English','')),
+                            'brand_ar':str(row.get('Brand Arabic','')),
+                            'unit_en':str(row.get('Unit Of Measures English','')),
+                            'unit_ar':str(row.get('Unit Of Measures Arabic','')),
+                            'market_en':str(row.get('Target Market English','')),
+                            'market_ar':str(row.get('Target Market Arabic','')),
+                            'gpc_en':str(row.get('GPC English','')),
+                            'gpc_ar':str(row.get('GPC Arabic','')),
+                            'active_from':str(row.get('active_from','')),
+                            'active_to':str(row.get('active_to','')),
+                            'status':str(row.get('IsDiscontinued','')),
+                        })
+                    st.success(f"تم تحميل {len(new_products)} صنف من الملف")
+                    st.markdown(f'<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(0,206,201,.06);border:1px solid rgba(0,206,201,.15);color:#00cec9;font-size:.82rem;">'
+                        f'📊 الملف: <strong>{len(new_products)}</strong> صنف | القاعدة الحالية: <strong>{len(gs1_db)}</strong> صنف</div>',unsafe_allow_html=True)
+                    if st.button("💾 حفظ في القاعدة",key="gs1_save_db",type="primary",use_container_width=True):
+                        _save_gs1_db(new_products)
+                        st.success(f"تم حفظ {len(new_products)} صنف")
+                        st.rerun()
+            except Exception as e:
+                st.error(f"خطأ في قراءة الملف: {e}")
+    if gs1_db:
+        st.markdown(f'<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot" style="background:#00cec9;"></div><h3>المنتجات المسجلة ({len(gs1_db)})</h3></div>',unsafe_allow_html=True)
+        gs1_search=st.text_input("ابحث بالاسم أو الباركود أو البراند",key="gs1_search",placeholder="مثال: 6224009978694، flour، sun mall...")
+        filtered=gs1_db
+        if gs1_search.strip():
+            sq=gs1_search.strip().lower()
+            filtered=[p for p in gs1_db if sq in str(p.get('barcode','')).lower() or sq in str(p.get('desc_en','')).lower() or sq in str(p.get('desc_ar','')).lower() or sq in str(p.get('brand_en','')).lower() or sq in str(p.get('brand_ar','')).lower() or sq in str(p.get('func_en','')).lower() or sq in str(p.get('func_ar','')).lower() or sq in str(p.get('gpc_en','')).lower() or sq in str(p.get('gpc_ar','')).lower()]
+        if filtered:
+            gs1_rows=[]
+            for p in filtered:
+                gs1_rows.append({'الباركود':p.get('barcode',''),'الاسم بالعربي':p.get('desc_ar',''),'الاسم بالإنجليزي':p.get('desc_en',''),
+                    'البراند (AR)':p.get('brand_ar',''),'البراند (EN)':p.get('brand_en',''),
+                    'صافي المحتوى':p.get('net_content',''),'الحالة':p.get('status',''),
+                    'من':p.get('active_from',''),'إلى':p.get('active_to','')})
+            gs1_df=pd.DataFrame(gs1_rows)
+            st.dataframe(gs1_df,use_container_width=True,height=400)
+            col_dl1,col_dl2=st.columns([1,4])
+            with col_dl1:
                 excel_buf=BytesIO()
                 gs1_df.to_excel(excel_buf,index=False,engine='xlsxwriter')
                 excel_buf.seek(0)
-                st.download_button("📊 تحميل المنتجات",data=excel_buf.getvalue(),file_name="gs1_products.xlsx",mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",key="dl_gs1")
-            else:
-                st.info("لم يتم العثور على نتائج")
+                st.download_button("📊 تحميل القائمة",data=excel_buf.getvalue(),file_name="gs1_products.xlsx",mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",key="dl_gs1")
+            with col_dl2:
+                if is_admin and st.button("🗑️ مسح القاعدة",key="gs1_clear_db"):
+                    _save_gs1_db([])
+                    st.rerun()
+        else:
+            st.info(f"لم يتم العثور على نتائج لكلمة: {gs1_search.strip()}")
+    else:
+        st.markdown("""<div class="erp-empty" style="padding:2rem;margin-top:1rem;text-align:center;">
+            <div class="erp-empty-icon">📦</div>
+            <h3 style="color:#fff;">لم يتم رفع أي أكواد بعد</h3>
+            <p style="color:var(--text2);">ارفع ملف Excel يحتوي أكواد GS1 لبدء البحث</p>
+        </div>""",unsafe_allow_html=True)
 
 def _fix_vat_in_records(records):
     fixed=[]
@@ -1540,70 +1571,69 @@ if page == "🏠 الرئيسية":
         </div>""", unsafe_allow_html=True)
 
     cu=get_current_user()
-    if not cu or cu.get('role')!='admin':
-        st.markdown('<style>a[href*="manage"],a[data-testid="stManageApp"],section[data-testid="stSidebar"]+div>a{display:none!important;}</style>',unsafe_allow_html=True)
-        if cu and cu.get('role')=='admin':
-            st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>تعديل البيانات (Admin)</h3></div>', unsafe_allow_html=True)
-            ec1,ec2=st.columns(2)
-            with ec1: new_pn=st.text_input("رقم المدفوعة",value=rec.get('payment_number',''),key="edit_pn")
-            with ec2:
-                try: pd_val=datetime.fromisoformat(str(rec.get('payment_date',''))[:10]).date() if rec.get('payment_date') else datetime.now().date()
-                except: pd_val=datetime.now().date()
-                new_pd=st.date_input("تاريخ المدفوعة",value=pd_val,key="edit_pd")
-            em1,ey1=st.columns(2)
-            with em1: new_mm=st.selectbox("شهر النموذج",range(1,13),index=rec.get('model_month',7)-1,format_func=lambda x:f"{x} - {MONTHS[x]}",key="edit_mm")
-            with ey1: new_yy=st.selectbox("سنة النموذج",range(2020,2031),index=rec.get('model_year',2025)-2020,key="edit_yy")
-            e1,e2=st.columns(2)
-            with e1:
-                if st.button("💾 حفظ التعديل",key="save_edit",type="primary",use_container_width=True):
-                    data[dv['index']]['payment_number']=new_pn
-                    data[dv['index']]['payment_date']=new_pd.isoformat()
-                    data[dv['index']]['model_month']=new_mm
-                    data[dv['index']]['model_year']=new_yy
-                    save_data(f,data)
-                    st.success("تم التعديل بنجاح!");st.rerun()
-            with e2:
-                if st.button("🗑️ حذف النموذج بالكامل",key="delete_batch",type="secondary",use_container_width=True):
-                    st.session_state['confirm_delete_batch']=dv['index']
-                    st.session_state['confirm_delete_file']=f
-            if st.session_state.get('confirm_delete_batch')==dv['index'] and st.session_state.get('confirm_delete_file')==f:
-                st.markdown('<div style="padding:.8rem 1rem;border-radius:10px;background:rgba(255,107,107,.08);border:1px solid rgba(255,107,107,.2);margin:.5rem 0;">⚠ هل أنت متأكد من حذف هذا النموذج بالكامل؟ لا يمكن التراجع.</div>', unsafe_allow_html=True)
-                cd1,cd2=st.columns(2)
-                with cd1:
-                    if st.button("نعم، احذف",key="confirm_del_yes",type="primary",use_container_width=True):
-                        del_data=load_data(f)
-                        del_data.pop(dv['index'])
-                        save_data(f,del_data)
-                        del st.session_state['confirm_delete_batch']
-                        del st.session_state['confirm_delete_file']
-                        del st.session_state['detail_view']
-                        st.success("تم الحذف!");st.rerun()
-                with cd2:
-                    if st.button("إلغاء",key="confirm_del_no",use_container_width=True):
-                        del st.session_state['confirm_delete_batch']
-                        del st.session_state['confirm_delete_file']
-                        st.rerun()
+    st.markdown('<style>a[href*="manage"],a[data-testid="stManageApp"],section[data-testid="stSidebar"]+div>a{display:none!important;}</style>',unsafe_allow_html=True)
+    if cu and cu.get('role')=='admin':
+        st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>تعديل البيانات (Admin)</h3></div>', unsafe_allow_html=True)
+        ec1,ec2=st.columns(2)
+        with ec1: new_pn=st.text_input("رقم المدفوعة",value=rec.get('payment_number',''),key="edit_pn")
+        with ec2:
+            try: pd_val=datetime.fromisoformat(str(rec.get('payment_date',''))[:10]).date() if rec.get('payment_date') else datetime.now().date()
+            except: pd_val=datetime.now().date()
+            new_pd=st.date_input("تاريخ المدفوعة",value=pd_val,key="edit_pd")
+        em1,ey1=st.columns(2)
+        with em1: new_mm=st.selectbox("شهر النموذج",range(1,13),index=rec.get('model_month',7)-1,format_func=lambda x:f"{x} - {MONTHS[x]}",key="edit_mm")
+        with ey1: new_yy=st.selectbox("سنة النموذج",range(2020,2031),index=rec.get('model_year',2025)-2020,key="edit_yy")
+        e1,e2=st.columns(2)
+        with e1:
+            if st.button("💾 حفظ التعديل",key="save_edit",type="primary",use_container_width=True):
+                data[dv['index']]['payment_number']=new_pn
+                data[dv['index']]['payment_date']=new_pd.isoformat()
+                data[dv['index']]['model_month']=new_mm
+                data[dv['index']]['model_year']=new_yy
+                save_data(f,data)
+                st.success("تم التعديل بنجاح!");st.rerun()
+        with e2:
+            if st.button("🗑️ حذف النموذج بالكامل",key="delete_batch",type="secondary",use_container_width=True):
+                st.session_state['confirm_delete_batch']=dv['index']
+                st.session_state['confirm_delete_file']=f
+        if st.session_state.get('confirm_delete_batch')==dv['index'] and st.session_state.get('confirm_delete_file')==f:
+            st.markdown('<div style="padding:.8rem 1rem;border-radius:10px;background:rgba(255,107,107,.08);border:1px solid rgba(255,107,107,.2);margin:.5rem 0;">⚠ هل أنت متأكد من حذف هذا النموذج بالكامل؟ لا يمكن التراجع.</div>', unsafe_allow_html=True)
+            cd1,cd2=st.columns(2)
+            with cd1:
+                if st.button("نعم، احذف",key="confirm_del_yes",type="primary",use_container_width=True):
+                    del_data=load_data(f)
+                    del_data.pop(dv['index'])
+                    save_data(f,del_data)
+                    del st.session_state['confirm_delete_batch']
+                    del st.session_state['confirm_delete_file']
+                    del st.session_state['detail_view']
+                    st.success("تم الحذف!");st.rerun()
+            with cd2:
+                if st.button("إلغاء",key="confirm_del_no",use_container_width=True):
+                    del st.session_state['confirm_delete_batch']
+                    del st.session_state['confirm_delete_file']
+                    st.rerun()
 
-        if dv['type'] == 'f41':
-            total_tax = sum(_sf(r.get('المحصل لحساب الضريبة',0)) for r in records)
-            total_val = sum(_sf(r.get('القيمة الإجمالية للتعامل',0)) for r in records)
-            s1,s2,s3 = st.columns(3)
-            with s1: st.markdown(f'<div class="erp-stat s-orange"><div class="erp-stat-label">إجمالي المحصل لحساب الضريبة</div><div class="erp-stat-value">{fmt(total_tax)}</div></div>', unsafe_allow_html=True)
-            with s2: st.markdown(f'<div class="erp-stat s-cyan"><div class="erp-stat-label">إجمالي القيمة الإجمالية للتعامل</div><div class="erp-stat-value">{fmt(total_val)}</div></div>', unsafe_allow_html=True)
-            with s3: st.markdown(f'<div class="erp-stat s-blue"><div class="erp-stat-label">عدد السجلات</div><div class="erp-stat-value">{len(records)}</div></div>', unsafe_allow_html=True)
-        else:
-            tt=sum(_sf(r.get('ضريبة الجدول',0)) for r in records)
-            tv=sum(_sf(r.get('20% قيمة مضافة',0)) for r in records)
-            s1,s2,s3=st.columns(3)
-            with s1: st.markdown(f'<div class="erp-stat s-orange"><div class="erp-stat-label">ضريبة الجدول</div><div class="erp-stat-value">{fmt(tt)}</div></div>', unsafe_allow_html=True)
-            with s2: st.markdown(f'<div class="erp-stat s-pink"><div class="erp-stat-label">20% قيمة مضافة</div><div class="erp-stat-value">{fmt(tv)}</div></div>', unsafe_allow_html=True)
-            with s3: st.markdown(f'<div class="erp-stat s-green"><div class="erp-stat-label">الإجمالي</div><div class="erp-stat-value">{fmt(tt+tv)}</div></div>', unsafe_allow_html=True)
+    if dv['type'] == 'f41':
+        total_tax = sum(_sf(r.get('المحصل لحساب الضريبة',0)) for r in records)
+        total_val = sum(_sf(r.get('القيمة الإجمالية للتعامل',0)) for r in records)
+        s1,s2,s3 = st.columns(3)
+        with s1: st.markdown(f'<div class="erp-stat s-orange"><div class="erp-stat-label">إجمالي المحصل لحساب الضريبة</div><div class="erp-stat-value">{fmt(total_tax)}</div></div>', unsafe_allow_html=True)
+        with s2: st.markdown(f'<div class="erp-stat s-cyan"><div class="erp-stat-label">إجمالي القيمة الإجمالية للتعامل</div><div class="erp-stat-value">{fmt(total_val)}</div></div>', unsafe_allow_html=True)
+        with s3: st.markdown(f'<div class="erp-stat s-blue"><div class="erp-stat-label">عدد السجلات</div><div class="erp-stat-value">{len(records)}</div></div>', unsafe_allow_html=True)
+    else:
+        tt=sum(_sf(r.get('ضريبة الجدول',0)) for r in records)
+        tv=sum(_sf(r.get('20% قيمة مضافة',0)) for r in records)
+        s1,s2,s3=st.columns(3)
+        with s1: st.markdown(f'<div class="erp-stat s-orange"><div class="erp-stat-label">ضريبة الجدول</div><div class="erp-stat-value">{fmt(tt)}</div></div>', unsafe_allow_html=True)
+        with s2: st.markdown(f'<div class="erp-stat s-pink"><div class="erp-stat-label">20% قيمة مضافة</div><div class="erp-stat-value">{fmt(tv)}</div></div>', unsafe_allow_html=True)
+        with s3: st.markdown(f'<div class="erp-stat s-green"><div class="erp-stat-label">الإجمالي</div><div class="erp-stat-value">{fmt(tt+tv)}</div></div>', unsafe_allow_html=True)
 
-        st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>البيانات التفصيلية</h3></div>', unsafe_allow_html=True)
-        st.markdown('<div class="erp-card">', unsafe_allow_html=True)
-        st.dataframe(pd.DataFrame(records), use_container_width=True, height=400)
-        st.markdown('</div>', unsafe_allow_html=True)
-        st.stop()
+    st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>البيانات التفصيلية</h3></div>', unsafe_allow_html=True)
+    st.markdown('<div class="erp-card">', unsafe_allow_html=True)
+    st.dataframe(pd.DataFrame(records), use_container_width=True, height=400)
+    st.markdown('</div>', unsafe_allow_html=True)
+    st.stop()
 
     # Dashboard
     f41 = load_data(FORM41_FILE); vat = load_data(VAT_FILE)
