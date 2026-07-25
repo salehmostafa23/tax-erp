@@ -243,6 +243,26 @@ def _extract_barcode_from_line(line):
     if not barcode: barcode=line.get('itemCode','')
     return barcode
 
+_translation_cache={}
+def _translate_to_arabic(text):
+    import re as _re
+    if not text or not text.strip(): return text
+    if text in _translation_cache: return _translation_cache[text]
+    has_arabic=any('\u0600'<='\u06FF'<='\u097F' or '\u0600'<=c<='\u06FF' for c in text)
+    if has_arabic:
+        _translation_cache[text]=text
+        return text
+    try:
+        r=http_requests.get('https://translate.googleapis.com/translate_a/single',params={'client':'gtx','sl':'en','tl':'ar','dt':'t','q':text},timeout=10,verify=False)
+        if r.status_code==200:
+            result=''.join(part[0] for part in r.json() if part[0])
+            if result:
+                _translation_cache[text]=result
+                return result
+    except: pass
+    _translation_cache[text]=text
+    return text
+
 def _eta_extract_lines(uuid_val,doc,uu,codes_list):
     lines=doc.get('invoiceLines',[])
     if not lines:
@@ -259,7 +279,10 @@ def _eta_extract_lines(uuid_val,doc,uu,codes_list):
     for line in lines:
         bc=line.get('itemCode','')
         if not bc: bc=_extract_barcode_from_line(line)
-        name=line.get('description','') or line.get('itemPrimaryName','') or line.get('itemSecondaryName','')
+        name=line.get('description','') or ''
+        if not name.strip():
+            name=line.get('itemPrimaryName','') or line.get('itemSecondaryName','')
+            name=_translate_to_arabic(name)
         codes_list.append({
             'uuid':uu.get('uuid',''),'direction':'صادرة' if uu.get('direction','')=='out' else 'واردة',
             'counterparty':uu.get('name',''),'itemCode':bc,
