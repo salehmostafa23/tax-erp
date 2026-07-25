@@ -244,24 +244,26 @@ def _extract_barcode_from_line(line):
     return barcode
 
 def _eta_extract_lines(uuid_val,doc,uu,codes_list):
-    document=doc.get('document',{})
-    lines=document.get('invoiceLines',[])
+    lines=doc.get('invoiceLines',[])
     if not lines:
-        for key in ['invoice','Invoice','data','result']:
-            if isinstance(doc.get(key),dict):
-                lines=doc[key].get('invoiceLines',[]) or doc[key].get('lines',[])
+        for key in ['document','invoice','data','result']:
+            obj=doc.get(key,{})
+            if isinstance(obj,dict):
+                lines=obj.get('invoiceLines',[]) or obj.get('lines',[])
                 if lines: break
-            elif isinstance(doc.get(key),list):
-                for item in doc[key]:
+            elif isinstance(obj,list):
+                for item in obj:
                     if isinstance(item,dict) and ('invoiceLines' in item or 'lines' in item):
                         lines=item.get('invoiceLines',[]) or item.get('lines',[])
                         if lines: break
     for line in lines:
-        bc=_extract_barcode_from_line(line)
+        bc=line.get('itemCode','')
+        if not bc: bc=_extract_barcode_from_line(line)
+        name=line.get('itemPrimaryName','') or line.get('itemSecondaryName','') or line.get('description','')
         codes_list.append({
             'uuid':uu.get('uuid',''),'direction':'صادرة' if uu.get('direction','')=='out' else 'واردة',
             'counterparty':uu.get('name',''),'itemCode':bc,
-            'internalCode':line.get('internalCode',''),'description':line.get('description','')
+            'internalCode':line.get('internalCode',''),'description':name
         })
 
 def _portal_led():
