@@ -284,7 +284,8 @@ if not st.session_state['current_user']:
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Cairo:wght@300;400;500;600;700;800&display=swap');
     :root{--bg:#0a0a15;--surface:rgba(22,22,40,0.7);--surface2:#1e1e38;--border:rgba(255,255,255,0.06);--text:#eaeaf2;--text2:#7878a0;--accent:#6c5ce7;--accent2:#a29bfe;}
     html,body,[class*="css"]{font-family:'Inter','Cairo',sans-serif!important;}
-    #MainMenu,footer,header,.stDeployButton{visibility:hidden!important;}
+#MainMenu,footer,header,.stDeployButton{visibility:hidden!important;}
+div[data-testid="stDecoration"],div[data-testid="stManageApp"],iframe[title="Streamlit Manage App"]{display:none!important;visibility:hidden!important;height:0!important;width:0!important;overflow:hidden!important;}
     div[data-testid="stToolbar"]{display:none!important;}
     .stApp{background:linear-gradient(135deg,#08081a 0%,#0d0d22 50%,#0a0a18 100%)!important;}
     .login-box{max-width:320px;margin:6rem auto 0;padding:1.5rem 1.5rem;border-radius:16px;background:rgba(22,22,40,0.7);border:1px solid rgba(255,255,255,0.06);backdrop-filter:blur(20px);box-shadow:0 20px 60px rgba(0,0,0,.5);position:relative;overflow:hidden;}
@@ -324,6 +325,7 @@ st.markdown("""
 :root{--bg:#0a0a15;--surface:rgba(22,22,40,0.7);--surface2:#1e1e38;--border:rgba(255,255,255,0.06);--text:#eaeaf2;--text2:#7878a0;--accent:#6c5ce7;--accent2:#a29bfe;--cyan:#00cec9;--green:#00b894;--orange:#fdcb6e;--red:#ff6b6b;--pink:#fd79a8;--blue:#74b9ff;}
 html,body,[class*="css"]{font-family:'Inter','Cairo',sans-serif!important;direction:rtl;}
 #MainMenu,footer,header,.stDeployButton{visibility:hidden!important;}
+div[data-testid="stDecoration"],div[data-testid="stManageApp"],iframe[title="Streamlit Manage App"]{display:none!important;visibility:hidden!important;height:0!important;width:0!important;overflow:hidden!important;}
 div[data-testid="stToolbar"]{display:none!important;}
 .stApp{background:linear-gradient(135deg,#08081a 0%,#0d0d22 50%,#0a0a18 100%)!important;color:var(--text);}
 .block-container{padding:1rem 2rem 2rem 2rem!important;max-width:100%!important;}
@@ -437,6 +439,7 @@ section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p{margin:0!
 .erp-empty p{color:var(--text2);margin:0;font-size:.85rem;}
 
 ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(108,92,231,.25);border-radius:5px}
+a[href*="manage"],a[data-testid="stManageApp"],section[data-testid="stSidebar"]+div>a{display:none!important;}
 </style>
 """, unsafe_allow_html=True)
 
