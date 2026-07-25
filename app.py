@@ -2413,6 +2413,17 @@ elif page=="📄 Portal الفواتير الإلكترونية":
 
         if gpc_cache:
             bricks_list=gpc_cache.get('bricks',[])
+            st.markdown(f'<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot" style="background:#fdcb6e;"></div><h3>جميع Bricks ({len(bricks_list)})</h3></div>',unsafe_allow_html=True)
+            if bricks_list:
+                all_bricks_df=pd.DataFrame([{'كود Brick':b.get('code',''),'اسم Brick (AR)':b.get('title_ar','') or b.get('title',''),'اسم Brick (EN)':b.get('title',''),
+                    'الفئة (Class)':b.get('class_name_ar','') or b.get('class_name',''),'المجموعة (Family)':b.get('family_ar','') or b.get('family',''),
+                    'القطاع (Segment)':b.get('segment_ar','') or b.get('segment','')} for b in bricks_list])
+                st.dataframe(all_bricks_df,use_container_width=True,height=400)
+                excel_buf_gpc=BytesIO()
+                all_bricks_df.to_excel(excel_buf_gpc,index=False,engine='xlsxwriter')
+                excel_buf_gpc.seek(0)
+                st.download_button("📊 تحميل جميع Bricks",data=excel_buf_gpc.getvalue(),file_name="gpc_bricks.xlsx",mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",key="dl_gpc")
+
             st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot" style="background:#fdcb6e;"></div><h3>بحث في تصنيف GPC</h3></div>',unsafe_allow_html=True)
             gpc_q=st.text_input("ابحث بالاسم العربي أو الإنجليزي أو الكود",key="gpc_search_q",placeholder="مثال: مشروبات، أرز، حليب، Beverages, Rice, Milk...")
             if gpc_q.strip():
@@ -2427,17 +2438,6 @@ elif page=="📄 Portal الفواتير الإلكترونية":
                         st.caption(f"عرض أول 200 نتيجة من أصل {len(gpc_results)} — حدد كلمة بحث أضيق للحصول على نتائج أدق")
                 else:
                     st.info(f"لم يتم العثور على نتائج لكلمة: {gpc_q.strip()}")
-
-            st.markdown(f'<div class="erp-section" style="margin-top:1.5rem"><div class="erp-section-dot" style="background:#fdcb6e;"></div><h3>جميع Bricks ({len(bricks_list)})</h3></div>',unsafe_allow_html=True)
-            if bricks_list:
-                all_bricks_df=pd.DataFrame([{'كود Brick':b.get('code',''),'اسم Brick (AR)':b.get('title_ar','') or b.get('title',''),'اسم Brick (EN)':b.get('title',''),
-                    'الفئة (Class)':b.get('class_name_ar','') or b.get('class_name',''),'المجموعة (Family)':b.get('family_ar','') or b.get('family',''),
-                    'القطاع (Segment)':b.get('segment_ar','') or b.get('segment','')} for b in bricks_list])
-                st.dataframe(all_bricks_df,use_container_width=True,height=400)
-                excel_buf_gpc=BytesIO()
-                all_bricks_df.to_excel(excel_buf_gpc,index=False,engine='xlsxwriter')
-                excel_buf_gpc.seek(0)
-                st.download_button("📊 تحميل جميع Bricks",data=excel_buf_gpc.getvalue(),file_name="gpc_bricks.xlsx",mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",key="dl_gpc")
         else:
             st.markdown("""<div class="erp-empty" style="padding:3rem;margin-top:1rem;text-align:center;">
                 <div class="erp-empty-icon">🔬</div>
@@ -2695,6 +2695,14 @@ elif page=="🏷️ الاستعلام عن الأكواد":
 
     if gpc_cache2:
         bricks_list2=gpc_cache2.get('bricks',[])
+        st.markdown(f'<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot" style="background:#fdcb6e;"></div><h3>جميع Bricks ({len(bricks_list2)})</h3></div>',unsafe_allow_html=True)
+        if bricks_list2:
+            all_bricks_df2=pd.DataFrame([{'كود Brick':b.get('code',''),'اسم Brick (AR)':b.get('title_ar','') or b.get('title',''),'اسم Brick (EN)':b.get('title',''),
+                'الفئة (Class)':b.get('class_name_ar','') or b.get('class_name',''),'المجموعة (Family)':b.get('family_ar','') or b.get('family',''),
+                'القطاع (Segment)':b.get('segment_ar','') or b.get('segment','')} for b in bricks_list2])
+            st.dataframe(all_bricks_df2,use_container_width=True,height=400)
+
+        st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot" style="background:#fdcb6e;"></div><h3>بحث في تصنيف GPC</h3></div>',unsafe_allow_html=True)
         gpc_q2=st.text_input("ابحث بالاسم العربي أو الإنجليزي أو الكود",key="gpc_search_q2",placeholder=" مشروبات، أرز، حليب، Beverages, Rice, Milk...")
         if gpc_q2.strip():
             gpc_results2=_gpc_search(bricks_list2,gpc_q2.strip())
