@@ -205,13 +205,12 @@ def eta_get_document_details(token, uuid_val):
     r=http_requests.get(url,headers=headers,timeout=30,verify=False)
     if r.status_code==200:
         data=r.json()
-        if not st.session_state.get("_debug_dumped"):
-            try:
-                dump_path=os.path.join(DATA_DIR,"_eta_sample_response.json")
+        try:
+            dump_path=os.path.join(DATA_DIR,"_eta_sample_response.json")
+            if not os.path.exists(dump_path):
                 with open(dump_path,"w",encoding="utf-8") as f:
                     json.dump(data,f,ensure_ascii=False,indent=2)
-                st.session_state["_debug_dumped"]=True
-            except: pass
+        except: pass
         return data,None
     return None,f"HTTP {r.status_code}"
 
