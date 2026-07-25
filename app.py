@@ -2002,20 +2002,22 @@ elif page=="📄 Portal الفواتير الإلكترونية":
         fetched_codes=set(c.get('uuid','') for c in codes_db)
         unfetched=[u for u in all_uuids if u['uuid'] not in fetched_codes]
 
-        c1,c2=st.columns(2)
-        with c1:
+        if codes_db and not unfetched:
+            st.markdown(f"""<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(0,184,148,.06);border:1px solid rgba(0,184,148,.15);color:#55efc4;font-size:.82rem;">
+                ✅ جميع الفواتير (<strong>{len(all_uuids)}</strong>) — الأصناف: <strong>{len(codes_db)}</strong>
+            </div>""",unsafe_allow_html=True)
+        else:
             st.markdown(f"""<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(116,185,255,.06);border:1px solid rgba(116,185,255,.15);color:#74b9ff;font-size:.82rem;">
                 📦 الفواتير: <strong>{len(all_uuids)}</strong> | تم استخراج: <strong>{len(fetched_codes)}</strong> | متبقي: <strong>{len(unfetched)}</strong> | الأصناف: <strong>{len(codes_db)}</strong>
             </div>""",unsafe_allow_html=True)
-        with c2:
-            if st.button("🔄 تحميل جميع الأكواد من الفواتير",key="load_all_codes",type="primary",use_container_width=True):
+
+        if unfetched:
+            if st.button(f"🔄 تحديث الأكواد ({len(unfetched)} فاتورة جديدة)",key="load_all_codes",type="primary",use_container_width=True):
                 token=st.session_state.get("eta_token","")
                 if not token:
                     st.error("يجب الاتصال بالبورتال أولاً من تاب الربط")
-                elif not all_uuids:
-                    st.info("لا توجد فواتير مرفوعة (صادرة أو وارد)")
                 else:
-                    progress=st.progress(0,text=f"جاري تحميل أكواد {len(all_uuids)} فاتورة (سريع)...")
+                    progress=st.progress(0,text=f"جاري تحميل أكواد {len(unfetched)} فاتورة (سريع)...")
                     new_codes=[]
                     errors=0
                     done_count=[0]
@@ -2023,10 +2025,10 @@ elif page=="📄 Portal الفواتير الإلكترونية":
                         d,e=eta_get_document_details(token,uu['uuid'])
                         return uu,d,e
                     with ThreadPoolExecutor(max_workers=5) as pool:
-                        futures={pool.submit(_fetch_one,u):u for u in all_uuids}
+                        futures={pool.submit(_fetch_one,u):u for u in unfetched}
                         for f in as_completed(futures):
                             done_count[0]+=1
-                            progress.progress(min(done_count[0]/len(all_uuids),1.0),text=f"{done_count[0]}/{len(all_uuids)} فاتورة...")
+                            progress.progress(min(done_count[0]/len(unfetched),1.0),text=f"{done_count[0]}/{len(unfetched)} فاتورة...")
                             uu,doc,err=f.result()
                             if err or not doc:
                                 errors+=1
@@ -2038,19 +2040,19 @@ elif page=="📄 Portal الفواتير الإلكترونية":
                                     'itemCode':line.get('itemCode',''),'internalCode':line.get('internalCode',''),'description':line.get('description','')
                                 })
                     if new_codes:
-                        merged=list(codes_db)+new_codes
+                        merged=codes_db+new_codes
                         unique=[]
                         seen=set()
                         for c in merged:
-                            key=(c.get('itemCode',''),c.get('internalCode',''),c.get('description',''))
-                            if key not in seen:
-                                seen.add(key)
+                            k=(c.get('itemCode',''),c.get('internalCode',''),c.get('description',''))
+                            if k not in seen:
+                                seen.add(k)
                                 unique.append(c)
                         save_codes_db(unique)
-                        st.success(f"تم تحميل {len(new_codes)} صنف من {len(all_uuids)-errors} فاتورة (أخطاء: {errors}) — إجمالي الأصناف: {len(unique)}")
+                        st.success(f"تم تحميل {len(new_codes)} صنف من {len(unfetched)-errors} فاتورة — إجمالي الأصناف: {len(unique)}")
                         st.rerun()
                     else:
-                        st.warning("لم يتم العثور على أصناف في الفواتير")
+                        st.warning("لم يتم العثور على أصناف جديدة")
                     progress.empty()
 
         if codes_db:
@@ -2066,12 +2068,12 @@ elif page=="📄 Portal الفواتير الإلكترونية":
                 st.dataframe(df,use_container_width=True,hide_index=True)
                 st.caption(f"عرض {len(df)} صنف من أصل {len(codes_db)}")
             else:
-                st.info("لا توجد نتائج مطابقة" if q.strip() else "اضغط تحميل جميع الأكواد لبدء الاستخراج")
-        else:
+                st.info("لا توجد نتائج مطابقة" if q.strip() else "لا توجد أكواد محفوظة")
+        elif not unfetched:
             st.markdown("""<div class="erp-empty" style="padding:2rem;margin-top:1rem;">
                 <div class="erp-empty-icon">🏷️</div>
-                <h3>قاعدة الأكواد فاضية</h3>
-                <p>اضغط "تحميل جميع الأكواد من الفواتير" لاستخراج أكواد الأصناف من جميع الفواتير المرفوعة</p>
+                <h3>لا توجد فواتير</h3>
+                <p>ارفع فواتير صادرة أو وارد أولاً ثم عد إلى هذا التاب</p>
             </div>""",unsafe_allow_html=True)
 
 # ====================== الاستعلام عن الأكواد ======================
@@ -2082,9 +2084,6 @@ elif page=="🏷️ الاستعلام عن الأكواد":
 <div class="erp-topbar-right"><span class="erp-badge">🏷️ أكواد</span></div></div>""", unsafe_allow_html=True)
 
     codes_db=load_codes_db()
-    st.markdown(f"""<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(116,185,255,.06);border:1px solid rgba(116,185,255,.15);color:#74b9ff;font-size:.82rem;margin-bottom:1rem;">
-        📊 قاعدة الأكواد تحتوي على <strong>{len(codes_db)}</strong> صنف
-    </div>""",unsafe_allow_html=True)
 
     out_data=load_data(PORTAL_OUT_FILE)
     in_data=load_data(PORTAL_IN_FILE)
@@ -2100,18 +2099,20 @@ elif page=="🏷️ الاستعلام عن الأكواد":
     fetched_uuids=set(c.get('uuid','') for c in codes_db)
     unfetched=[u for u in all_uuids if u['uuid'] not in fetched_uuids]
 
-    c1,c2=st.columns(2)
-    with c1:
-        st.markdown(f"""<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(85,239,196,.06);border:1px solid rgba(85,239,196,.15);color:#55efc4;font-size:.82rem;">
-            📦 إجمالي الفواتير: <strong>{len(all_uuids)}</strong> | تم استخراج الأكواد: <strong>{len(fetched_uuids)}</strong> | متبقي: <strong>{len(unfetched)}</strong>
+    if codes_db and not unfetched:
+        st.markdown(f"""<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(0,184,148,.06);border:1px solid rgba(0,184,148,.15);color:#55efc4;font-size:.82rem;margin-bottom:1rem;">
+            ✅ جميع الفواتير (<strong>{len(all_uuids)}</strong>) — الأصناف: <strong>{len(codes_db)}</strong>
         </div>""",unsafe_allow_html=True)
-    with c2:
-        if st.button("🔄 تحديث الأكواد من البورتال",key="refresh_codes",type="primary"):
+    else:
+        st.markdown(f"""<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(116,185,255,.06);border:1px solid rgba(116,185,255,.15);color:#74b9ff;font-size:.82rem;margin-bottom:1rem;">
+            📦 إجمالي الفواتير: <strong>{len(all_uuids)}</strong> | تم استخراج: <strong>{len(fetched_uuids)}</strong> | متبقي: <strong>{len(unfetched)}</strong> | الأصناف: <strong>{len(codes_db)}</strong>
+        </div>""",unsafe_allow_html=True)
+
+    if unfetched:
+        if st.button(f"🔄 تحديث الأكواد ({len(unfetched)} فاتورة جديدة)",key="refresh_codes",type="primary",use_container_width=True):
             token=st.session_state.get("eta_token","")
             if not token:
                 st.error("يجب الاتصال بالبورتال أولاً من تاب Portal الفواتير الإلكترونية")
-            elif not unfetched:
-                st.success("جميع الفواتير تم استخراج أكوادها بالفعل!")
             else:
                 progress=st.progress(0,text=f"جاري استخراج الأكواد من {len(unfetched)} فاتورة (سريع)...")
                 new_codes=[]
@@ -2140,19 +2141,19 @@ elif page=="🏷️ الاستعلام عن الأكواد":
                                 'unitPrice':unit_val.get('amountEGP',0) if isinstance(unit_val,dict) else 0,'salesTotal':line.get('salesTotal',0)
                             })
                 if new_codes:
-                    codes_db.extend(new_codes)
-                    codes_db_unique=[]
+                    merged=codes_db+new_codes
+                    unique=[]
                     seen=set()
-                    for c in codes_db:
-                        key=(c.get('uuid',''),c.get('itemCode',''),c.get('description',''))
+                    for c in merged:
+                        key=(c.get('itemCode',''),c.get('internalCode',''),c.get('description',''))
                         if key not in seen:
                             seen.add(key)
-                            codes_db_unique.append(c)
-                    save_codes_db(codes_db_unique)
-                    st.success(f"تم استخراج {len(new_codes)} صنف من {len(unfetched)-errors} فاتورة (أخطاء: {errors})")
+                            unique.append(c)
+                    save_codes_db(unique)
+                    st.success(f"تم استخراج {len(new_codes)} صنف من {len(unfetched)-errors} فاتورة — إجمالي: {len(unique)} صنف")
                     st.rerun()
                 else:
-                    st.warning("لم يتم العثور على أصناف في الفواتير المدروسة")
+                    st.warning("لم يتم العثور على أصناف جديدة")
                 progress.empty()
 
     st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot"></div><h3>بحث عن صنف</h3></div>',unsafe_allow_html=True)
