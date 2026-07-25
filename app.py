@@ -282,7 +282,12 @@ def _eta_extract_lines(uuid_val,doc,uu,codes_list):
         name=line.get('description','') or ''
         if not name.strip():
             name=line.get('itemPrimaryName','') or line.get('itemSecondaryName','')
-            name=_translate_to_arabic(name)
+        name_ar=_translate_to_arabic(name) if name.strip() else name
+        codes_list.append({
+            'uuid':uu.get('uuid',''),'direction':'صادرة' if uu.get('direction','')=='out' else 'واردة',
+            'counterparty':uu.get('name',''),'itemCode':bc,
+            'internalCode':line.get('internalCode',''),'description':name,'description_ar':name_ar
+        })
         codes_list.append({
             'uuid':uu.get('uuid',''),'direction':'صادرة' if uu.get('direction','')=='out' else 'واردة',
             'counterparty':uu.get('name',''),'itemCode':bc,
@@ -374,7 +379,7 @@ if not st.session_state['current_user']:
     :root{--bg:#0a0a15;--surface:rgba(22,22,40,0.7);--surface2:#1e1e38;--border:rgba(255,255,255,0.06);--text:#eaeaf2;--text2:#7878a0;--accent:#6c5ce7;--accent2:#a29bfe;}
     html,body,[class*="css"]{font-family:'Inter','Cairo',sans-serif!important;}
 #MainMenu,footer,header,.stDeployButton{visibility:hidden!important;}
-div[data-testid="stDecoration"],div[data-testid="stManageApp"],iframe[title="Streamlit Manage App"]{display:none!important;visibility:hidden!important;height:0!important;width:0!important;overflow:hidden!important;}
+div[data-testid="stDecoration"]{display:none!important;visibility:hidden!important;height:0!important;width:0!important;overflow:hidden!important;}
     div[data-testid="stToolbar"]{display:none!important;}
     .stApp{background:linear-gradient(135deg,#08081a 0%,#0d0d22 50%,#0a0a18 100%)!important;}
     .login-box{max-width:320px;margin:6rem auto 0;padding:1.5rem 1.5rem;border-radius:16px;background:rgba(22,22,40,0.7);border:1px solid rgba(255,255,255,0.06);backdrop-filter:blur(20px);box-shadow:0 20px 60px rgba(0,0,0,.5);position:relative;overflow:hidden;}
@@ -414,7 +419,7 @@ st.markdown("""
 :root{--bg:#0a0a15;--surface:rgba(22,22,40,0.7);--surface2:#1e1e38;--border:rgba(255,255,255,0.06);--text:#eaeaf2;--text2:#7878a0;--accent:#6c5ce7;--accent2:#a29bfe;--cyan:#00cec9;--green:#00b894;--orange:#fdcb6e;--red:#ff6b6b;--pink:#fd79a8;--blue:#74b9ff;}
 html,body,[class*="css"]{font-family:'Inter','Cairo',sans-serif!important;direction:rtl;}
 #MainMenu,footer,header,.stDeployButton{visibility:hidden!important;}
-div[data-testid="stDecoration"],div[data-testid="stManageApp"],iframe[title="Streamlit Manage App"]{display:none!important;visibility:hidden!important;height:0!important;width:0!important;overflow:hidden!important;}
+div[data-testid="stDecoration"]{display:none!important;visibility:hidden!important;height:0!important;width:0!important;overflow:hidden!important;}
 div[data-testid="stToolbar"]{display:none!important;}
 .stApp{background:linear-gradient(135deg,#08081a 0%,#0d0d22 50%,#0a0a18 100%)!important;color:var(--text);}
 .block-container{padding:1rem 2rem 2rem 2rem!important;max-width:100%!important;}
@@ -528,7 +533,6 @@ section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p{margin:0!
 .erp-empty p{color:var(--text2);margin:0;font-size:.85rem;}
 
 ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(108,92,231,.25);border-radius:5px}
-a[href*="manage"],a[data-testid="stManageApp"],section[data-testid="stSidebar"]+div>a{display:none!important;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -1024,7 +1028,6 @@ if page == ADMIN_PAGE:
                     if u['username']==sel_user['username']:
                         u['permissions']=final_perms
                 save_users(users)
-                cu=get_current_user()
                 if cu and cu.get('username')==sel_user['username']:
                     cu['permissions']=final_perms
                 st.success(f"تم تعديل صلاحيات {sel_user.get('display_name','')} بنجاح!")
@@ -1062,7 +1065,9 @@ if page == "🏠 الرئيسية":
             {meta_html("تاريخ الرفع", _fmt_date_dmy(rec.get('upload_date','')))}
         </div>""", unsafe_allow_html=True)
 
-        cu=get_current_user()
+    cu=get_current_user()
+    if not cu or cu.get('role')!='admin':
+        st.markdown('<style>a[href*="manage"],a[data-testid="stManageApp"],section[data-testid="stSidebar"]+div>a{display:none!important;}</style>',unsafe_allow_html=True)
         if cu and cu.get('role')=='admin':
             st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>تعديل البيانات (Admin)</h3></div>', unsafe_allow_html=True)
             ec1,ec2=st.columns(2)
@@ -2195,8 +2200,8 @@ elif page=="📄 Portal الفواتير الإلكترونية":
                 ql=q.strip().lower()
                 filtered=[c for c in codes_db if ql in str(c.get('itemCode','')).lower() or ql in str(c.get('description','')).lower() or ql in str(c.get('internalCode','')).lower() or ql in str(c.get('counterparty','')).lower()]
             if filtered:
-                df=pd.DataFrame([{'الباركود':c.get('itemCode',''),'الكود الداخلي':c.get('internalCode',''),'اسم الصنف / الوصف':c.get('description','')} for c in filtered])
-                df=df.drop_duplicates(subset=['الباركود','اسم الصنف / الوصف'])
+                df=pd.DataFrame([{'الباركود':c.get('itemCode',''),'الكود الداخلي':c.get('internalCode',''),'الوصف':c.get('description',''),'الوصف مترجم':c.get('description_ar','')} for c in filtered])
+                df=df.drop_duplicates(subset=['الباركود','الوصف'])
                 st.dataframe(df,use_container_width=True,hide_index=True)
                 st.caption(f"عرض {len(df)} صنف من أصل {len(codes_db)}")
             else:
@@ -2363,7 +2368,7 @@ elif page=="🏷️ الاستعلام عن الأكواد":
 
     if codes_db:
         st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot"></div><h3>جميع الأكواد</h3></div>',unsafe_allow_html=True)
-        codes_df=pd.DataFrame([{'الباركود':c.get('itemCode',''),'الكود الداخلي':c.get('internalCode',''),'الوصف':c.get('description',''),
+        codes_df=pd.DataFrame([{'الباركود':c.get('itemCode',''),'الكود الداخلي':c.get('internalCode',''),'الوصف':c.get('description',''),'الوصف مترجم':c.get('description_ar',''),
             'الاتجاه':c.get('direction',''),'المورد/العميل':c.get('counterparty',''),'الكمية':c.get('quantity',0),
             'وحدة القياس':c.get('unitType',''),'سعر الوحدة':c.get('unitPrice',0),'الإجمالي':c.get('salesTotal',0)} for c in codes_db])
         st.dataframe(codes_df,use_container_width=True,height=400)
