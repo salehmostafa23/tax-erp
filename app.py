@@ -244,12 +244,12 @@ def _extract_barcode_from_line(line):
     return barcode
 
 _translation_cache={}
+def _has_arabic(text):
+    return any('\u0600'<=c<='\u06FF' for c in text)
 def _translate_to_arabic(text):
-    import re as _re
     if not text or not text.strip(): return text
     if text in _translation_cache: return _translation_cache[text]
-    has_arabic=any('\u0600'<='\u06FF'<='\u097F' or '\u0600'<=c<='\u06FF' for c in text)
-    if has_arabic:
+    if _has_arabic(text):
         _translation_cache[text]=text
         return text
     try:
@@ -262,6 +262,10 @@ def _translate_to_arabic(text):
     except: pass
     _translation_cache[text]=text
     return text
+def _get_ar_desc(c):
+    ar=c.get('description_ar','')
+    if ar: return ar
+    return _translate_to_arabic(c.get('description','') or c.get('itemCode',''))
 
 def _eta_extract_lines(uuid_val,doc,uu,codes_list):
     lines=doc.get('invoiceLines',[])
@@ -2200,7 +2204,7 @@ elif page=="📄 Portal الفواتير الإلكترونية":
                 ql=q.strip().lower()
                 filtered=[c for c in codes_db if ql in str(c.get('itemCode','')).lower() or ql in str(c.get('description','')).lower() or ql in str(c.get('internalCode','')).lower() or ql in str(c.get('counterparty','')).lower()]
             if filtered:
-                df=pd.DataFrame([{'الباركود':c.get('itemCode',''),'الكود الداخلي':c.get('internalCode',''),'الوصف':c.get('description',''),'الوصف مترجم':c.get('description_ar','')} for c in filtered])
+                df=pd.DataFrame([{'الباركود':c.get('itemCode',''),'الكود الداخلي':c.get('internalCode',''),'الوصف':c.get('description',''),'الوصف مترجم':_get_ar_desc(c)} for c in filtered])
                 df=df.drop_duplicates(subset=['الباركود','الوصف'])
                 st.dataframe(df,use_container_width=True,hide_index=True)
                 st.caption(f"عرض {len(df)} صنف من أصل {len(codes_db)}")
@@ -2368,7 +2372,7 @@ elif page=="🏷️ الاستعلام عن الأكواد":
 
     if codes_db:
         st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot"></div><h3>جميع الأكواد</h3></div>',unsafe_allow_html=True)
-        codes_df=pd.DataFrame([{'الباركود':c.get('itemCode',''),'الكود الداخلي':c.get('internalCode',''),'الوصف':c.get('description',''),'الوصف مترجم':c.get('description_ar',''),
+        codes_df=pd.DataFrame([{'الباركود':c.get('itemCode',''),'الكود الداخلي':c.get('internalCode',''),'الوصف':c.get('description',''),'الوصف مترجم':_get_ar_desc(c),
             'الاتجاه':c.get('direction',''),'المورد/العميل':c.get('counterparty',''),'الكمية':c.get('quantity',0),
             'وحدة القياس':c.get('unitType',''),'سعر الوحدة':c.get('unitPrice',0),'الإجمالي':c.get('salesTotal',0)} for c in codes_db])
         st.dataframe(codes_df,use_container_width=True,height=400)
