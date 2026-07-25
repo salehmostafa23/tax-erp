@@ -726,42 +726,24 @@ def _standalone_gs1_tab():
     is_admin=cu and cu.get('role')=='admin'
     if is_admin:
         st.markdown('<div class="erp-section" style="margin-bottom:1rem"><div class="erp-section-dot"></div><h3>رفع أكواد GS1</h3></div>',unsafe_allow_html=True)
+        st.caption("الملف لازم يكون فيه عمود A = Barcode وعمود D = Description Arabic (بترتيب الأعمدة)")
         uploaded_file=st.file_uploader("ارفع ملف Excel يحتوي أكواد GS1",type=["xlsx","xls"],key="gs1_upload")
         if uploaded_file:
             try:
-                upload_df=pd.read_excel(uploaded_file)
-                required=['Barcode','Description English','Description Arabic']
-                missing=[c for c in required if c not in upload_df.columns]
-                if missing:
-                    st.error(f"الملف ناقص أعمدة: {', '.join(missing)}")
+                upload_df=pd.read_excel(uploaded_file,header=0)
+                cols=list(upload_df.columns)
+                barcode_col=cols[0] if len(cols)>0 else None
+                desc_col=cols[3] if len(cols)>3 else None
+                if not barcode_col or not desc_col:
+                    st.error("الملف محتاج عمودين على الأقل (A و D)")
                 else:
                     new_products=[]
                     for _,row in upload_df.iterrows():
-                        barcode=str(row.get('Barcode','')).strip()
-                        if not barcode or barcode=='nan': continue
-                        new_products.append({
-                            'barcode':barcode,
-                            'type':str(row.get('Type',''))[:20],
-                            'desc_en':str(row.get('Description English','')),
-                            'desc_ar':str(row.get('Description Arabic','')),
-                            'func_en':str(row.get('Functional Name English','')),
-                            'func_ar':str(row.get('Functional Name Arabic','')),
-                            'variant_en':str(row.get('Variant English','')),
-                            'variant_ar':str(row.get('Variant Arabic','')),
-                            'net_content':str(row.get('Net Content','')),
-                            'sku':str(row.get('Sku Number','')),
-                            'brand_en':str(row.get('Brand English','')),
-                            'brand_ar':str(row.get('Brand Arabic','')),
-                            'unit_en':str(row.get('Unit Of Measures English','')),
-                            'unit_ar':str(row.get('Unit Of Measures Arabic','')),
-                            'market_en':str(row.get('Target Market English','')),
-                            'market_ar':str(row.get('Target Market Arabic','')),
-                            'gpc_en':str(row.get('GPC English','')),
-                            'gpc_ar':str(row.get('GPC Arabic','')),
-                            'active_from':str(row.get('active_from','')),
-                            'active_to':str(row.get('active_to','')),
-                            'status':str(row.get('IsDiscontinued','')),
-                        })
+                        barcode=str(row.get(barcode_col,'')).strip()
+                        if not barcode or barcode=='nan' or barcode=='None': continue
+                        desc=str(row.get(desc_col,'')).strip()
+                        if desc=='nan' or desc=='None': desc=''
+                        new_products.append({'barcode':barcode,'desc_ar':desc})
                     st.success(f"تم تحميل {len(new_products)} صنف من الملف")
                     st.markdown(f'<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(0,206,201,.06);border:1px solid rgba(0,206,201,.15);color:#00cec9;font-size:.82rem;">'
                         f'📊 الملف: <strong>{len(new_products)}</strong> صنف | القاعدة الحالية: <strong>{len(gs1_db)}</strong> صنف</div>',unsafe_allow_html=True)
@@ -773,18 +755,13 @@ def _standalone_gs1_tab():
                 st.error(f"خطأ في قراءة الملف: {e}")
     if gs1_db:
         st.markdown(f'<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot" style="background:#00cec9;"></div><h3>المنتجات المسجلة ({len(gs1_db)})</h3></div>',unsafe_allow_html=True)
-        gs1_search=st.text_input("ابحث بالاسم أو الباركود أو البراند",key="gs1_search",placeholder="مثال: 6224009978694، flour، sun mall...")
+        gs1_search=st.text_input("ابحث بالاسم",key="gs1_search",placeholder="اكتب كلمة في اسم الصنف...")
         filtered=gs1_db
         if gs1_search.strip():
             sq=gs1_search.strip().lower()
-            filtered=[p for p in gs1_db if sq in str(p.get('barcode','')).lower() or sq in str(p.get('desc_en','')).lower() or sq in str(p.get('desc_ar','')).lower() or sq in str(p.get('brand_en','')).lower() or sq in str(p.get('brand_ar','')).lower() or sq in str(p.get('func_en','')).lower() or sq in str(p.get('func_ar','')).lower() or sq in str(p.get('gpc_en','')).lower() or sq in str(p.get('gpc_ar','')).lower()]
+            filtered=[p for p in gs1_db if sq in str(p.get('desc_ar','')).lower() or sq in str(p.get('barcode','')).lower()]
         if filtered:
-            gs1_rows=[]
-            for p in filtered:
-                gs1_rows.append({'الباركود':p.get('barcode',''),'الاسم بالعربي':p.get('desc_ar',''),'الاسم بالإنجليزي':p.get('desc_en',''),
-                    'البراند (AR)':p.get('brand_ar',''),'البراند (EN)':p.get('brand_en',''),
-                    'صافي المحتوى':p.get('net_content',''),'الحالة':p.get('status',''),
-                    'من':p.get('active_from',''),'إلى':p.get('active_to','')})
+            gs1_rows=[{'الباركود':p.get('barcode',''),'الاسم بالعربي':p.get('desc_ar','')} for p in filtered]
             gs1_df=pd.DataFrame(gs1_rows)
             st.dataframe(gs1_df,use_container_width=True,height=400)
             col_dl1,col_dl2=st.columns([1,4])
@@ -1099,6 +1076,18 @@ with st.sidebar:
         <p style="color:rgba(255,255,255,.22);font-size:.55rem;margin:0;letter-spacing:1px;">v1.1.2 • Tax Management System</p></div>""", unsafe_allow_html=True)
 
 # ====================== DATA ======================
+RECEIPTS_FILE=os.path.join(DATA_DIR,"receipts_registry.json")
+
+def load_receipts():
+    if os.path.exists(RECEIPTS_FILE):
+        try:
+            with open(RECEIPTS_FILE,'r',encoding='utf-8') as f: return json.load(f)
+        except: pass
+    return []
+
+def save_receipts(data):
+    with open(RECEIPTS_FILE,'w',encoding='utf-8') as f: json.dump(data,f,ensure_ascii=False,indent=2)
+
 FORM41_FILE = os.path.join(DATA_DIR, "form41_data.json")
 VAT_FILE = os.path.join(DATA_DIR, "vat_data.json")
 PORTAL_OUT_FILE = os.path.join(DATA_DIR, "portal_outgoing.json")
@@ -1999,107 +1988,172 @@ elif page == "💰 القيمة المضافة":
 # ====================== MARKET ======================
 elif page=="🛒 فواتير الماركت":
     if not user_has_permission(page): st.error("لا تملك صلاحية الوصول");st.stop()
-    st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>فواتير الماركت — إنشاء Template Portal</h3></div>',unsafe_allow_html=True)
-    if 'mkt_step' not in st.session_state: st.session_state['mkt_step']=1
+    _tab_mkt1,_tab_mkt2=st.tabs(["📝 إنشاء Template","📋 سجل الريسيتات"])
 
-    steps_labels={1:"1️⃣ رفع Detailed Receipt",2:"2️⃣ رفع Barcodes",3:"3️⃣ إنشاء Template Portal"}
-    cs=st.session_state['mkt_step']
-    step_html='<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:1.5rem;">'
-    for si,sl in steps_labels.items():
-        if si<cs: step_html+=f'<div style="display:flex;align-items:center;gap:.4rem;"><div style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#00b894,#55efc4);display:flex;align-items:center;justify-content:center;color:#fff;font-size:.75rem;font-weight:700;">✓</div><span style="color:#55efc4;font-size:.78rem;font-weight:600;">الخطوة {si}</span></div><div style="width:30px;height:2px;background:linear-gradient(90deg,#00b894,rgba(0,184,148,.2));border-radius:2px;"></div>'
-        elif si==cs: step_html+=f'<div style="display:flex;align-items:center;gap:.4rem;"><div style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#6c5ce7,#a29bfe);display:flex;align-items:center;justify-content:center;color:#fff;font-size:.75rem;font-weight:700;box-shadow:0 0 15px rgba(108,92,231,.4);">{si}</div><span style="color:#fff;font-size:.78rem;font-weight:700;">الخطوة {si}</span></div>'
-        else: step_html+=f'<div style="display:flex;align-items:center;gap:.4rem;"><div style="width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.25);font-size:.75rem;font-weight:700;">{si}</div><span style="color:rgba(255,255,255,.25);font-size:.78rem;">الخطوة {si}</span></div>'
-        if si<3: step_html+='<div style="width:30px;height:2px;background:rgba(255,255,255,.06);border-radius:2px;"></div>'
-    step_html+='</div>'
-    st.markdown(step_html,unsafe_allow_html=True)
+    with _tab_mkt1:
+        st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>فواتير الماركت — إنشاء Template Portal</h3></div>',unsafe_allow_html=True)
+        if 'mkt_step' not in st.session_state: st.session_state['mkt_step']=1
 
-    if cs==1:
-        st.markdown("""<div class="erp-card"><div class="erp-card-header">
-            <div class="erp-card-icon" style="background:linear-gradient(135deg,rgba(108,92,231,.15),rgba(108,92,231,.03));">📄</div>
-            <div><h3>الخطوة 1 — Detailed Receipt</h3><p>B-C(الضريبة) • F-E(الخصم) • G(الكمية) • H-I(السعر) • S-J(اسم الصنف) • T(رقم الصنف)</p></div>
-        </div></div>""",unsafe_allow_html=True)
-        st.markdown('<div class="erp-card">',unsafe_allow_html=True)
-        up=st.file_uploader("ارفع Detailed Receipt",type=['xlsx','xls'],key="det_up",label_visibility="collapsed")
-        if up:
-            try:
-                ddf=read_detailed_receipt(up)
-                if ddf.empty: st.error("الملف فارغ")
-                else:
-                    st.markdown(f'<div style="margin:.5rem 0;padding:.6rem 1rem;border-radius:10px;background:rgba(0,184,148,.08);border:1px solid rgba(0,184,148,.15);color:#55efc4;font-size:.82rem;">✓ {len(ddf)} صنف</div>',unsafe_allow_html=True)
-                    st.session_state['detail_df']=ddf
-                    st.dataframe(ddf,use_container_width=True,height=300)
-                    if st.button("التالي ←",key="next1",type="primary"):
-                        st.session_state['mkt_step']=2;st.rerun()
-            except Exception as e: st.error(f"خطأ: {e}")
-        st.markdown('</div>',unsafe_allow_html=True)
-    elif cs==2:
-        st.markdown("""<div class="erp-card"><div class="erp-card-header">
-            <div class="erp-card-icon" style="background:linear-gradient(135deg,rgba(0,206,201,.15),rgba(0,206,201,.03));">📊</div>
-            <div><h3>الخطوة 2 — Barcodes</h3><p>العمود B: رقم الصنف الداخلي | العمود G: الباركود</p></div>
-        </div></div>""",unsafe_allow_html=True)
-        st.markdown('<div class="erp-card">',unsafe_allow_html=True)
-        up=st.file_uploader("ارفع Barcodes",type=['xlsx','xls'],key="bc_up",label_visibility="collapsed")
-        if up:
-            try:
-                bmap=read_barcodes(up)
-                if not bmap: st.error("لا توجد بيانات")
-                else:
-                    st.markdown(f'<div style="margin:.5rem 0;padding:.6rem 1rem;border-radius:10px;background:rgba(0,184,148,.08);border:1px solid rgba(0,184,148,.15);color:#55efc4;font-size:.82rem;">✓ {len(bmap)} صنف مرتبط</div>',unsafe_allow_html=True)
-                    st.session_state['barcode_map']=bmap
-                    st.dataframe(pd.DataFrame(list(bmap.items())[:10],columns=['الكود الداخلي','الباركود']),use_container_width=True)
-                    c1,c2=st.columns(2)
-                    with c1:
-                        if st.button("← السابق",key="prev2"):
-                            st.session_state['mkt_step']=1;st.rerun()
-                    with c2:
-                        if st.button("التالي ←",key="next2",type="primary"):
-                            st.session_state['mkt_step']=3;st.rerun()
-            except Exception as e: st.error(f"خطأ: {e}")
-        else:
-            if st.button("← السابق",key="prev2b"):
-                st.session_state['mkt_step']=1;st.rerun()
-        st.markdown('</div>',unsafe_allow_html=True)
-    elif cs==3:
-        hd='detail_df' in st.session_state and not st.session_state['detail_df'].empty
-        hb='barcode_map' in st.session_state and len(st.session_state.get('barcode_map',{}))>0
-        if hd and hb:
-            ddf=st.session_state['detail_df'];bmap=st.session_state['barcode_map']
-            matched=sum(1 for _,r in ddf.iterrows() if str(r['internal_code']).strip() in bmap)
-            unmatched=len(ddf)-matched;tc=sum(1 for _,r in ddf.iterrows() if float(r['tax'] or 0)>0)
-            dt=sum(1 for _,r in ddf.iterrows() if float(r['discount'] or 0)>0 and float(r['tax'] or 0)>0)
+        steps_labels={1:"1️⃣ رفع Detailed Receipt",2:"2️⃣ رفع Barcodes",3:"3️⃣ إنشاء Template Portal"}
+        cs=st.session_state['mkt_step']
+        step_html='<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:1.5rem;">'
+        for si,sl in steps_labels.items():
+            if si<cs: step_html+=f'<div style="display:flex;align-items:center;gap:.4rem;"><div style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#00b894,#55efc4);display:flex;align-items:center;justify-content:center;color:#fff;font-size:.75rem;font-weight:700;">✓</div><span style="color:#55efc4;font-size:.78rem;font-weight:600;">الخطوة {si}</span></div><div style="width:30px;height:2px;background:linear-gradient(90deg,#00b894,rgba(0,184,148,.2));border-radius:2px;"></div>'
+            elif si==cs: step_html+=f'<div style="display:flex;align-items:center;gap:.4rem;"><div style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#6c5ce7,#a29bfe);display:flex;align-items:center;justify-content:center;color:#fff;font-size:.75rem;font-weight:700;box-shadow:0 0 15px rgba(108,92,231,.4);">{si}</div><span style="color:#fff;font-size:.78rem;font-weight:700;">الخطوة {si}</span></div>'
+            else: step_html+=f'<div style="display:flex;align-items:center;gap:.4rem;"><div style="width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.25);font-size:.75rem;font-weight:700;">{si}</div><span style="color:rgba(255,255,255,.25);font-size:.78rem;">الخطوة {si}</span></div>'
+            if si<3: step_html+='<div style="width:30px;height:2px;background:rgba(255,255,255,.06);border-radius:2px;"></div>'
+        step_html+='</div>'
+        st.markdown(step_html,unsafe_allow_html=True)
+
+        if cs==1:
             st.markdown("""<div class="erp-card"><div class="erp-card-header">
-                <div class="erp-card-icon" style="background:linear-gradient(135deg,rgba(253,203,110,.15),rgba(253,203,110,.03));">⚙️</div>
-                <div><h3>الخطوة 3 — ملخص البيانات</h3></div>
+                <div class="erp-card-icon" style="background:linear-gradient(135deg,rgba(108,92,231,.15),rgba(108,92,231,.03));">📄</div>
+                <div><h3>الخطوة 1 — Detailed Receipt</h3><p>B-C(الضريبة) • F-E(الخصم) • G(الكمية) • H-I(السعر) • S-J(اسم الصنف) • T(رقم الصنف)</p></div>
             </div></div>""",unsafe_allow_html=True)
-            s1,s2,s3=st.columns(3)
-            with s1: st.markdown(f'<div class="erp-stat s-blue"><div class="erp-stat-label">إجمالي الأصناف</div><div class="erp-stat-value">{len(ddf)}</div></div>',unsafe_allow_html=True)
-            with s2: st.markdown(f'<div class="erp-stat s-green"><div class="erp-stat-label">مرتبطة بالباركود</div><div class="erp-stat-value">{matched}</div></div>',unsafe_allow_html=True)
-            with s3: st.markdown(f'<div class="erp-stat s-red"><div class="erp-stat-label">غير مرتبطه</div><div class="erp-stat-value">{unmatched}</div></div>',unsafe_allow_html=True)
-            s4,s5=st.columns(2)
-            with s4: st.markdown(f'<div class="erp-stat s-orange"><div class="erp-stat-label">بها ضريبة (÷1.14)</div><div class="erp-stat-value">{tc}</div></div>',unsafe_allow_html=True)
-            with s5: st.markdown(f'<div class="erp-stat s-pink"><div class="erp-stat-label">خصم + ضريبة</div><div class="erp-stat-value">{dt}</div></div>',unsafe_allow_html=True)
-            if unmatched>0:
-                miss=[str(r['internal_code']).strip() for _,r in ddf.iterrows() if str(r['internal_code']).strip() not in bmap]
-                st.warning(f"أكواد غير موجودة: {', '.join(miss[:15])}{'...' if len(miss)>15 else ''}")
-            c1,c2=st.columns([1,2])
-            with c1:
-                if st.button("← السابق",key="prev3"):
+            st.markdown('<div class="erp-card">',unsafe_allow_html=True)
+            up=st.file_uploader("ارفع Detailed Receipt",type=['xlsx','xls'],key="det_up",label_visibility="collapsed")
+            if up:
+                try:
+                    ddf=read_detailed_receipt(up)
+                    if ddf.empty: st.error("الملف فارغ")
+                    else:
+                        st.markdown(f'<div style="margin:.5rem 0;padding:.6rem 1rem;border-radius:10px;background:rgba(0,184,148,.08);border:1px solid rgba(0,184,148,.15);color:#55efc4;font-size:.82rem;">✓ {len(ddf)} صنف</div>',unsafe_allow_html=True)
+                        st.session_state['detail_df']=ddf
+                        st.dataframe(ddf,use_container_width=True,height=300)
+                        if st.button("التالي ←",key="next1",type="primary"):
+                            st.session_state['mkt_step']=2;st.rerun()
+                except Exception as e: st.error(f"خطأ: {e}")
+            st.markdown('</div>',unsafe_allow_html=True)
+        elif cs==2:
+            st.markdown("""<div class="erp-card"><div class="erp-card-header">
+                <div class="erp-card-icon" style="background:linear-gradient(135deg,rgba(0,206,201,.15),rgba(0,206,201,.03));">📊</div>
+                <div><h3>الخطوة 2 — Barcodes</h3><p>العمود B: رقم الصنف الداخلي | العمود G: الباركود</p></div>
+            </div></div>""",unsafe_allow_html=True)
+            st.markdown('<div class="erp-card">',unsafe_allow_html=True)
+            up=st.file_uploader("ارفع Barcodes",type=['xlsx','xls'],key="bc_up",label_visibility="collapsed")
+            if up:
+                try:
+                    bmap=read_barcodes(up)
+                    if not bmap: st.error("لا توجد بيانات")
+                    else:
+                        st.markdown(f'<div style="margin:.5rem 0;padding:.6rem 1rem;border-radius:10px;background:rgba(0,184,148,.08);border:1px solid rgba(0,184,148,.15);color:#55efc4;font-size:.82rem;">✓ {len(bmap)} صنف مرتبط</div>',unsafe_allow_html=True)
+                        st.session_state['barcode_map']=bmap
+                        st.dataframe(pd.DataFrame(list(bmap.items())[:10],columns=['الكود الداخلي','الباركود']),use_container_width=True)
+                        c1,c2=st.columns(2)
+                        with c1:
+                            if st.button("← السابق",key="prev2"):
+                                st.session_state['mkt_step']=1;st.rerun()
+                        with c2:
+                            if st.button("التالي ←",key="next2",type="primary"):
+                                st.session_state['mkt_step']=3;st.rerun()
+                except Exception as e: st.error(f"خطأ: {e}")
+            else:
+                if st.button("← السابق",key="prev2b"):
+                    st.session_state['mkt_step']=1;st.rerun()
+            st.markdown('</div>',unsafe_allow_html=True)
+        elif cs==3:
+            hd='detail_df' in st.session_state and not st.session_state['detail_df'].empty
+            hb='barcode_map' in st.session_state and len(st.session_state.get('barcode_map',{}))>0
+            if hd and hb:
+                ddf=st.session_state['detail_df'];bmap=st.session_state['barcode_map']
+                matched=sum(1 for _,r in ddf.iterrows() if str(r['internal_code']).strip() in bmap)
+                unmatched=len(ddf)-matched;tc=sum(1 for _,r in ddf.iterrows() if float(r['tax'] or 0)>0)
+                dt=sum(1 for _,r in ddf.iterrows() if float(r['discount'] or 0)>0 and float(r['tax'] or 0)>0)
+                st.markdown("""<div class="erp-card"><div class="erp-card-header">
+                    <div class="erp-card-icon" style="background:linear-gradient(135deg,rgba(253,203,110,.15),rgba(253,203,110,.03));">⚙️</div>
+                    <div><h3>الخطوة 3 — بيانات الريسيت وإنشاء Template</h3></div>
+                </div></div>""",unsafe_allow_html=True)
+                s1,s2,s3=st.columns(3)
+                with s1: st.markdown(f'<div class="erp-stat s-blue"><div class="erp-stat-label">إجمالي الأصناف</div><div class="erp-stat-value">{len(ddf)}</div></div>',unsafe_allow_html=True)
+                with s2: st.markdown(f'<div class="erp-stat s-green"><div class="erp-stat-label">مرتبطة بالباركود</div><div class="erp-stat-value">{matched}</div></div>',unsafe_allow_html=True)
+                with s3: st.markdown(f'<div class="erp-stat s-red"><div class="erp-stat-label">غير مرتبطه</div><div class="erp-stat-value">{unmatched}</div></div>',unsafe_allow_html=True)
+                s4,s5=st.columns(2)
+                with s4: st.markdown(f'<div class="erp-stat s-orange"><div class="erp-stat-label">بها ضريبة (÷1.14)</div><div class="erp-stat-value">{tc}</div></div>',unsafe_allow_html=True)
+                with s5: st.markdown(f'<div class="erp-stat s-pink"><div class="erp-stat-label">خصم + ضريبة</div><div class="erp-stat-value">{dt}</div></div>',unsafe_allow_html=True)
+                if unmatched>0:
+                    miss=[str(r['internal_code']).strip() for _,r in ddf.iterrows() if str(r['internal_code']).strip() not in bmap]
+                    st.warning(f"أكواد غير موجودة: {', '.join(miss[:15])}{'...' if len(miss)>15 else ''}")
+
+                st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot" style="background:#fdcb6e;"></div><h3>بيانات الريسيت</h3></div>',unsafe_allow_html=True)
+                receipts_list=load_receipts()
+                r1,r2=st.columns(2)
+                with r1:
+                    receipt_number=st.text_input("رقم الريسيت *",key="rcpt_num",placeholder="أدخل رقم الريسيت...")
+                with r2:
+                    receipt_date=st.date_input("تاريخ الريسيت *",key="rcpt_date")
+                r3,r4=st.columns(2)
+                with r3:
+                    receiver_name=st.text_input("اسم المستلم *",key="rcpt_receiver",placeholder="اسم المستلم...")
+                with r4:
+                    st.write("")
+                    existing_nums=[str(r.get('receipt_number','')).strip() for r in receipts_list]
+                    if receipt_number and receipt_number.strip():
+                        is_dup=receipt_number.strip() in existing_nums
+                        if is_dup:
+                            st.markdown('<div style="display:flex;align-items:center;gap:.5rem;padding:.6rem 1rem;border-radius:10px;background:rgba(255,107,107,.08);border:1px solid rgba(255,107,107,.3);margin-top:1.2rem;"><div style="width:14px;height:14px;border-radius:50%;background:#ff6b6b;box-shadow:0 0 10px #ff6b6b;"></div><span style="color:#ff6b6b;font-size:.85rem;font-weight:600;">رقم الريسيت موجود مسبقاً!</span></div>',unsafe_allow_html=True)
+                        else:
+                            st.markdown('<div style="display:flex;align-items:center;gap:.5rem;padding:.6rem 1rem;border-radius:10px;background:rgba(0,184,148,.08);border:1px solid rgba(0,184,148,.3);margin-top:1.2rem;"><div style="width:14px;height:14px;border-radius:50%;background:#00b894;box-shadow:0 0 10px #00b894;"></div><span style="color:#00b894;font-size:.85rem;font-weight:600;">رقم جديد</span></div>',unsafe_allow_html=True)
+                    else:
+                        st.markdown('<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);margin-top:1.2rem;"><span style="color:rgba(255,255,255,.25);font-size:.85rem;">أدخل رقم الريسيت للتحقق</span></div>',unsafe_allow_html=True)
+
+                c1,c2=st.columns([1,2])
+                with c1:
+                    if st.button("← السابق",key="prev3"):
+                        st.session_state['mkt_step']=2;st.rerun()
+                with c2:
+                    if st.button("🚀 إنشاء Template Portal",key="gen_p",type="primary"):
+                        rn=(receipt_number or '').strip()
+                        rd=str(receipt_date)
+                        rm=(receiver_name or '').strip()
+                        if not rn or not rm:
+                            st.error("لازم تدخل رقم الريسيت واسم المستلم!")
+                        elif rn in existing_nums:
+                            st.error(f"رقم الريسيت {rn} موجود مسبقاً! ادخل رقم غير مكرر.")
+                        else:
+                            try:
+                                out=gen_template(ddf,bmap);st.success("تم الإنشاء!")
+                                st.dataframe(pd.read_excel(out,engine='openpyxl'),use_container_width=True,height=400)
+                                out.seek(0)
+                                file_name=f"{rn}_{rd}_{rm}.xlsx"
+                                st.download_button("📥 تحميل",data=out,file_name=file_name,mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",type="primary")
+                                new_rec={'receipt_number':rn,'receipt_date':rd,'receiver_name':rm,'file_name':file_name,'upload_date':datetime.now().isoformat(),'items_count':len(ddf),'matched':matched}
+                                receipts_list.append(new_rec)
+                                save_receipts(receipts_list)
+                            except Exception as e: st.error(f"خطأ: {e}")
+            else:
+                miss=[]
+                if not hd: miss.append("Detailed Receipt")
+                if not hb: miss.append("Barcodes")
+                st.markdown(f'<div class="erp-empty"><div class="erp-empty-icon">⏳</div><h3>بانتظار إكمال الخطوات</h3><p>يرجى رفع: {" + ".join(miss)}</p></div>',unsafe_allow_html=True)
+                if st.button("← السابق",key="prev3b"):
                     st.session_state['mkt_step']=2;st.rerun()
-            with c2:
-                if st.button("🚀 إنشاء Template Portal",key="gen_p",type="primary"):
-                    try:
-                        out=gen_template(ddf,bmap);st.success("تم الإنشاء!")
-                        st.dataframe(pd.read_excel(out,engine='openpyxl'),use_container_width=True,height=400)
-                        out.seek(0)
-                        st.download_button("📥 تحميل",data=out,file_name=f"Template_Portal_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",type="primary")
-                    except Exception as e: st.error(f"خطأ: {e}")
+
+    with _tab_mkt2:
+        st.markdown('<div class="erp-section"><div class="erp-section-dot" style="background:#fdcb6e;"></div><h3>📋 سجل الريسيتات</h3></div>',unsafe_allow_html=True)
+        receipts_list=load_receipts()
+        if receipts_list:
+            rcpt_search=st.text_input("ابحث برقم الريسيت أو اسم المستلم",key="rcpt_search",placeholder="اكتب رقم الريسيت أو اسم المستلم...")
+            filtered_r=receipts_list
+            if rcpt_search.strip():
+                sq=rcpt_search.strip().lower()
+                filtered_r=[r for r in receipts_list if sq in str(r.get('receipt_number','')).lower() or sq in str(r.get('receiver_name','')).lower()]
+            if filtered_r:
+                rows=[{'رقم الريسيت':r.get('receipt_number',''),'التاريخ':r.get('receipt_date',''),'اسم المستلم':r.get('receiver_name',''),  'اسم الملف':r.get('file_name',''),'عدد الأصناف':r.get('items_count',''),'تاريخ الرفع':str(r.get('upload_date',''))[:10]} for r in filtered_r]
+                st.dataframe(pd.DataFrame(rows),use_container_width=True,height=400)
+                st.markdown(f'<div style="padding:.5rem 1rem;border-radius:10px;background:rgba(0,206,201,.06);border:1px solid rgba(0,206,201,.15);color:#00cec9;font-size:.82rem;">📊 إجمالي السجلات: <strong>{len(filtered_r)}</strong></div>',unsafe_allow_html=True)
+                cu=get_current_user()
+                if cu and cu.get('role')=='admin':
+                    if st.button("🗑️ مسح السجل بالكامل",key="clear_rcpts"):
+                        save_receipts([])
+                        st.success("تم المسح!");st.rerun()
+            else:
+                st.info(f"لا توجد نتائج لكلمة: {rcpt_search.strip()}")
         else:
-            miss=[]
-            if not hd: miss.append("Detailed Receipt")
-            if not hb: miss.append("Barcodes")
-            st.markdown(f'<div class="erp-empty"><div class="erp-empty-icon">⏳</div><h3>بانتظار إكمال الخطوات</h3><p>يرجى رفع: {" + ".join(miss)}</p></div>',unsafe_allow_html=True)
-            if st.button("← السابق",key="prev3b"):
-                st.session_state['mkt_step']=2;st.rerun()
+            st.markdown("""<div class="erp-empty" style="padding:2rem;margin-top:1rem;text-align:center;">
+                <div class="erp-empty-icon">📋</div>
+                <h3 style="color:#fff;">لا توجد سجلات بعد</h3>
+                <p style="color:var(--text2);">سيظهر السجل هنا تلقائياً عند إنشاء Templates من الريسيتات</p>
+            </div>""",unsafe_allow_html=True)
 
 # ====================== PORTAL ELECTRONIC INVOICES ======================
 elif page=="📄 Portal الفواتير الإلكترونية":
