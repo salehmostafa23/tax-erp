@@ -2344,13 +2344,72 @@ elif page=="📄 Portal الفواتير الإلكترونية":
                 </div>""",unsafe_allow_html=True)
         with c_hdr2:
             if st.button("🔄 تحديث بيانات GPC",key="gpc_refresh",type="primary",use_container_width=True):
-                with st.spinner("جاري تحميل تصنيف GPC من GS1..."):
-                    result,err=_gpc_fetch_all()
-                if err:
-                    st.error(f"خطأ: {err}")
-                else:
-                    st.success(f"تم تحميل {result['stats']['bricks']} Brick بنجاح")
-                    st.rerun()
+                gpc_progress=st.progress(0,text="جاري الاتصال بـ GS1...")
+                pubs=_gpc_api_get("/browser/publication",{"languageId":8})
+                if not pubs:
+                    st.error("خطأ: لا توجد إصدارات GPC");st.stop()
+                gpc_progress.progress(10,text="تم العثور على الإصدارات...")
+                latest=None
+                for p in pubs:
+                    if p.get('isLatest'): latest=p;break
+                if not latest: latest=pubs[0]
+                pid=latest.get('publicationId','')
+                gpc_progress.progress(15,text="جاري تحميل Segments...")
+                segments=_gpc_api_get("/browser/segment",{"publicationId":pid})
+                gpc_progress.progress(25,text="جاري تحميل Families...")
+                families=_gpc_api_get("/browser/family",{"publicationId":pid})
+                gpc_progress.progress(40,text="جاري تحميل Classes...")
+                classes=_gpc_api_get("/browser/class",{"publicationId":pid})
+                gpc_progress.progress(60,text="جاري تحميل Bricks...")
+                bricks=_gpc_api_get("/browser/brick",{"publicationId":pid})
+                if not bricks:
+                    st.error("خطأ: فشل تحميل Bricks");st.stop()
+                gpc_progress.progress(65,text="تم تحميل البيانات — جاري تجهيز الشجرة...")
+                seg_map={s.get('code',''):s.get('title','') or str(s.get('code','')) for s in (segments or [])}
+                fam_map={f.get('code',''):f.get('title','') or str(f.get('code','')) for f in (families or [])}
+                cls_map_={c.get('code',''):c for c in (classes or [])}
+                cls_name_map={c.get('code',''):c.get('title','') or str(c.get('code','')) for c in (classes or [])}
+                flat_bricks=[]
+                all_texts=[]
+                for b in bricks:
+                    bcode=b.get('code','')
+                    btitle=b.get('title','') or b.get('definition','') or str(bcode)
+                    parent=b.get('parentCode','')
+                    cname=cls_name_map.get(parent,'')
+                    cobj=cls_map_.get(parent,{})
+                    fam_code=cobj.get('parentCode','')
+                    fname=fam_map.get(fam_code,'')
+                    fam_obj={f.get('code',''):f for f in (families or [])}.get(fam_code,{})
+                    seg_code=fam_obj.get('parentCode','')
+                    sname=seg_map.get(seg_code,'')
+                    flat_bricks.append({'code':bcode,'title':btitle,'class_name':cname,'family':fname,'segment':sname})
+                    all_texts.extend([btitle,cname,fname,sname])
+                gpc_progress.progress(70,text=f"جاري ترجمة {len(flat_bricks)} Brick للعربية...")
+                unique=[t for t in set(all_texts) if t.strip() and not _has_arabic(t)]
+                BATCH=30
+                ar_map={}
+                total_batches=max(1,(len(unique)+BATCH-1)//BATCH)
+                for bi in range(0,len(unique),BATCH):
+                    batch=unique[bi:bi+BATCH]
+                    joined=' | '.join(batch)
+                    translated=_translate_to_arabic(joined)
+                    if translated and translated!=joined:
+                        parts=translated.split('|')
+                        for j,t in enumerate(batch):
+                            if j<len(parts): ar_map[t.strip()]=parts[j].strip()
+                    pct=70+int(25*(bi//BATCH+1)/total_batches)
+                    gpc_progress.progress(min(pct,95),text=f"جاري الترجمة... ({bi//BATCH+1}/{total_batches})")
+                for b in flat_bricks:
+                    b['title_ar']=ar_map.get(b['title'],'') or _translate_to_arabic(b['title'])
+                    b['class_name_ar']=ar_map.get(b['class_name'],'') or _translate_to_arabic(b['class_name'])
+                    b['family_ar']=ar_map.get(b['family'],'') or _translate_to_arabic(b['family'])
+                    b['segment_ar']=ar_map.get(b['segment'],'') or _translate_to_arabic(b['segment'])
+                gpc_progress.progress(98,text="جاري الحفظ...")
+                _gpc_save_cache({'bricks':flat_bricks,'publication':latest,
+                    'stats':{'segments':len(segments or []),'families':len(families or []),'classes':len(classes or []),'bricks':len(bricks)},
+                    'fetched_at':datetime.now().isoformat()})
+                gpc_progress.progress(100,text=f"تم! {len(bricks)} Brick — {len(segments or [])} Segment — {len(families or [])} Family — {len(classes or [])} Class")
+                st.rerun()
 
         if gpc_cache:
             bricks_list=gpc_cache.get('bricks',[])
@@ -2567,13 +2626,72 @@ elif page=="🏷️ الاستعلام عن الأكواد":
             </div>""",unsafe_allow_html=True)
     with gc2:
         if st.button("🔄 تحديث بيانات GPC",key="gpc_refresh_standalone",type="primary",use_container_width=True):
-            with st.spinner("جاري تحميل تصنيف GPC من GS1..."):
-                result,err=_gpc_fetch_all()
-            if err:
-                st.error(f"خطأ: {err}")
-            else:
-                st.success(f"تم تحميل {result['stats']['bricks']} Brick بنجاح")
-                st.rerun()
+            gpc_progress2=st.progress(0,text="جاري الاتصال بـ GS1...")
+            pubs2=_gpc_api_get("/browser/publication",{"languageId":8})
+            if not pubs2:
+                st.error("خطأ: لا توجد إصدارات GPC");st.stop()
+            gpc_progress2.progress(10,text="تم العثور على الإصدارات...")
+            latest2=None
+            for p in pubs2:
+                if p.get('isLatest'): latest2=p;break
+            if not latest2: latest2=pubs2[0]
+            pid2=latest2.get('publicationId','')
+            gpc_progress2.progress(15,text="جاري تحميل Segments...")
+            segments2=_gpc_api_get("/browser/segment",{"publicationId":pid2})
+            gpc_progress2.progress(25,text="جاري تحميل Families...")
+            families2=_gpc_api_get("/browser/family",{"publicationId":pid2})
+            gpc_progress2.progress(40,text="جاري تحميل Classes...")
+            classes2=_gpc_api_get("/browser/class",{"publicationId":pid2})
+            gpc_progress2.progress(60,text="جاري تحميل Bricks...")
+            bricks2=_gpc_api_get("/browser/brick",{"publicationId":pid2})
+            if not bricks2:
+                st.error("خطأ: فشل تحميل Bricks");st.stop()
+            gpc_progress2.progress(65,text="تم تحميل البيانات — جاري تجهيز الشجرة...")
+            seg_map2={s.get('code',''):s.get('title','') or str(s.get('code','')) for s in (segments2 or [])}
+            fam_map2={f.get('code',''):f.get('title','') or str(f.get('code','')) for f in (families2 or [])}
+            cls_map2_={c.get('code',''):c for c in (classes2 or [])}
+            cls_name_map2={c.get('code',''):c.get('title','') or str(c.get('code','')) for c in (classes2 or [])}
+            flat_bricks2=[]
+            all_texts2=[]
+            for b in bricks2:
+                bcode=b.get('code','')
+                btitle=b.get('title','') or b.get('definition','') or str(bcode)
+                parent=b.get('parentCode','')
+                cname=cls_name_map2.get(parent,'')
+                cobj=cls_map2_.get(parent,{})
+                fam_code=cobj.get('parentCode','')
+                fname=fam_map2.get(fam_code,'')
+                fam_obj={f.get('code',''):f for f in (families2 or [])}.get(fam_code,{})
+                seg_code=fam_obj.get('parentCode','')
+                sname=seg_map2.get(seg_code,'')
+                flat_bricks2.append({'code':bcode,'title':btitle,'class_name':cname,'family':fname,'segment':sname})
+                all_texts2.extend([btitle,cname,fname,sname])
+            gpc_progress2.progress(70,text=f"جاري ترجمة {len(flat_bricks2)} Brick للعربية...")
+            unique2=[t for t in set(all_texts2) if t.strip() and not _has_arabic(t)]
+            BATCH=30
+            ar_map2={}
+            total_batches2=max(1,(len(unique2)+BATCH-1)//BATCH)
+            for bi in range(0,len(unique2),BATCH):
+                batch=unique2[bi:bi+BATCH]
+                joined=' | '.join(batch)
+                translated=_translate_to_arabic(joined)
+                if translated and translated!=joined:
+                    parts=translated.split('|')
+                    for j,t in enumerate(batch):
+                        if j<len(parts): ar_map2[t.strip()]=parts[j].strip()
+                pct=70+int(25*(bi//BATCH+1)/total_batches2)
+                gpc_progress2.progress(min(pct,95),text=f"جاري الترجمة... ({bi//BATCH+1}/{total_batches2})")
+            for b in flat_bricks2:
+                b['title_ar']=ar_map2.get(b['title'],'') or _translate_to_arabic(b['title'])
+                b['class_name_ar']=ar_map2.get(b['class_name'],'') or _translate_to_arabic(b['class_name'])
+                b['family_ar']=ar_map2.get(b['family'],'') or _translate_to_arabic(b['family'])
+                b['segment_ar']=ar_map2.get(b['segment'],'') or _translate_to_arabic(b['segment'])
+            gpc_progress2.progress(98,text="جاري الحفظ...")
+            _gpc_save_cache({'bricks':flat_bricks2,'publication':latest2,
+                'stats':{'segments':len(segments2 or []),'families':len(families2 or []),'classes':len(classes2 or []),'bricks':len(bricks2)},
+                'fetched_at':datetime.now().isoformat()})
+            gpc_progress2.progress(100,text=f"تم! {len(bricks2)} Brick — {len(segments2 or [])} Segment — {len(families2 or [])} Family — {len(classes2 or [])} Class")
+            st.rerun()
 
     if gpc_cache2:
         bricks_list2=gpc_cache2.get('bricks',[])
