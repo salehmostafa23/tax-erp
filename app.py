@@ -308,71 +308,74 @@ def _portal_led():
 
 GPC_API_BASE="https://gpc-api.gs1.org/api"
 GPC_DATA_FILE=os.path.join(DATA_DIR,"gpc_database.json")
+_GPC_HEADERS={
+    'Content-Type':'application/json;charset=utf-8',
+    'Accept':'application/json, text/plain, */*',
+    'Origin':'https://gpc-browser.gs1.org',
+    'Referer':'https://gpc-browser.gs1.org/',
+    'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+}
 
-def _gpc_fetch_languages():
+def _gpc_api_get(endpoint,params=None):
     try:
-        r=http_requests.get(f"{GPC_API_BASE}/browser/language/all",timeout=15)
-        if r.status_code==200: return r.json()
+        r=http_requests.get(f"{GPC_API_BASE}{endpoint}",params=params,headers=_GPC_HEADERS,timeout=30)
+        if r.status_code==200:
+            data=r.json()
+            if isinstance(data,dict) and 'result' in data: return data['result']
+            return data
     except: pass
-    return []
+    return None
 
-def _gpc_get_publications(language_id):
-    try:
-        r=http_requests.get(f"{GPC_API_BASE}/browser/publication",params={"languageId":language_id},timeout=15)
-        if r.status_code==200: return r.json()
-    except: pass
-    return []
+def _gpc_fetch_all():
+    pubs=_gpc_api_get("/browser/publication",{"languageId":8})
+    if not pubs: return None,"لا توجد إصدارات GPC"
+    latest=None
+    for p in pubs:
+        if p.get('isLatest'): latest=p; break
+    if not latest: latest=pubs[0]
+    pid=latest.get('publicationId','')
+    segments=_gpc_api_get("/browser/segment",{"publicationId":pid})
+    families=_gpc_api_get("/browser/family",{"publicationId":pid})
+    classes=_gpc_api_get("/browser/class",{"publicationId":pid})
+    bricks=_gpc_api_get("/browser/brick",{"publicationId":pid})
+    if not bricks: return None,"فشل تحميل بيانات Brick"
+    seg_map={s.get('code',''):s.get('title','') or str(s.get('code','')) for s in (segments or [])}
+    fam_map={f.get('code',''):f.get('title','') or str(f.get('code','')) for f in (families or [])}
+    cls_map_={c.get('code',''):c for c in (classes or [])}
+    cls_name_map={c.get('code',''):c.get('title','') or str(c.get('code','')) for c in (classes or [])}
+    flat_bricks=[]
+    for b in bricks:
+        bcode=b.get('code','')
+        btitle=b.get('title','') or b.get('definition','') or str(bcode)
+        parent=b.get('parentCode','')
+        cname=cls_name_map.get(parent,'')
+        cobj=cls_map_.get(parent,{})
+        fam_code=cobj.get('parentCode','')
+        fname=fam_map.get(fam_code,'')
+        fam_obj={f.get('code',''):f for f in (families or [])}.get(fam_code,{})
+        seg_code=fam_obj.get('parentCode','')
+        sname=seg_map.get(seg_code,'')
+        flat_bricks.append({'code':bcode,'title':btitle,'class_name':cname,'family':fname,'segment':sname})
+    result={
+        'bricks':flat_bricks,
+        'publication':latest,
+        'stats':{'segments':len(segments or []),'families':len(families or []),'classes':len(classes or []),'bricks':len(bricks)},
+        'fetched_at':datetime.now().isoformat()
+    }
+    _gpc_save_cache(result)
+    return result,None
 
-def _gpc_fetch_hierarchy(pub_id):
-    out={}
-    for key,endpoint in [("segments","segment"),("families","family"),("classes","class"),("bricks","brick")]:
-        try:
-            r=http_requests.get(f"{GPC_API_BASE}/browser/{endpoint}",params={"publicationId":pub_id},timeout=30)
-            if r.status_code==200: out[key]=r.json()
-            else: out[key]=[]
-        except: out[key]=[]
-    return out
-
-def _gpc_build_tree(data):
-    bricks_map={b.get('code',''):b for b in data.get('bricks',[])}
-    classes_map={c.get('code',''):c for c in data.get('classes',[])}
-    families_map={f.get('code',''):f for f in data.get('families',[])}
-    segments_map={s.get('code',''):s for s in data.get('segments',[])}
-    for c in data.get('classes',[]):
-        c['bricks']=[b for b in data.get('bricks',[]) if b.get('parentCode')==c.get('code','')]
-    for f in data.get('families',[]):
-        f['classes']=[c for c in data.get('classes',[]) if c.get('parentCode')==f.get('code','')]
-    for s in data.get('segments',[]):
-        s['families']=[f for f in data.get('families',[]) if f.get('parentCode')==s.get('code','')]
-    return data.get('segments',[])
-
-def _gpc_search(segments,q):
+def _gpc_search(bricks,q):
     q=q.lower().strip()
     results=[]
-    for seg in segments:
-        for fam in seg.get('families',[]):
-            for cls in fam.get('classes',[]):
-                for brick in cls.get('bricks',[]):
-                    name=str(brick.get('title','') or brick.get('definition','')).lower()
-                    code=str(brick.get('code','')).lower()
-                    if q in name or q in code:
-                        results.append({'level':'brick','code':brick.get('code',''),'name':brick.get('title','') or brick.get('definition',''),
-                            'family':fam.get('title','') or fam.get('code',''),'segment':seg.get('title','') or seg.get('code',''),
-                            'class_name':cls.get('title','') or cls.get('code','')})
-                cls_name=str(cls.get('title','') or cls.get('definition','')).lower()
-                cls_code=str(cls.get('code','')).lower()
-                if q in cls_name or q in cls_code:
-                    results.append({'level':'class','code':cls.get('code',''),'name':cls.get('title','') or cls.get('definition',''),
-                        'family':fam.get('title','') or fam.get('code',''),'segment':seg.get('title','') or seg.get('code','')})
-            fam_name=str(fam.get('title','') or fam.get('definition','')).lower()
-            fam_code=str(fam.get('code','')).lower()
-            if q in fam_name or q in fam_code:
-                results.append({'level':'family','code':fam.get('code',''),'name':fam.get('title','') or fam.get('definition',''),
-                    'segment':seg.get('title','') or seg.get('code','')})
-        seg_name=str(seg.get('title','') or seg.get('definition','')).lower()
-        seg_code=str(seg.get('code','')).lower()
-        if q in seg_name or q in seg_code:
-            results.append({'level':'segment','code':seg.get('code',''),'name':seg.get('title','') or seg.get('definition','')})
+    for b in bricks:
+        title=str(b.get('title','')).lower()
+        code=str(b.get('code','')).lower()
+        cname=str(b.get('class_name','')).lower()
+        fname=str(b.get('family','')).lower()
+        sname=str(b.get('segment','')).lower()
+        if q in title or q in code or q in cname or q in fname or q in sname:
+            results.append(b)
     return results
 
 def _gpc_load_cache():
@@ -384,33 +387,6 @@ def _gpc_load_cache():
 
 def _gpc_save_cache(data):
     with open(GPC_DATA_FILE,'w',encoding='utf-8') as f: json.dump(data,f,ensure_ascii=False,indent=2,default=str)
-
-def _gpc_fetch_all():
-    langs=_gpc_fetch_languages()
-    ar_lang=None
-    for l in langs:
-        if str(l.get('languageCode','')).upper()=='AR':
-            ar_lang=l; break
-    if not ar_lang and langs:
-        ar_lang=langs[0]
-    if not ar_lang: return None,"اللغات غير متاحة"
-    pubs=_gpc_get_publications(ar_lang.get('languageId',''))
-    if not pubs: return None,"لا توجد إصدارات"
-    latest=pubs[0] if pubs else None
-    for p in pubs:
-        if p.get('isLatest') or p.get('is_latest'): latest=p; break
-    if not latest: latest=pubs[0]
-    hierarchy=_gpc_fetch_hierarchy(latest.get('publicationId',''))
-    segments=_gpc_build_tree(hierarchy)
-    total_bricks=len(hierarchy.get('bricks',[]))
-    total_classes=len(hierarchy.get('classes',[]))
-    total_families=len(hierarchy.get('families',[]))
-    total_segments=len(hierarchy.get('segments',[]))
-    result={'segments':segments,'raw':hierarchy,'publication':latest,'language':ar_lang,
-        'stats':{'segments':total_segments,'families':total_families,'classes':total_classes,'bricks':total_bricks},
-        'fetched_at':datetime.now().isoformat()}
-    _gpc_save_cache(result)
-    return result,None
 
 def _fix_vat_in_records(records):
     fixed=[]
@@ -2333,7 +2309,7 @@ elif page=="📄 Portal الفواتير الإلكترونية":
                 stats=gpc_cache.get('stats',{})
                 fetched=gpc_cache.get('fetched_at','')[:16].replace('T',' ')
                 st.markdown(f"""<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(253,203,110,.06);border:1px solid rgba(253,203,110,.15);color:#fdcb6e;font-size:.82rem;">
-                    📊 الشجرة: <strong>{stats.get('segments',0)}</strong>_SEGMENT | <strong>{stats.get('families',0)}</strong> Family | <strong>{stats.get('classes',0)}</strong> Class | <strong>{stats.get('bricks',0)}</strong> Brick — آخر تحديث: {fetched}
+                    📊 <strong>{stats.get('bricks',0)}</strong> Brick | <strong>{stats.get('classes',0)}</strong> Class | <strong>{stats.get('families',0)}</strong> Family | <strong>{stats.get('segments',0)}</strong> Segment — آخر تحديث: {fetched}
                 </div>""",unsafe_allow_html=True)
             else:
                 st.markdown("""<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(253,203,110,.06);border:1px solid rgba(253,203,110,.15);color:#fdcb6e;font-size:.82rem;">
@@ -2350,71 +2326,36 @@ elif page=="📄 Portal الفواتير الإلكترونية":
                     st.rerun()
 
         if gpc_cache:
+            bricks_list=gpc_cache.get('bricks',[])
             st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot" style="background:#fdcb6e;"></div><h3>بحث في تصنيف GPC</h3></div>',unsafe_allow_html=True)
-            gpc_q=st.text_input("ابحث بالاسم أو الكود (Segment / Family / Class / Brick)",key="gpc_search_q",placeholder="مثال: Beverages, Food, Dairy, مبيدات, أدوية...")
+            gpc_q=st.text_input("ابحث بالاسم أو الكود (Brick / Class / Family / Segment)",key="gpc_search_q",placeholder="مثال: Beverages, Food, Dairy, Rice, Milk...")
             if gpc_q.strip():
-                segments=gpc_cache.get('segments',[])
-                gpc_results=_gpc_search(segments,gpc_q.strip())
+                gpc_results=_gpc_search(bricks_list,gpc_q.strip())
                 if gpc_results:
-                    st.success(f"تم العثور على {len(gpc_results)} نتيجة")
-                    level_labels={'segment':'🟢 Segment','family':'🔵 Family','class':'🟠 Class','brick':'🔴 Brick'}
-                    level_colors={'segment':'#55efc4','family':'#74b9ff','class':'#fdcb6e','brick':'#ff6b6b'}
-                    for r in gpc_results[:100]:
-                        lv=r.get('level','')
-                        lc=level_colors.get(lv,'#a29bfe')
-                        path_parts=[]
-                        if r.get('segment'): path_parts.append(r['segment'])
-                        if r.get('family'): path_parts.append(r['family'])
-                        if r.get('class_name'): path_parts.append(r['class_name'])
-                        breadcrumb=' → '.join(path_parts)
-                        st.markdown(f"""<div class="erp-card" style="margin-bottom:.5rem;border-left:3px solid {lc};">
-                            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-                                <div>
-                                    <div style="color:{lc};font-size:.72rem;font-weight:600;margin-bottom:.2rem;">{level_labels.get(lv,lv)}</div>
-                                    <div style="color:#fff;font-weight:700;font-size:.92rem;">{r.get('name','—')}</div>
-                                    <div style="color:var(--text2);font-size:.78rem;margin-top:.2rem;">📋 الكود: <strong style="color:#00cec9;">{r.get('code','—')}</strong></div>
-                                </div>
-                            </div>
-                            {"<div style='color:var(--text2);font-size:.72rem;margin-top:.3rem;border-top:1px solid rgba(255,255,255,.05);padding-top:.3rem;'>"+breadcrumb+"</div>" if breadcrumb else ""}
-                        </div>""",unsafe_allow_html=True)
-                    if len(gpc_results)>100:
-                        st.caption(f"عرض أول 100 نتيجة من أصل {len(gpc_results)}")
+                    st.success(f"تم العثور على {len(gpc_results)} Brick")
+                    gpc_df=pd.DataFrame([{'كود Brick':r.get('code',''),'اسم Brick (EN)':r.get('title',''),'الاسم مترجم':_translate_to_arabic(r.get('title','')),
+                        'Class':r.get('class_name',''),'Family':r.get('family',''),'Segment':r.get('segment','')} for r in gpc_results[:200]])
+                    st.dataframe(gpc_df,use_container_width=True,hide_index=True)
+                    if len(gpc_results)>200:
+                        st.caption(f"عرض أول 200 نتيجة من أصل {len(gpc_results)} — حدد كلمة بحث أضيق للحصول على نتائج أدق")
                 else:
                     st.info(f"لم يتم العثور على نتائج لكلمة: {gpc_q.strip()}")
 
-            st.markdown('<div class="erp-section" style="margin-top:1.5rem"><div class="erp-section-dot" style="background:#fdcb6e;"></div><h3>شجرة التصنيف الكاملة</h3></div>',unsafe_allow_html=True)
-            segments=gpc_cache.get('segments',[])
-            if segments:
-                with st.expander("📂 عرض الشجرة الكاملة (Segment → Family → Class → Brick)",expanded=False):
-                    for seg in segments:
-                        seg_label=seg.get('title','') or seg.get('code','')
-                        fams=seg.get('families',[])
-                        st.markdown(f"""<div style="color:#55efc4;font-weight:700;font-size:.92rem;padding:.4rem 0;">🟢 {seg_label} <span style="color:var(--text2);font-size:.72rem;">({len(fams)} Family)</span></div>""",unsafe_allow_html=True)
-                        for fam in fams[:20]:
-                            fam_label=fam.get('title','') or fam.get('code','')
-                            classes=fam.get('classes',[])
-                            st.markdown(f"""<div style="color:#74b9ff;font-weight:600;font-size:.85rem;padding:.3rem 1.2rem;">🔵 {fam_label} <span style="color:var(--text2);font-size:.72rem;">({len(classes)} Class)</span></div>""",unsafe_allow_html=True)
-                            for cls in classes[:15]:
-                                cls_label=cls.get('title','') or cls.get('code','')
-                                bricks=cls.get('bricks',[])
-                                st.markdown(f"""<div style="color:#fdcb6e;font-size:.8rem;padding:.2rem 2.4rem;">🟠 {cls_label} <span style="color:var(--text2);font-size:.72rem;">({len(bricks)} Brick)</span></div>""",unsafe_allow_html=True)
-                                for brick in bricks[:10]:
-                                    brick_label=brick.get('title','') or brick.get('code','')
-                                    st.markdown(f"""<div style="color:#ff6b6b;font-size:.75rem;padding:.15rem 3.6rem;">• {brick_label} <span style="color:var(--text2);font-size:.68rem;">[{brick.get('code','')}]</span></div>""",unsafe_allow_html=True)
-                                if len(bricks)>10:
-                                    st.markdown(f"""<div style="color:var(--text2);font-size:.7rem;padding:.1rem 3.6rem;">+ {len(bricks)-10} Brick إضافي...</div>""",unsafe_allow_html=True)
-                            if len(classes)>15:
-                                st.markdown(f"""<div style="color:var(--text2);font-size:.7rem;padding:.2rem 2.4rem;">+ {len(classes)-15} Class إضافي...</div>""",unsafe_allow_html=True)
-                        if len(fams)>20:
-                            st.markdown(f"""<div style="color:var(--text2);font-size:.72rem;padding:.3rem 1.2rem;">+ {len(fams)-20} Family إضافي...</div>""",unsafe_allow_html=True)
-            else:
-                st.info("لا توجد بيانات شجرة")
+            st.markdown('<div class="erp-section" style="margin-top:1.5rem"><div class="erp-section-dot" style="background:#fdcb6e;"></div><h3>جميع Bricks ({len(bricks_list)})</h3></div>',unsafe_allow_html=True)
+            if bricks_list:
+                all_bricks_df=pd.DataFrame([{'كود Brick':b.get('code',''),'اسم Brick (EN)':b.get('title',''),
+                    'Class':b.get('class_name',''),'Family':b.get('family',''),'Segment':b.get('segment','')} for b in bricks_list])
+                st.dataframe(all_bricks_df,use_container_width=True,height=400)
+                excel_buf_gpc=BytesIO()
+                all_bricks_df.to_excel(excel_buf_gpc,index=False,engine='xlsxwriter')
+                excel_buf_gpc.seek(0)
+                st.download_button("📊 تحميل جميع Bricks",data=excel_buf_gpc.getvalue(),file_name="gpc_bricks.xlsx",mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",key="dl_gpc")
         else:
             st.markdown("""<div class="erp-empty" style="padding:3rem;margin-top:1rem;text-align:center;">
                 <div class="erp-empty-icon">🔬</div>
                 <h3 style="color:#fff;">GPC Browser — تصنيف GS1 العالمي</h3>
-                <p style="color:var(--text2);">اضضغط تحديث لتحميل التصنيف من GS1</p>
-                <p style="color:var(--text2);font-size:.78rem;margin-top:.5rem;">Segment → Family → Class → Brick — يدعم البحث بالعربي والإنجليزي</p>
+                <p style="color:var(--text2);">اضضغط تحديث لتحميل تصنيف Brick من GS1</p>
+                <p style="color:var(--text2);font-size:.78rem;margin-top:.5rem;">Segment → Family → Class — يدعم البحث بالعربي والإنجليزي</p>
             </div>""",unsafe_allow_html=True)
 
 # ====================== الاستعلام عن الأكواد ======================
@@ -2589,7 +2530,7 @@ elif page=="🏷️ الاستعلام عن الأكواد":
             stats=gpc_cache2.get('stats',{})
             fetched=gpc_cache2.get('fetched_at','')[:16].replace('T',' ')
             st.markdown(f"""<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(253,203,110,.06);border:1px solid rgba(253,203,110,.15);color:#fdcb6e;font-size:.82rem;">
-                📊 <strong>{stats.get('segments',0)}</strong> SEGMENT | <strong>{stats.get('families',0)}</strong> Family | <strong>{stats.get('classes',0)}</strong> Class | <strong>{stats.get('bricks',0)}</strong> Brick — آخر تحديث: {fetched}
+                📊 <strong>{stats.get('bricks',0)}</strong> Brick | <strong>{stats.get('classes',0)}</strong> Class | <strong>{stats.get('families',0)}</strong> Family | <strong>{stats.get('segments',0)}</strong> Segment — آخر تحديث: {fetched}
             </div>""",unsafe_allow_html=True)
         else:
             st.markdown("""<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(253,203,110,.06);border:1px solid rgba(253,203,110,.15);color:#fdcb6e;font-size:.82rem;">
@@ -2606,41 +2547,24 @@ elif page=="🏷️ الاستعلام عن الأكواد":
                 st.rerun()
 
     if gpc_cache2:
-        gpc_q2=st.text_input("ابحث بالاسم أو الكود (Segment / Family / Class / Brick)",key="gpc_search_q2",placeholder=" Beverages, Food, Dairy, مبيدات, أدوية...")
+        bricks_list2=gpc_cache2.get('bricks',[])
+        gpc_q2=st.text_input("ابحث بالاسم أو الكود (Brick / Class / Family / Segment)",key="gpc_search_q2",placeholder=" Beverages, Food, Dairy, Rice, Milk...")
         if gpc_q2.strip():
-            segments2=gpc_cache2.get('segments',[])
-            gpc_results2=_gpc_search(segments2,gpc_q2.strip())
+            gpc_results2=_gpc_search(bricks_list2,gpc_q2.strip())
             if gpc_results2:
-                st.success(f"تم العثور على {len(gpc_results2)} نتيجة")
-                level_labels={'segment':'🟢 Segment','family':'🔵 Family','class':'🟠 Class','brick':'🔴 Brick'}
-                level_colors={'segment':'#55efc4','family':'#74b9ff','class':'#fdcb6e','brick':'#ff6b6b'}
-                for r in gpc_results2[:100]:
-                    lv=r.get('level','')
-                    lc=level_colors.get(lv,'#a29bfe')
-                    path_parts=[]
-                    if r.get('segment'): path_parts.append(r['segment'])
-                    if r.get('family'): path_parts.append(r['family'])
-                    if r.get('class_name'): path_parts.append(r['class_name'])
-                    breadcrumb=' → '.join(path_parts)
-                    st.markdown(f"""<div class="erp-card" style="margin-bottom:.5rem;border-left:3px solid {lc};">
-                        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-                            <div>
-                                <div style="color:{lc};font-size:.72rem;font-weight:600;margin-bottom:.2rem;">{level_labels.get(lv,lv)}</div>
-                                <div style="color:#fff;font-weight:700;font-size:.92rem;">{r.get('name','—')}</div>
-                                <div style="color:var(--text2);font-size:.78rem;margin-top:.2rem;">📋 الكود: <strong style="color:#00cec9;">{r.get('code','—')}</strong></div>
-                            </div>
-                        </div>
-                        {"<div style='color:var(--text2);font-size:.72rem;margin-top:.3rem;border-top:1px solid rgba(255,255,255,.05);padding-top:.3rem;'>"+breadcrumb+"</div>" if breadcrumb else ""}
-                    </div>""",unsafe_allow_html=True)
-                if len(gpc_results2)>100:
-                    st.caption(f"عرض أول 100 نتيجة من أصل {len(gpc_results2)}")
+                st.success(f"تم العثور على {len(gpc_results2)} Brick")
+                gpc_df2=pd.DataFrame([{'كود Brick':r.get('code',''),'اسم Brick (EN)':r.get('title',''),'الاسم مترجم':_translate_to_arabic(r.get('title','')),
+                    'Class':r.get('class_name',''),'Family':r.get('family',''),'Segment':r.get('segment','')} for r in gpc_results2[:200]])
+                st.dataframe(gpc_df2,use_container_width=True,hide_index=True)
+                if len(gpc_results2)>200:
+                    st.caption(f"عرض أول 200 نتيجة من أصل {len(gpc_results2)}")
             else:
                 st.info(f"لم يتم العثور على نتائج لكلمة: {gpc_q2.strip()}")
     else:
         st.markdown("""<div class="erp-empty" style="padding:2rem;margin-top:1rem;text-align:center;">
             <div class="erp-empty-icon">🔬</div>
             <h3 style="color:#fff;">GPC Browser</h3>
-            <p style="color:var(--text2);">اضضغط تحديث لتحميل التصنيف من GS1 — Segment → Family → Class → Brick</p>
+            <p style="color:var(--text2);">اضضغط تحديث لتحميل تصنيف Brick من GS1</p>
         </div>""",unsafe_allow_html=True)
 
 # ====================== الاستعلام عن ممول ======================
