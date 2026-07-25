@@ -224,6 +224,46 @@ def _eta_refresh_token():
         return token
     return None
 
+def _extract_barcode_from_line(line):
+    import re
+    all_strs=[]
+    for k,v in line.items():
+        if isinstance(v,str) and v.strip(): all_strs.append(v.strip())
+        elif isinstance(v,dict):
+            for k2,v2 in v.items():
+                if isinstance(v2,str) and v2.strip(): all_strs.append(v2.strip())
+    barcode=""
+    for s in all_strs:
+        if re.match(r'^(622|100)\d{10,}$',s): barcode=s; break
+        if re.match(r'^EG-\d',s): barcode=s; break
+    if not barcode:
+        for s in all_strs:
+            if s.startswith('622') or s.startswith('EG-') or s.startswith('100'):
+                if len(s)>=8: barcode=s; break
+    if not barcode: barcode=line.get('itemCode','')
+    return barcode
+
+def _eta_extract_lines(uuid_val,doc,uu,codes_list):
+    document=doc.get('document',{})
+    lines=document.get('invoiceLines',[])
+    if not lines:
+        for key in ['invoice','Invoice','data','result']:
+            if isinstance(doc.get(key),dict):
+                lines=doc[key].get('invoiceLines',[]) or doc[key].get('lines',[])
+                if lines: break
+            elif isinstance(doc.get(key),list):
+                for item in doc[key]:
+                    if isinstance(item,dict) and ('invoiceLines' in item or 'lines' in item):
+                        lines=item.get('invoiceLines',[]) or item.get('lines',[])
+                        if lines: break
+    for line in lines:
+        bc=_extract_barcode_from_line(line)
+        codes_list.append({
+            'uuid':uu.get('uuid',''),'direction':'صادرة' if uu.get('direction','')=='out' else 'واردة',
+            'counterparty':uu.get('name',''),'itemCode':bc,
+            'internalCode':line.get('internalCode',''),'description':line.get('description','')
+        })
+
 def _portal_led():
     token=st.session_state.get("eta_token","")
     if token:
@@ -2091,12 +2131,7 @@ elif page=="📄 Portal الفواتير الإلكترونية":
                             if err or not doc:
                                 failed_uuids.append(uu)
                                 continue
-                            document=doc.get('document',{})
-                            for line in document.get('invoiceLines',[]):
-                                new_codes.append({
-                                    'uuid':uu['uuid'],'direction':'صادرة' if uu['direction']=='out' else 'واردة','counterparty':uu['name'],
-                                    'itemCode':line.get('itemCode',''),'internalCode':line.get('internalCode',''),'description':line.get('description','')
-                                })
+                            _eta_extract_lines(uu['uuid'],doc,uu,new_codes)
                     if failed_uuids:
                         new_token=_eta_refresh_token()
                         if new_token:
@@ -2110,12 +2145,7 @@ elif page=="📄 Portal الفواتير الإلكترونية":
                                     uu,doc,err,_=f.result()
                                     if doc:
                                         retried_ok+=1
-                                        document=doc.get('document',{})
-                                        for line in document.get('invoiceLines',[]):
-                                            new_codes.append({
-                                                'uuid':uu['uuid'],'direction':'صادرة' if uu['direction']=='out' else 'واردة','counterparty':uu['name'],
-                                                'itemCode':line.get('itemCode',''),'internalCode':line.get('internalCode',''),'description':line.get('description','')
-                                            })
+                                        _eta_extract_lines(uu['uuid'],doc,uu,new_codes)
                             failed_uuids=[u for u in failed_uuids if u['uuid'] not in set(c.get('uuid','') for c in new_codes)]
                     progress.empty()
                     if new_codes:
@@ -2134,8 +2164,8 @@ elif page=="📄 Portal الفواتير الإلكترونية":
                 ql=q.strip().lower()
                 filtered=[c for c in codes_db if ql in str(c.get('itemCode','')).lower() or ql in str(c.get('description','')).lower() or ql in str(c.get('internalCode','')).lower() or ql in str(c.get('counterparty','')).lower()]
             if filtered:
-                df=pd.DataFrame([{'رقم الكود':c.get('itemCode',''),'الكود الداخلي':c.get('internalCode',''),'اسم الصنف / الوصف':c.get('description','')} for c in filtered])
-                df=df.drop_duplicates(subset=['رقم الكود','اسم الصنف / الوصف'])
+                df=pd.DataFrame([{'الباركود':c.get('itemCode',''),'الكود الداخلي':c.get('internalCode',''),'اسم الصنف / الوصف':c.get('description','')} for c in filtered])
+                df=df.drop_duplicates(subset=['الباركود','اسم الصنف / الوصف'])
                 st.dataframe(df,use_container_width=True,hide_index=True)
                 st.caption(f"عرض {len(df)} صنف من أصل {len(codes_db)}")
             else:
@@ -2216,16 +2246,7 @@ elif page=="🏷️ الاستعلام عن الأكواد":
                         if err or not doc:
                             failed_uuids.append(uu)
                             continue
-                        document=doc.get('document',{})
-                        for line in document.get('invoiceLines',[]):
-                            unit_val=line.get('unitValue',{})
-                            new_codes.append({
-                                'uuid':uu['uuid'],'direction':'صادر' if uu['direction']=='out' else 'وارد',
-                                'counterparty':uu['name'],'itemCode':line.get('itemCode',''),'internalCode':line.get('internalCode',''),
-                                'description':line.get('description',''),'itemType':line.get('itemType',''),
-                                'quantity':line.get('quantity',0),'unitType':line.get('unitType',''),
-                                'unitPrice':unit_val.get('amountEGP',0) if isinstance(unit_val,dict) else 0,'salesTotal':line.get('salesTotal',0)
-                            })
+                        _eta_extract_lines(uu['uuid'],doc,uu,new_codes)
                 if failed_uuids:
                     new_token=_eta_refresh_token()
                     if new_token:
@@ -2239,16 +2260,7 @@ elif page=="🏷️ الاستعلام عن الأكواد":
                                 uu,doc,err,_=f.result()
                                 if doc:
                                     retried_ok+=1
-                                    document=doc.get('document',{})
-                                    for line in document.get('invoiceLines',[]):
-                                        unit_val=line.get('unitValue',{})
-                                        new_codes.append({
-                                            'uuid':uu['uuid'],'direction':'صادر' if uu['direction']=='out' else 'وارد',
-                                            'counterparty':uu['name'],'itemCode':line.get('itemCode',''),'internalCode':line.get('internalCode',''),
-                                            'description':line.get('description',''),'itemType':line.get('itemType',''),
-                                            'quantity':line.get('quantity',0),'unitType':line.get('unitType',''),
-                                            'unitPrice':unit_val.get('amountEGP',0) if isinstance(unit_val,dict) else 0,'salesTotal':line.get('salesTotal',0)
-                                        })
+                                    _eta_extract_lines(uu['uuid'],doc,uu,new_codes)
                         failed_uuids=[u for u in failed_uuids if u['uuid'] not in set(c.get('uuid','') for c in new_codes)]
                 progress.empty()
                 if new_codes:
@@ -2302,7 +2314,7 @@ elif page=="🏷️ الاستعلام عن الأكواد":
                             <div>
                                 <div style="color:#fff;font-weight:700;font-size:.92rem;">{c.get('description','—')}</div>
                                 <div style="display:flex;gap:.8rem;margin-top:.3rem;flex-wrap:wrap;">
-                                    <span style="color:#00cec9;font-size:.78rem;font-weight:600;">📋 كود: {c.get('itemCode','—')}</span>
+                                    <span style="color:#00cec9;font-size:.78rem;font-weight:600;">🏷️ باركود: {c.get('itemCode','—')}</span>
                                     <span style="color:#fdcb6e;font-size:.75rem;">رقم داخلي: {c.get('internalCode','—')}</span>
                                     <span style="color:{dir_color};font-size:.72rem;font-weight:600;">{dir_label}</span>
                                 </div>
@@ -2320,7 +2332,7 @@ elif page=="🏷️ الاستعلام عن الأكواد":
 
     if codes_db:
         st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot"></div><h3>جميع الأكواد</h3></div>',unsafe_allow_html=True)
-        codes_df=pd.DataFrame([{'الكود':c.get('itemCode',''),'الكود الداخلي':c.get('internalCode',''),'الوصف':c.get('description',''),
+        codes_df=pd.DataFrame([{'الباركود':c.get('itemCode',''),'الكود الداخلي':c.get('internalCode',''),'الوصف':c.get('description',''),
             'الاتجاه':c.get('direction',''),'المورد/العميل':c.get('counterparty',''),'الكمية':c.get('quantity',0),
             'وحدة القياس':c.get('unitType',''),'سعر الوحدة':c.get('unitPrice',0),'الإجمالي':c.get('salesTotal',0)} for c in codes_db])
         st.dataframe(codes_df,use_container_width=True,height=400)
