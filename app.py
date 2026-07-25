@@ -2119,6 +2119,7 @@ elif page=="📄 Portal الفواتير الإلكترونية":
                     new_codes=[]
                     failed_uuids=[]
                     done_count=[0]
+                    _debug_resp=None
                     def _fetch_one(tok,uu):
                         d,e=eta_get_document_details(tok,uu['uuid'])
                         return uu,d,e,e
@@ -2131,6 +2132,7 @@ elif page=="📄 Portal الفواتير الإلكترونية":
                             if err or not doc:
                                 failed_uuids.append(uu)
                                 continue
+                            if _debug_resp is None: _debug_resp=doc
                             _eta_extract_lines(uu['uuid'],doc,uu,new_codes)
                     if failed_uuids:
                         new_token=_eta_refresh_token()
@@ -2145,9 +2147,13 @@ elif page=="📄 Portal الفواتير الإلكترونية":
                                     uu,doc,err,_=f.result()
                                     if doc:
                                         retried_ok+=1
+                                        if _debug_resp is None: _debug_resp=doc
                                         _eta_extract_lines(uu['uuid'],doc,uu,new_codes)
                             failed_uuids=[u for u in failed_uuids if u['uuid'] not in set(c.get('uuid','') for c in new_codes)]
                     progress.empty()
+                    if _debug_resp is not None:
+                        with st.expander("🔍 عرض استجابة البورتال الخام (للتشخيص)",expanded=False):
+                            st.json(_debug_resp)
                     if new_codes:
                         all_codes=codes_db+new_codes
                         saved=save_codes_db(all_codes)
