@@ -171,17 +171,33 @@ def eta_get_document_pdf(token, uuid_val):
 CODES_DB_FILE=os.path.join(DATA_DIR,"codes_database.json")
 def load_codes_db():
     gh=gh_read("codes_database.json")
-    if gh is not None:
+    if gh is not None and isinstance(gh,list) and len(gh)>0:
         with open(CODES_DB_FILE,'w',encoding='utf-8') as f: json.dump(gh,f,ensure_ascii=False,indent=2,default=str)
         return gh
     if os.path.exists(CODES_DB_FILE):
         try:
-            with open(CODES_DB_FILE,'r',encoding='utf-8') as f: return json.load(f)
+            with open(CODES_DB_FILE,'r',encoding='utf-8') as f:
+                local=json.load(f)
+            if isinstance(local,list) and len(local)>0:
+                if gh is None:
+                    gh_write("codes_database.json",local)
+                return local
         except: pass
+    if gh is not None and isinstance(gh,list):
+        with open(CODES_DB_FILE,'w',encoding='utf-8') as f: json.dump(gh,f,ensure_ascii=False,indent=2,default=str)
+        return gh
     return []
 def save_codes_db(data):
-    with open(CODES_DB_FILE,'w',encoding='utf-8') as f: json.dump(data,f,ensure_ascii=False,indent=2,default=str)
-    gh_write("codes_database.json",data)
+    unique=[]
+    seen=set()
+    for c in data:
+        k=(c.get('itemCode',''),c.get('internalCode',''),c.get('description',''))
+        if k not in seen:
+            seen.add(k)
+            unique.append(c)
+    with open(CODES_DB_FILE,'w',encoding='utf-8') as f: json.dump(unique,f,ensure_ascii=False,indent=2,default=str)
+    gh_write("codes_database.json",unique)
+    return unique
 
 def eta_get_document_details(token, uuid_val):
     url=f"{ETA_API_BASE}/api/v1.0/documents/{uuid_val}/details"
@@ -2039,21 +2055,18 @@ elif page=="📄 Portal الفواتير الإلكترونية":
                                     'uuid':uu['uuid'],'direction':'صادرة' if uu['direction']=='out' else 'واردة','counterparty':uu['name'],
                                     'itemCode':line.get('itemCode',''),'internalCode':line.get('internalCode',''),'description':line.get('description','')
                                 })
-                    if new_codes:
-                        merged=codes_db+new_codes
-                        unique=[]
-                        seen=set()
-                        for c in merged:
-                            k=(c.get('itemCode',''),c.get('internalCode',''),c.get('description',''))
-                            if k not in seen:
-                                seen.add(k)
-                                unique.append(c)
-                        save_codes_db(unique)
-                        st.success(f"تم تحميل {len(new_codes)} صنف من {len(unfetched)-errors} فاتورة — إجمالي الأصناف: {len(unique)}")
-                        st.rerun()
-                    else:
-                        st.warning("لم يتم العثور على أصناف جديدة")
                     progress.empty()
+                    if new_codes:
+                        all_codes=codes_db+new_codes
+                        saved=save_codes_db(all_codes)
+                        codes_db=saved
+                        fetched_codes=set(c.get('uuid','') for c in codes_db)
+                        unfetched=[u for u in all_uuids if u['uuid'] not in fetched_codes]
+                        st.success(f"تم تحميل {len(new_codes)} صنف من {len(unfetched)+len(new_codes)} فاتورة — إجمالي الأصناف: {len(codes_db)}")
+                    elif errors:
+                        st.warning(f"حدث {errors} خطأ — تأكد من اتصال البورتال")
+                    else:
+                        st.warning("لم يتم العثور على أصناف في الفواتير")
 
         if codes_db:
             st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot" style="background:#74b9ff;"></div><h3>بحث في الأكواد</h3></div>',unsafe_allow_html=True)
@@ -2140,21 +2153,16 @@ elif page=="🏷️ الاستعلام عن الأكواد":
                                 'quantity':line.get('quantity',0),'unitType':line.get('unitType',''),
                                 'unitPrice':unit_val.get('amountEGP',0) if isinstance(unit_val,dict) else 0,'salesTotal':line.get('salesTotal',0)
                             })
+                progress.empty()
                 if new_codes:
-                    merged=codes_db+new_codes
-                    unique=[]
-                    seen=set()
-                    for c in merged:
-                        key=(c.get('itemCode',''),c.get('internalCode',''),c.get('description',''))
-                        if key not in seen:
-                            seen.add(key)
-                            unique.append(c)
-                    save_codes_db(unique)
-                    st.success(f"تم استخراج {len(new_codes)} صنف من {len(unfetched)-errors} فاتورة — إجمالي: {len(unique)} صنف")
-                    st.rerun()
+                    all_codes=codes_db+new_codes
+                    saved=save_codes_db(all_codes)
+                    codes_db=saved
+                    st.success(f"تم استخراج {len(new_codes)} صنف — إجمالي: {len(codes_db)} صنف")
+                elif errors:
+                    st.warning(f"حدث {errors} خطأ — تأكد من اتصال البورتال")
                 else:
                     st.warning("لم يتم العثور على أصناف جديدة")
-                progress.empty()
 
     st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot"></div><h3>بحث عن صنف</h3></div>',unsafe_allow_html=True)
     st.markdown('<div class="erp-card">',unsafe_allow_html=True)
