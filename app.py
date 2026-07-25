@@ -415,6 +415,368 @@ def _gpc_load_cache():
 def _gpc_save_cache(data):
     with open(GPC_DATA_FILE,'w',encoding='utf-8') as f: json.dump(data,f,ensure_ascii=False,indent=2,default=str)
 
+GS1_API_BASE="https://external-api.gs1eg.org"
+def _gs1_login(email,password):
+    try:
+        r=http_requests.post(f"{GS1_API_BASE}/v1/users/sign_in",json={"email":email,"password":password},timeout=15)
+        if r.status_code==200:
+            return {'client':r.headers.get('client',''),'token':r.headers.get('token',''),'uid':r.headers.get('uid','')}
+    except: pass
+    return None
+
+def _gs1_get_products(auth):
+    if not auth: return []
+    all_products=[]
+    start_after=None
+    for _ in range(50):
+        params={"per_page":100}
+        if start_after: params["starting_after"]=start_after
+        try:
+            r=http_requests.get(f"{GS1_API_BASE}/v3/user/products",headers=auth,params=params,timeout=30)
+            if r.status_code!=200: break
+            data=r.json()
+            products=data.get('products',[])
+            all_products.extend(products)
+            meta=data.get('meta',{})
+            if not meta.get('has_next'): break
+            start_after=meta.get('ending_at','')
+            if not start_after: break
+        except: break
+    return all_products
+
+def _standalone_portal_tab():
+    codes_db=load_codes_db()
+    out_data=load_data(PORTAL_OUT_FILE)
+    in_data=load_data(PORTAL_IN_FILE)
+    all_uuids=[]
+    for rec in out_data:
+        for r in rec.get('records',[]):
+            uid=r.get('UUID','')
+            issue=str(r.get('تاريخ الإصدار',''))[:10]
+            if uid: all_uuids.append({'uuid':uid,'direction':'out','name':r.get('الطرف الآخر',''),'date':issue})
+    for rec in in_data:
+        for r in rec.get('records',[]):
+            uid=r.get('UUID','')
+            issue=str(r.get('تاريخ الإصدار',''))[:10]
+            if uid: all_uuids.append({'uuid':uid,'direction':'in','name':r.get('الطرف الآخر',''),'date':issue})
+    _all_dates=sorted(set(u['date'] for u in all_uuids if u['date'] and len(u['date'])==10))
+    _min_d=_all_dates[0] if _all_dates else str(datetime.now().date())
+    _max_d=_all_dates[-1] if _all_dates else str(datetime.now().date())
+    f1,f2=st.columns(2)
+    with f1:
+        date_from=st.date_input("من تاريخ",value=datetime.strptime(_min_d,'%Y-%m-%d').date() if _min_d else datetime.now().date(),key="standalone_codes_from")
+    with f2:
+        date_to=st.date_input("إلى تاريخ",value=datetime.strptime(_max_d,'%Y-%m-%d').date() if _max_d else datetime.now().date(),key="standalone_codes_to")
+    df_str=date_from.strftime('%Y-%m-%d')
+    dt_str=date_to.strftime('%Y-%m-%d')
+    period_uuids=[u for u in all_uuids if u['date'] and len(u['date'])==10 and df_str<=u['date']<=dt_str]
+    fetched_uuids=set(c.get('uuid','') for c in codes_db)
+    period_unfetched=[u for u in period_uuids if u['uuid'] not in fetched_uuids]
+    c_led1,c_led2=st.columns([3,1])
+    with c_led1:
+        st.markdown(f"""<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(116,185,255,.06);border:1px solid rgba(116,185,255,.15);color:#74b9ff;font-size:.82rem;margin-bottom:1rem;">
+            📦 الفترة: <strong>{df_str}</strong> → <strong>{dt_str}</strong> | فواتور الفترة: <strong>{len(period_uuids)}</strong> | متبقي: <strong>{len(period_unfetched)}</strong> | الأصناف المحفوظة: <strong>{len(codes_db)}</strong>
+        </div>""",unsafe_allow_html=True)
+    with c_led2:
+        _portal_led()
+    if period_unfetched:
+        if st.button(f"🔄 استخراج أكواد {len(period_unfetched)} فاتورة في الفترة المحددة",key="refresh_codes",type="primary",use_container_width=True):
+            token=st.session_state.get("eta_token","")
+            if not token:
+                st.error("يجب الاتصال بالبورتال أولاً من تاب Portal الفواتير الإلكترونية")
+            else:
+                progress=st.progress(0,text=f"جاري استخراج الأكواد من {len(period_unfetched)} فاتورة...")
+                new_codes=[]
+                failed_uuids=[]
+                done_count=[0]
+                def _fetch_standalone(tok,uu):
+                    d,e=eta_get_document_details(tok,uu['uuid'])
+                    return uu,d,e,e
+                with ThreadPoolExecutor(max_workers=5) as pool:
+                    futures={pool.submit(_fetch_standalone,token,u):u for u in period_unfetched}
+                    for f in as_completed(futures):
+                        done_count[0]+=1
+                        progress.progress(min(done_count[0]/len(period_unfetched),1.0),text=f"{done_count[0]}/{len(period_unfetched)} فاتورة...")
+                        uu,doc,err,_=f.result()
+                        if err or not doc:
+                            failed_uuids.append(uu)
+                            continue
+                        _eta_extract_lines(uu['uuid'],doc,uu,new_codes)
+                if failed_uuids:
+                    new_token=_eta_refresh_token()
+                    if new_token:
+                        retried=0
+                        retried_ok=0
+                        with ThreadPoolExecutor(max_workers=5) as pool:
+                            futures={pool.submit(_fetch_standalone,new_token,u):u for u in failed_uuids}
+                            for f in as_completed(futures):
+                                retried+=1
+                                progress.progress(min((len(period_unfetched)+retried)/(len(period_unfetched)+len(failed_uuids)),1.0),text=f"إعادة محاولة {retried}/{len(failed_uuids)}...")
+                                uu,doc,err,_=f.result()
+                                if doc:
+                                    retried_ok+=1
+                                    _eta_extract_lines(uu['uuid'],doc,uu,new_codes)
+                        failed_uuids=[u for u in failed_uuids if u['uuid'] not in set(c.get('uuid','') for c in new_codes)]
+                progress.empty()
+                if new_codes:
+                    all_codes=codes_db+new_codes
+                    saved=save_codes_db(all_codes)
+                    codes_db=saved
+                    st.success(f"تم استخراج {len(new_codes)} صنف — إجمالي: {len(codes_db)} صنف")
+                if failed_uuids:
+                    st.warning(f"{len(failed_uuids)} فاتورة لم تُستخرج (قد تكون غير موجودة في البورتال)")
+    st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot"></div><h3>بحث عن صنف</h3></div>',unsafe_allow_html=True)
+    st.markdown('<div class="erp-card">',unsafe_allow_html=True)
+    search_query=st.text_input("اكتب كلمة مفتاحية (اسم الصنف أو الوصف أو الكود)",key="codes_search",placeholder="مثال: فلاش، منظف، أرز...")
+    if st.button("🔍 بحث",key="codes_search_btn",type="primary"):
+        if not search_query.strip():
+            st.warning("أدخل كلمة للبحث")
+        elif not codes_db:
+            st.info("قاعدة الأكواد فاضية — اضغط تحديث الأكواد أولاً")
+        else:
+            q=search_query.strip()
+            results=[]
+            for c in codes_db:
+                score=0
+                desc=str(c.get('description','')).lower()
+                code=str(c.get('itemCode','')).lower()
+                ic=str(c.get('internalCode','')).lower()
+                name=str(c.get('counterparty','')).lower()
+                if q.lower() in desc: score=max(score,10)
+                if q.lower() in code: score=max(score,8)
+                if q.lower() in ic: score=max(score,8)
+                if q.lower() in name: score=max(score,5)
+                q_words=q.lower().split()
+                for w in q_words:
+                    if w in desc: score+=3
+                    if w in code: score+=2
+                    if w in ic: score+=2
+                if score>0:
+                    results.append((score,c))
+            results.sort(key=lambda x:x[0],reverse=True)
+            if results:
+                st.success(f"تم العثور على {len(results)} نتيجة")
+                seen_codes=set()
+                for score,c in results:
+                    item_key=(c.get('itemCode',''),c.get('description',''))
+                    if item_key in seen_codes: continue
+                    seen_codes.add(item_key)
+                    dir_color='#00cec9' if c.get('direction')=='وارد' else '#a29bfe'
+                    dir_label=c.get('direction','')
+                    st.markdown(f"""<div class="erp-card" style="margin-bottom:.6rem;border-left:3px solid {dir_color};">
+                        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                            <div>
+                                <div style="color:#fff;font-weight:700;font-size:.92rem;">{c.get('description','—')}</div>
+                                <div style="display:flex;gap:.8rem;margin-top:.3rem;flex-wrap:wrap;">
+                                    <span style="color:#00cec9;font-size:.78rem;font-weight:600;">🏷️ باركود: {c.get('itemCode','—')}</span>
+                                    <span style="color:#fdcb6e;font-size:.75rem;">رقم داخلي: {c.get('internalCode','—')}</span>
+                                    <span style="color:{dir_color};font-size:.72rem;font-weight:600;">{dir_label}</span>
+                                </div>
+                                <div style="color:var(--text2);font-size:.72rem;margin-top:.2rem;">المورد/العميل: {c.get('counterparty','—')}</div>
+                            </div>
+                            <div style="text-align:left;">
+                                <div style="color:#55efc4;font-weight:700;font-size:.85rem;">{fmt(c.get('salesTotal',0))}</div>
+                                <div style="color:var(--text2);font-size:.68rem;">الكمية: {c.get('quantity',0)} {c.get('unitType','')}</div>
+                            </div>
+                        </div>
+                    </div>""",unsafe_allow_html=True)
+            else:
+                st.info(f"لم يتم العثور على نتائج لكلمة: {q}")
+    st.markdown('</div>',unsafe_allow_html=True)
+    if codes_db:
+        st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot"></div><h3>جميع الأكواد</h3></div>',unsafe_allow_html=True)
+        codes_df=pd.DataFrame([{'الباركود':c.get('itemCode',''),'الكود الداخلي':c.get('internalCode',''),'الوصف':c.get('description',''),'الوصف مترجم':_get_ar_desc(c),
+            'الاتجاه':c.get('direction',''),'المورد/العميل':c.get('counterparty',''),'الكمية':c.get('quantity',0),
+            'وحدة القياس':c.get('unitType',''),'سعر الوحدة':c.get('unitPrice',0),'الإجمالي':c.get('salesTotal',0)} for c in codes_db])
+        st.dataframe(codes_df,use_container_width=True,height=400)
+        excel_buf=BytesIO()
+        codes_df.to_excel(excel_buf,index=False,engine='xlsxwriter')
+        excel_buf.seek(0)
+        st.download_button("📊 تحميل جميع الأكواد",data=excel_buf.getvalue(),file_name="item_codes.xlsx",mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",key="dl_codes")
+
+def _standalone_gpc_tab():
+    gpc_cache2=_gpc_load_cache()
+    gc1,gc2=st.columns([3,1])
+    with gc1:
+        if gpc_cache2:
+            stats=gpc_cache2.get('stats',{})
+            fetched=gpc_cache2.get('fetched_at','')[:16].replace('T',' ')
+            st.markdown(f"""<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(253,203,110,.06);border:1px solid rgba(253,203,110,.15);color:#fdcb6e;font-size:.82rem;">
+                📊 <strong>{stats.get('bricks',0)}</strong> Brick | <strong>{stats.get('classes',0)}</strong> Class | <strong>{stats.get('families',0)}</strong> Family | <strong>{stats.get('segments',0)}</strong> Segment — آخر تحديث: {fetched}
+            </div>""",unsafe_allow_html=True)
+        else:
+            st.markdown("""<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(253,203,110,.06);border:1px solid rgba(253,203,110,.15);color:#fdcb6e;font-size:.82rem;">
+                ⏳ لم يتم تحميل بيانات GPC بعد — اضغط تحديث أولاً
+            </div>""",unsafe_allow_html=True)
+    with gc2:
+        if st.button("🔄 تحديث بيانات GPC",key="gpc_refresh_standalone",type="primary",use_container_width=True):
+            gpc_progress2=st.progress(0,text="جاري الاتصال بـ GS1...")
+            pubs2=_gpc_api_get("/browser/publication",{"languageId":8})
+            if not pubs2:
+                st.error("خطأ: لا توجد إصدارات GPC");st.stop()
+            gpc_progress2.progress(10,text="تم العثور على الإصدارات...")
+            latest2=None
+            for p in pubs2:
+                if p.get('isLatest'): latest2=p;break
+            if not latest2: latest2=pubs2[0]
+            pid2=latest2.get('publicationId','')
+            gpc_progress2.progress(15,text="جاري تحميل Segments...")
+            segments2=_gpc_api_get("/browser/segment",{"publicationId":pid2})
+            gpc_progress2.progress(25,text="جاري تحميل Families...")
+            families2=_gpc_api_get("/browser/family",{"publicationId":pid2})
+            gpc_progress2.progress(40,text="جاري تحميل Classes...")
+            classes2=_gpc_api_get("/browser/class",{"publicationId":pid2})
+            gpc_progress2.progress(60,text="جاري تحميل Bricks...")
+            bricks2=_gpc_api_get("/browser/brick",{"publicationId":pid2})
+            if not bricks2:
+                st.error("خطأ: فشل تحميل Bricks");st.stop()
+            gpc_progress2.progress(65,text="تم تحميل البيانات — جاري تجهيز الشجرة...")
+            seg_map2={s.get('code',''):s.get('title','') or str(s.get('code','')) for s in (segments2 or [])}
+            fam_map2={f.get('code',''):f.get('title','') or str(f.get('code','')) for f in (families2 or [])}
+            cls_map2_={c.get('code',''):c for c in (classes2 or [])}
+            cls_name_map2={c.get('code',''):c.get('title','') or str(c.get('code','')) for c in (classes2 or [])}
+            flat_bricks2=[]
+            all_texts2=[]
+            for b in bricks2:
+                bcode=b.get('code','')
+                btitle=b.get('title','') or b.get('definition','') or str(bcode)
+                parent=b.get('parentCode','')
+                cname=cls_name_map2.get(parent,'')
+                cobj=cls_map2_.get(parent,{})
+                fam_code=cobj.get('parentCode','')
+                fname=fam_map2.get(fam_code,'')
+                fam_obj={f.get('code',''):f for f in (families2 or [])}.get(fam_code,{})
+                seg_code=fam_obj.get('parentCode','')
+                sname=seg_map2.get(seg_code,'')
+                flat_bricks2.append({'code':bcode,'title':btitle,'class_name':cname,'family':fname,'segment':sname})
+                all_texts2.extend([btitle,cname,fname,sname])
+            gpc_progress2.progress(70,text=f"جاري ترجمة {len(flat_bricks2)} Brick للعربية...")
+            unique2=[t for t in set(all_texts2) if t.strip() and not _has_arabic(t)]
+            BATCH=30
+            ar_map2={}
+            total_batches2=max(1,(len(unique2)+BATCH-1)//BATCH)
+            for bi in range(0,len(unique2),BATCH):
+                batch=unique2[bi:bi+BATCH]
+                joined=' | '.join(batch)
+                translated=_translate_to_arabic(joined)
+                if translated and translated!=joined:
+                    parts=translated.split('|')
+                    for j,t in enumerate(batch):
+                        if j<len(parts): ar_map2[t.strip()]=parts[j].strip()
+                pct=70+int(25*(bi//BATCH+1)/total_batches2)
+                gpc_progress2.progress(min(pct,95),text=f"جاري الترجمة... ({bi//BATCH+1}/{total_batches2})")
+            for b in flat_bricks2:
+                b['title_ar']=ar_map2.get(b['title'],'') or _translate_to_arabic(b['title'])
+                b['class_name_ar']=ar_map2.get(b['class_name'],'') or _translate_to_arabic(b['class_name'])
+                b['family_ar']=ar_map2.get(b['family'],'') or _translate_to_arabic(b['family'])
+                b['segment_ar']=ar_map2.get(b['segment'],'') or _translate_to_arabic(b['segment'])
+            gpc_progress2.progress(98,text="جاري الحفظ...")
+            _gpc_save_cache({'bricks':flat_bricks2,'publication':latest2,
+                'stats':{'segments':len(segments2 or []),'families':len(families2 or []),'classes':len(classes2 or []),'bricks':len(bricks2)},
+                'fetched_at':datetime.now().isoformat()})
+            gpc_progress2.progress(100,text=f"تم! {len(bricks2)} Brick — {len(segments2 or [])} Segment — {len(families2 or [])} Family — {len(classes2 or [])} Class")
+            st.rerun()
+    if gpc_cache2:
+        bricks_list2=gpc_cache2.get('bricks',[])
+        st.markdown(f'<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot" style="background:#fdcb6e;"></div><h3>جميع Bricks ({len(bricks_list2)})</h3></div>',unsafe_allow_html=True)
+        if bricks_list2:
+            all_bricks_df2=pd.DataFrame([{'كود Brick':b.get('code',''),'اسم Brick (AR)':b.get('title_ar','') or b.get('title',''),'اسم Brick (EN)':b.get('title',''),
+                'الفئة (Class)':b.get('class_name_ar','') or b.get('class_name',''),'المجموعة (Family)':b.get('family_ar','') or b.get('family',''),
+                'القطاع (Segment)':b.get('segment_ar','') or b.get('segment','')} for b in bricks_list2])
+            st.dataframe(all_bricks_df2,use_container_width=True,height=400)
+        st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot" style="background:#fdcb6e;"></div><h3>بحث في تصنيف GPC</h3></div>',unsafe_allow_html=True)
+        gpc_q2=st.text_input("ابحث بالاسم العربي أو الإنجليزي أو الكود",key="gpc_search_q2",placeholder=" مشروبات، أرز، حليب، Beverages, Rice, Milk...")
+        if gpc_q2.strip():
+            gpc_results2=_gpc_search(bricks_list2,gpc_q2.strip())
+            if gpc_results2:
+                st.success(f"تم العثور على {len(gpc_results2)} Brick")
+                gpc_df2=pd.DataFrame([{'كود Brick':r.get('code',''),'اسم Brick (AR)':r.get('title_ar','') or r.get('title',''),'اسم Brick (EN)':r.get('title',''),
+                    'الفئة (Class)':r.get('class_name_ar','') or r.get('class_name',''),'المجموعة (Family)':r.get('family_ar','') or r.get('family',''),
+                    'القطاع (Segment)':r.get('segment_ar','') or r.get('segment','')} for r in gpc_results2[:200]])
+                st.dataframe(gpc_df2,use_container_width=True,hide_index=True)
+                if len(gpc_results2)>200:
+                    st.caption(f"عرض أول 200 نتيجة من أصل {len(gpc_results2)}")
+            else:
+                st.info(f"لم يتم العثور على نتائج لكلمة: {gpc_q2.strip()}")
+    else:
+        st.markdown("""<div class="erp-empty" style="padding:2rem;margin-top:1rem;text-align:center;">
+            <div class="erp-empty-icon">🔬</div>
+            <h3 style="color:#fff;">GPC Browser</h3>
+            <p style="color:var(--text2);">اضضغط تحديث لتحميل تصنيف Brick من GS1</p>
+        </div>""",unsafe_allow_html=True)
+
+def _standalone_gs1_tab():
+    st.markdown('<div class="erp-section"><div class="erp-section-dot" style="background:#00cec9;box-shadow:0 0 12px #00cec9;"></div><h3>📦 أكواد GS1 — منظمة GS1 مصر</h3></div>',unsafe_allow_html=True)
+    if 'gs1_auth' not in st.session_state: st.session_state.gs1_auth=None
+    if 'gs1_products' not in st.session_state: st.session_state.gs1_products=[]
+    auth=st.session_state.gs1_auth
+    if not auth:
+        st.markdown("""<div style="padding:.8rem 1rem;border-radius:10px;background:rgba(0,206,201,.06);border:1px solid rgba(0,206,201,.15);color:#00cec9;font-size:.82rem;margin-bottom:1rem;">
+            🔐 سجّل الدخول بحساب GS1 Egypt لعرض المنتجات المسجلة
+        </div>""",unsafe_allow_html=True)
+        c1,c2=st.columns(2)
+        with c1:
+            gs1_email=st.text_input("البريد الإلكتروني",key="gs1_email",placeholder="example@company.com")
+        with c2:
+            gs1_pass=st.text_input("كلمة المرور",key="gs1_pass",type="password",placeholder="••••••••")
+        if st.button("🔐 تسجيل الدخول",key="gs1_login_btn",type="primary",use_container_width=True):
+            if not gs1_email or not gs1_pass:
+                st.warning("أدخل البريد الإلكتروني وكلمة المرور")
+            else:
+                with st.spinner("جاري الاتصال بـ GS1 Egypt..."):
+                    result=_gs1_login(gs1_email,gs1_pass)
+                    if result and result.get('client'):
+                        st.session_state.gs1_auth=result
+                        st.success("تم تسجيل الدخول بنجاح")
+                        st.rerun()
+                    else:
+                        st.error("فشل تسجيل الدخول — تأكد من البيانات")
+    else:
+        c1,c2,c3=st.columns([3,3,1])
+        with c1:
+            st.markdown(f"""<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(0,206,201,.06);border:1px solid rgba(0,206,201,.15);color:#00cec9;font-size:.82rem;">
+                🔗 متصل بـ GS1 Egypt | المنتجات: <strong>{len(st.session_state.gs1_products)}</strong>
+            </div>""",unsafe_allow_html=True)
+        with c3:
+            if st.button("🔄",key="gs1_refresh",help="تحديث المنتجات"):
+                with st.spinner("جاري تحميل المنتجات..."):
+                    products=_gs1_get_products(auth)
+                    st.session_state.gs1_products=products or []
+                st.rerun()
+        if st.button("🚪 تسجيل الخروج",key="gs1_logout"):
+            st.session_state.gs1_auth=None
+            st.session_state.gs1_products=[]
+            st.rerun()
+        products=st.session_state.gs1_products
+        if not products:
+            if st.button("🔄 تحميل المنتجات",key="gs1_load_products",type="primary",use_container_width=True):
+                with st.spinner("جاري تحميل المنتجات من GS1 Egypt..."):
+                    loaded=_gs1_get_products(auth)
+                    st.session_state.gs1_products=loaded or []
+                st.rerun()
+        if products:
+            st.markdown(f'<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot" style="background:#00cec9;"></div><h3>المنتجات المسجلة ({len(products)})</h3></div>',unsafe_allow_html=True)
+            gs1_search=st.text_input("ابحث في المنتجات",key="gs1_search",placeholder="اسم المنتج، باركود، براند...")
+            filtered=products
+            if gs1_search.strip():
+                sq=gs1_search.strip().lower()
+                filtered=[p for p in products if sq in str(p.get('gtin','')).lower() or sq in str(p.get('brand',{}).get('name','')).lower() or sq in str(p.get('product_description_english','')).lower() or sq in str(p.get('product_description_arabic','')).lower() or sq in str(p.get('brand',{}).get('arabic_name','')).lower()]
+            if filtered:
+                gs1_rows=[]
+                for p in filtered:
+                    brand=p.get('brand',{})
+                    gs1_rows.append({'GTIN':p.get('gtin',''),'الاسم بالعربي':p.get('product_description_arabic',''),'الاسم بالإنجليزي':p.get('product_description_english',''),
+                        'البراند (AR)':brand.get('arabic_name',''),'البراند (EN)':brand.get('name',''),
+                        'صافي المحتوى':p.get('net_content',''),'رقم التسجيل':p.get('tax_registration_number','')})
+                gs1_df=pd.DataFrame(gs1_rows)
+                st.dataframe(gs1_df,use_container_width=True,height=400)
+                excel_buf=BytesIO()
+                gs1_df.to_excel(excel_buf,index=False,engine='xlsxwriter')
+                excel_buf.seek(0)
+                st.download_button("📊 تحميل المنتجات",data=excel_buf.getvalue(),file_name="gs1_products.xlsx",mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",key="dl_gs1")
+            else:
+                st.info("لم يتم العثور على نتائج")
+
 def _fix_vat_in_records(records):
     fixed=[]
     for r in records:
@@ -2453,275 +2815,10 @@ elif page=="🏷️ الاستعلام عن الأكواد":
     st.markdown(f"""<div class="erp-topbar"><div><h2>{page}</h2><p>بحث واستعلام عن أكواد الأصناف في الفواتير الإلكترونية</p></div>
 <div class="erp-topbar-right"><span class="erp-badge">🏷️ أكواد</span></div></div>""", unsafe_allow_html=True)
 
-    codes_db=load_codes_db()
-
-    out_data=load_data(PORTAL_OUT_FILE)
-    in_data=load_data(PORTAL_IN_FILE)
-    all_uuids=[]
-    for rec in out_data:
-        for r in rec.get('records',[]):
-            uid=r.get('UUID','')
-            issue=str(r.get('تاريخ الإصدار',''))[:10]
-            if uid: all_uuids.append({'uuid':uid,'direction':'out','name':r.get('الطرف الآخر',''),'date':issue})
-    for rec in in_data:
-        for r in rec.get('records',[]):
-            uid=r.get('UUID','')
-            issue=str(r.get('تاريخ الإصدار',''))[:10]
-            if uid: all_uuids.append({'uuid':uid,'direction':'in','name':r.get('الطرف الآخر',''),'date':issue})
-
-    _all_dates=sorted(set(u['date'] for u in all_uuids if u['date'] and len(u['date'])==10))
-    _min_d=_all_dates[0] if _all_dates else str(datetime.now().date())
-    _max_d=_all_dates[-1] if _all_dates else str(datetime.now().date())
-
-    f1,f2=st.columns(2)
-    with f1:
-        date_from=st.date_input("من تاريخ",value=datetime.strptime(_min_d,'%Y-%m-%d').date() if _min_d else datetime.now().date(),key="standalone_codes_from")
-    with f2:
-        date_to=st.date_input("إلى تاريخ",value=datetime.strptime(_max_d,'%Y-%m-%d').date() if _max_d else datetime.now().date(),key="standalone_codes_to")
-
-    df_str=date_from.strftime('%Y-%m-%d')
-    dt_str=date_to.strftime('%Y-%m-%d')
-    period_uuids=[u for u in all_uuids if u['date'] and len(u['date'])==10 and df_str<=u['date']<=dt_str]
-    fetched_uuids=set(c.get('uuid','') for c in codes_db)
-    period_unfetched=[u for u in period_uuids if u['uuid'] not in fetched_uuids]
-
-    c_led1,c_led2=st.columns([3,1])
-    with c_led1:
-        st.markdown(f"""<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(116,185,255,.06);border:1px solid rgba(116,185,255,.15);color:#74b9ff;font-size:.82rem;margin-bottom:1rem;">
-            📦 الفترة: <strong>{df_str}</strong> → <strong>{dt_str}</strong> | فواتور الفترة: <strong>{len(period_uuids)}</strong> | متبقي: <strong>{len(period_unfetched)}</strong> | الأصناف المحفوظة: <strong>{len(codes_db)}</strong>
-        </div>""",unsafe_allow_html=True)
-    with c_led2:
-        _portal_led()
-
-    if period_unfetched:
-        if st.button(f"🔄 استخراج أكواد {len(period_unfetched)} فاتورة في الفترة المحددة",key="refresh_codes",type="primary",use_container_width=True):
-            token=st.session_state.get("eta_token","")
-            if not token:
-                st.error("يجب الاتصال بالبورتال أولاً من تاب Portal الفواتير الإلكترونية")
-            else:
-                progress=st.progress(0,text=f"جاري استخراج الأكواد من {len(period_unfetched)} فاتورة...")
-                new_codes=[]
-                failed_uuids=[]
-                done_count=[0]
-                def _fetch_standalone(tok,uu):
-                    d,e=eta_get_document_details(tok,uu['uuid'])
-                    return uu,d,e,e
-                with ThreadPoolExecutor(max_workers=5) as pool:
-                    futures={pool.submit(_fetch_standalone,token,u):u for u in period_unfetched}
-                    for f in as_completed(futures):
-                        done_count[0]+=1
-                        progress.progress(min(done_count[0]/len(period_unfetched),1.0),text=f"{done_count[0]}/{len(period_unfetched)} فاتورة...")
-                        uu,doc,err,_=f.result()
-                        if err or not doc:
-                            failed_uuids.append(uu)
-                            continue
-                        _eta_extract_lines(uu['uuid'],doc,uu,new_codes)
-                if failed_uuids:
-                    new_token=_eta_refresh_token()
-                    if new_token:
-                        retried=0
-                        retried_ok=0
-                        with ThreadPoolExecutor(max_workers=5) as pool:
-                            futures={pool.submit(_fetch_standalone,new_token,u):u for u in failed_uuids}
-                            for f in as_completed(futures):
-                                retried+=1
-                                progress.progress(min((len(period_unfetched)+retried)/(len(period_unfetched)+len(failed_uuids)),1.0),text=f"إعادة محاولة {retried}/{len(failed_uuids)}...")
-                                uu,doc,err,_=f.result()
-                                if doc:
-                                    retried_ok+=1
-                                    _eta_extract_lines(uu['uuid'],doc,uu,new_codes)
-                        failed_uuids=[u for u in failed_uuids if u['uuid'] not in set(c.get('uuid','') for c in new_codes)]
-                progress.empty()
-                if new_codes:
-                    all_codes=codes_db+new_codes
-                    saved=save_codes_db(all_codes)
-                    codes_db=saved
-                    st.success(f"تم استخراج {len(new_codes)} صنف — إجمالي: {len(codes_db)} صنف")
-                if failed_uuids:
-                    st.warning(f"{len(failed_uuids)} فاتورة لم تُستخرج (قد تكون غير موجودة في البورتال)")
-
-    st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot"></div><h3>بحث عن صنف</h3></div>',unsafe_allow_html=True)
-    st.markdown('<div class="erp-card">',unsafe_allow_html=True)
-    search_query=st.text_input("اكتب كلمة مفتاحية (اسم الصنف أو الوصف أو الكود)",key="codes_search",placeholder="مثال: فلاش، منظف، أرز...")
-    if st.button("🔍 بحث",key="codes_search_btn",type="primary"):
-        if not search_query.strip():
-            st.warning("أدخل كلمة للبحث")
-        elif not codes_db:
-            st.info("قاعدة الأكواد فاضية — اضغط تحديث الأكواد أولاً")
-        else:
-            q=search_query.strip()
-            results=[]
-            for c in codes_db:
-                score=0
-                desc=str(c.get('description','')).lower()
-                code=str(c.get('itemCode','')).lower()
-                ic=str(c.get('internalCode','')).lower()
-                name=str(c.get('counterparty','')).lower()
-                if q.lower() in desc: score=max(score,10)
-                if q.lower() in code: score=max(score,8)
-                if q.lower() in ic: score=max(score,8)
-                if q.lower() in name: score=max(score,5)
-                q_words=q.lower().split()
-                for w in q_words:
-                    if w in desc: score+=3
-                    if w in code: score+=2
-                    if w in ic: score+=2
-                if score>0:
-                    results.append((score,c))
-            results.sort(key=lambda x:x[0],reverse=True)
-            if results:
-                st.success(f"تم العثور على {len(results)} نتيجة")
-                seen_codes=set()
-                for score,c in results:
-                    item_key=(c.get('itemCode',''),c.get('description',''))
-                    if item_key in seen_codes: continue
-                    seen_codes.add(item_key)
-                    dir_color='#00cec9' if c.get('direction')=='وارد' else '#a29bfe'
-                    dir_label=c.get('direction','')
-                    st.markdown(f"""<div class="erp-card" style="margin-bottom:.6rem;border-left:3px solid {dir_color};">
-                        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-                            <div>
-                                <div style="color:#fff;font-weight:700;font-size:.92rem;">{c.get('description','—')}</div>
-                                <div style="display:flex;gap:.8rem;margin-top:.3rem;flex-wrap:wrap;">
-                                    <span style="color:#00cec9;font-size:.78rem;font-weight:600;">🏷️ باركود: {c.get('itemCode','—')}</span>
-                                    <span style="color:#fdcb6e;font-size:.75rem;">رقم داخلي: {c.get('internalCode','—')}</span>
-                                    <span style="color:{dir_color};font-size:.72rem;font-weight:600;">{dir_label}</span>
-                                </div>
-                                <div style="color:var(--text2);font-size:.72rem;margin-top:.2rem;">المورد/العميل: {c.get('counterparty','—')}</div>
-                            </div>
-                            <div style="text-align:left;">
-                                <div style="color:#55efc4;font-weight:700;font-size:.85rem;">{fmt(c.get('salesTotal',0))}</div>
-                                <div style="color:var(--text2);font-size:.68rem;">الكمية: {c.get('quantity',0)} {c.get('unitType','')}</div>
-                            </div>
-                        </div>
-                    </div>""",unsafe_allow_html=True)
-            else:
-                st.info(f"لم يتم العثور على نتائج لكلمة: {q}")
-    st.markdown('</div>',unsafe_allow_html=True)
-
-    if codes_db:
-        st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot"></div><h3>جميع الأكواد</h3></div>',unsafe_allow_html=True)
-        codes_df=pd.DataFrame([{'الباركود':c.get('itemCode',''),'الكود الداخلي':c.get('internalCode',''),'الوصف':c.get('description',''),'الوصف مترجم':_get_ar_desc(c),
-            'الاتجاه':c.get('direction',''),'المورد/العميل':c.get('counterparty',''),'الكمية':c.get('quantity',0),
-            'وحدة القياس':c.get('unitType',''),'سعر الوحدة':c.get('unitPrice',0),'الإجمالي':c.get('salesTotal',0)} for c in codes_db])
-        st.dataframe(codes_df,use_container_width=True,height=400)
-        excel_buf=BytesIO()
-        codes_df.to_excel(excel_buf,index=False,engine='xlsxwriter')
-        excel_buf.seek(0)
-        st.download_button("📊 تحميل جميع الأكواد",data=excel_buf.getvalue(),file_name="item_codes.xlsx",mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",key="dl_codes")
-
-    st.markdown('<div class="erp-section" style="margin-top:2rem"><div class="erp-section-dot" style="background:#fdcb6e;box-shadow:0 0 12px #fdcb6e;"></div><h3>🔬 GPC Browser — تصنيف GS1 العالمي</h3></div>',unsafe_allow_html=True)
-    gpc_cache2=_gpc_load_cache()
-    gc1,gc2=st.columns([3,1])
-    with gc1:
-        if gpc_cache2:
-            stats=gpc_cache2.get('stats',{})
-            fetched=gpc_cache2.get('fetched_at','')[:16].replace('T',' ')
-            st.markdown(f"""<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(253,203,110,.06);border:1px solid rgba(253,203,110,.15);color:#fdcb6e;font-size:.82rem;">
-                📊 <strong>{stats.get('bricks',0)}</strong> Brick | <strong>{stats.get('classes',0)}</strong> Class | <strong>{stats.get('families',0)}</strong> Family | <strong>{stats.get('segments',0)}</strong> Segment — آخر تحديث: {fetched}
-            </div>""",unsafe_allow_html=True)
-        else:
-            st.markdown("""<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(253,203,110,.06);border:1px solid rgba(253,203,110,.15);color:#fdcb6e;font-size:.82rem;">
-                ⏳ لم يتم تحميل بيانات GPC بعد — اضغط تحديث أولاً
-            </div>""",unsafe_allow_html=True)
-    with gc2:
-        if st.button("🔄 تحديث بيانات GPC",key="gpc_refresh_standalone",type="primary",use_container_width=True):
-            gpc_progress2=st.progress(0,text="جاري الاتصال بـ GS1...")
-            pubs2=_gpc_api_get("/browser/publication",{"languageId":8})
-            if not pubs2:
-                st.error("خطأ: لا توجد إصدارات GPC");st.stop()
-            gpc_progress2.progress(10,text="تم العثور على الإصدارات...")
-            latest2=None
-            for p in pubs2:
-                if p.get('isLatest'): latest2=p;break
-            if not latest2: latest2=pubs2[0]
-            pid2=latest2.get('publicationId','')
-            gpc_progress2.progress(15,text="جاري تحميل Segments...")
-            segments2=_gpc_api_get("/browser/segment",{"publicationId":pid2})
-            gpc_progress2.progress(25,text="جاري تحميل Families...")
-            families2=_gpc_api_get("/browser/family",{"publicationId":pid2})
-            gpc_progress2.progress(40,text="جاري تحميل Classes...")
-            classes2=_gpc_api_get("/browser/class",{"publicationId":pid2})
-            gpc_progress2.progress(60,text="جاري تحميل Bricks...")
-            bricks2=_gpc_api_get("/browser/brick",{"publicationId":pid2})
-            if not bricks2:
-                st.error("خطأ: فشل تحميل Bricks");st.stop()
-            gpc_progress2.progress(65,text="تم تحميل البيانات — جاري تجهيز الشجرة...")
-            seg_map2={s.get('code',''):s.get('title','') or str(s.get('code','')) for s in (segments2 or [])}
-            fam_map2={f.get('code',''):f.get('title','') or str(f.get('code','')) for f in (families2 or [])}
-            cls_map2_={c.get('code',''):c for c in (classes2 or [])}
-            cls_name_map2={c.get('code',''):c.get('title','') or str(c.get('code','')) for c in (classes2 or [])}
-            flat_bricks2=[]
-            all_texts2=[]
-            for b in bricks2:
-                bcode=b.get('code','')
-                btitle=b.get('title','') or b.get('definition','') or str(bcode)
-                parent=b.get('parentCode','')
-                cname=cls_name_map2.get(parent,'')
-                cobj=cls_map2_.get(parent,{})
-                fam_code=cobj.get('parentCode','')
-                fname=fam_map2.get(fam_code,'')
-                fam_obj={f.get('code',''):f for f in (families2 or [])}.get(fam_code,{})
-                seg_code=fam_obj.get('parentCode','')
-                sname=seg_map2.get(seg_code,'')
-                flat_bricks2.append({'code':bcode,'title':btitle,'class_name':cname,'family':fname,'segment':sname})
-                all_texts2.extend([btitle,cname,fname,sname])
-            gpc_progress2.progress(70,text=f"جاري ترجمة {len(flat_bricks2)} Brick للعربية...")
-            unique2=[t for t in set(all_texts2) if t.strip() and not _has_arabic(t)]
-            BATCH=30
-            ar_map2={}
-            total_batches2=max(1,(len(unique2)+BATCH-1)//BATCH)
-            for bi in range(0,len(unique2),BATCH):
-                batch=unique2[bi:bi+BATCH]
-                joined=' | '.join(batch)
-                translated=_translate_to_arabic(joined)
-                if translated and translated!=joined:
-                    parts=translated.split('|')
-                    for j,t in enumerate(batch):
-                        if j<len(parts): ar_map2[t.strip()]=parts[j].strip()
-                pct=70+int(25*(bi//BATCH+1)/total_batches2)
-                gpc_progress2.progress(min(pct,95),text=f"جاري الترجمة... ({bi//BATCH+1}/{total_batches2})")
-            for b in flat_bricks2:
-                b['title_ar']=ar_map2.get(b['title'],'') or _translate_to_arabic(b['title'])
-                b['class_name_ar']=ar_map2.get(b['class_name'],'') or _translate_to_arabic(b['class_name'])
-                b['family_ar']=ar_map2.get(b['family'],'') or _translate_to_arabic(b['family'])
-                b['segment_ar']=ar_map2.get(b['segment'],'') or _translate_to_arabic(b['segment'])
-            gpc_progress2.progress(98,text="جاري الحفظ...")
-            _gpc_save_cache({'bricks':flat_bricks2,'publication':latest2,
-                'stats':{'segments':len(segments2 or []),'families':len(families2 or []),'classes':len(classes2 or []),'bricks':len(bricks2)},
-                'fetched_at':datetime.now().isoformat()})
-            gpc_progress2.progress(100,text=f"تم! {len(bricks2)} Brick — {len(segments2 or [])} Segment — {len(families2 or [])} Family — {len(classes2 or [])} Class")
-            st.rerun()
-
-    if gpc_cache2:
-        bricks_list2=gpc_cache2.get('bricks',[])
-        st.markdown(f'<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot" style="background:#fdcb6e;"></div><h3>جميع Bricks ({len(bricks_list2)})</h3></div>',unsafe_allow_html=True)
-        if bricks_list2:
-            all_bricks_df2=pd.DataFrame([{'كود Brick':b.get('code',''),'اسم Brick (AR)':b.get('title_ar','') or b.get('title',''),'اسم Brick (EN)':b.get('title',''),
-                'الفئة (Class)':b.get('class_name_ar','') or b.get('class_name',''),'المجموعة (Family)':b.get('family_ar','') or b.get('family',''),
-                'القطاع (Segment)':b.get('segment_ar','') or b.get('segment','')} for b in bricks_list2])
-            st.dataframe(all_bricks_df2,use_container_width=True,height=400)
-
-        st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot" style="background:#fdcb6e;"></div><h3>بحث في تصنيف GPC</h3></div>',unsafe_allow_html=True)
-        gpc_q2=st.text_input("ابحث بالاسم العربي أو الإنجليزي أو الكود",key="gpc_search_q2",placeholder=" مشروبات، أرز، حليب، Beverages, Rice, Milk...")
-        if gpc_q2.strip():
-            gpc_results2=_gpc_search(bricks_list2,gpc_q2.strip())
-            if gpc_results2:
-                st.success(f"تم العثور على {len(gpc_results2)} Brick")
-                gpc_df2=pd.DataFrame([{'كود Brick':r.get('code',''),'اسم Brick (AR)':r.get('title_ar','') or r.get('title',''),'اسم Brick (EN)':r.get('title',''),
-                    'الفئة (Class)':r.get('class_name_ar','') or r.get('class_name',''),'المجموعة (Family)':r.get('family_ar','') or r.get('family',''),
-                    'القطاع (Segment)':r.get('segment_ar','') or r.get('segment','')} for r in gpc_results2[:200]])
-                st.dataframe(gpc_df2,use_container_width=True,hide_index=True)
-                if len(gpc_results2)>200:
-                    st.caption(f"عرض أول 200 نتيجة من أصل {len(gpc_results2)}")
-            else:
-                st.info(f"لم يتم العثور على نتائج لكلمة: {gpc_q2.strip()}")
-    else:
-        st.markdown("""<div class="erp-empty" style="padding:2rem;margin-top:1rem;text-align:center;">
-            <div class="erp-empty-icon">🔬</div>
-            <h3 style="color:#fff;">GPC Browser</h3>
-            <p style="color:var(--text2);">اضضغط تحديث لتحميل تصنيف Brick من GS1</p>
-        </div>""",unsafe_allow_html=True)
+    _tab1,_tab2,_tab3=st.tabs(["🔗 أكواد البورتال","🔬 GPC Browser","🏷️ أكواد GS1"])
+    with _tab1: _standalone_portal_tab()
+    with _tab2: _standalone_gpc_tab()
+    with _tab3: _standalone_gs1_tab()
 
 # ====================== الاستعلام عن ممول ======================
 elif page=="🔍 الاستعلام عن ممول":
