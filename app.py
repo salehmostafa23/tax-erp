@@ -259,7 +259,7 @@ def _eta_extract_lines(uuid_val,doc,uu,codes_list):
     for line in lines:
         bc=line.get('itemCode','')
         if not bc: bc=_extract_barcode_from_line(line)
-        name=line.get('itemPrimaryName','') or line.get('itemSecondaryName','') or line.get('description','')
+        name=line.get('description','') or line.get('itemPrimaryName','') or line.get('itemSecondaryName','')
         codes_list.append({
             'uuid':uu.get('uuid',''),'direction':'صادرة' if uu.get('direction','')=='out' else 'واردة',
             'counterparty':uu.get('name',''),'itemCode':bc,
