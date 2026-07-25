@@ -207,6 +207,34 @@ def eta_get_document_details(token, uuid_val):
         return r.json(),None
     return None,f"HTTP {r.status_code}"
 
+def _eta_refresh_token():
+    cid=st.session_state.get("eta_client_id","")
+    csec=st.session_state.get("eta_client_secret","")
+    if not cid: return None
+    token,err=eta_login(cid,csec)
+    if token:
+        st.session_state["eta_token"]=token
+        return token
+    return None
+
+def eta_get_details_with_retry(uuid_val):
+    token=st.session_state.get("eta_token","")
+    if not token: return None,"no_token"
+    url=f"{ETA_API_BASE}/api/v1.0/documents/{uuid_val}/details"
+    headers={"Authorization":f"Bearer {token}"}
+    r=http_requests.get(url,headers=headers,timeout=30,verify=False)
+    if r.status_code==200:
+        return r.json(),None
+    if r.status_code in [401,403]:
+        new_token=_eta_refresh_token()
+        if new_token:
+            headers={"Authorization":f"Bearer {new_token}"}
+            r=http_requests.get(url,headers=headers,timeout=30,verify=False)
+            if r.status_code==200:
+                return r.json(),None
+            return None,f"HTTP {r.status_code}"
+    return None,f"HTTP {r.status_code}"
+
 def _fix_vat_in_records(records):
     fixed=[]
     for r in records:
@@ -2052,7 +2080,7 @@ elif page=="📄 Portal الفواتير الإلكترونية":
                     errors=0
                     done_count=[0]
                     def _fetch_one(uu):
-                        d,e=eta_get_document_details(token,uu['uuid'])
+                        d,e=eta_get_details_with_retry(uu['uuid'])
                         return uu,d,e
                     with ThreadPoolExecutor(max_workers=5) as pool:
                         futures={pool.submit(_fetch_one,u):u for u in period_unfetched}
@@ -2155,7 +2183,7 @@ elif page=="🏷️ الاستعلام عن الأكواد":
                 errors=0
                 done_count=[0]
                 def _fetch_standalone(uu):
-                    d,e=eta_get_document_details(token,uu['uuid'])
+                    d,e=eta_get_details_with_retry(uu['uuid'])
                     return uu,d,e
                 with ThreadPoolExecutor(max_workers=5) as pool:
                     futures={pool.submit(_fetch_standalone,u):u for u in period_unfetched}
