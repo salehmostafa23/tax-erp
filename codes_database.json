@@ -1,1 +1,1402 @@
-[]
+[
+  {
+    "uuid": "DVK54EZ04QPWZ7709HKDN7YK10",
+    "direction": "واردة",
+    "counterparty": "شركة عبد المنعم قتيلووابنائه لمنتجات الالبان والاغذيه",
+    "itemCode": "6223004835674",
+    "internalCode": "6223004835674",
+    "description": "Katilo Cheese Processed Roomy 0.50 Kilogram"
+  },
+  {
+    "uuid": "DVK54EZ04QPWZ7709HKDN7YK10",
+    "direction": "واردة",
+    "counterparty": "شركة عبد المنعم قتيلووابنائه لمنتجات الالبان والاغذيه",
+    "itemCode": "6223004835629",
+    "internalCode": "6223004835629",
+    "description": "Katilo  Creamy Cheese 250 gm  0.25 Gram"
+  },
+  {
+    "uuid": "DVK54EZ04QPWZ7709HKDN7YK10",
+    "direction": "واردة",
+    "counterparty": "شركة عبد المنعم قتيلووابنائه لمنتجات الالبان والاغذيه",
+    "itemCode": "6223004834240",
+    "internalCode": "6223004834240",
+    "description": "Katilo  Natural Ghee 450 gm  0.45 Kilogram"
+  },
+  {
+    "uuid": "DVK54EZ04QPWZ7709HKDN7YK10",
+    "direction": "واردة",
+    "counterparty": "شركة عبد المنعم قتيلووابنائه لمنتجات الالبان والاغذيه",
+    "itemCode": "6223004833090",
+    "internalCode": "6223004833090",
+    "description": "Katilo  Roomy Cheesel block 2 kg ( 6 * 2 kg )  2 Kilogram"
+  },
+  {
+    "uuid": "DVK54EZ04QPWZ7709HKDN7YK10",
+    "direction": "واردة",
+    "counterparty": "شركة عبد المنعم قتيلووابنائه لمنتجات الالبان والاغذيه",
+    "itemCode": "6223004835667",
+    "internalCode": "6223004835667",
+    "description": "Katilo Cheese Creamy 3 Kilogram"
+  },
+  {
+    "uuid": "DVK54EZ04QPWZ7709HKDN7YK10",
+    "direction": "واردة",
+    "counterparty": "شركة عبد المنعم قتيلووابنائه لمنتجات الالبان والاغذيه",
+    "itemCode": "6223004831034",
+    "internalCode": "6223004831034",
+    "description": "Katilo Cream Fresh 3 Kilogram"
+  },
+  {
+    "uuid": "PA1X5KG41B6Q2QC1NA9KN7YK10",
+    "direction": "واردة",
+    "counterparty": "شركة عبد المنعم قتيلووابنائه لمنتجات الالبان والاغذيه",
+    "itemCode": "6223004834141",
+    "internalCode": "6223004834141",
+    "description": "Katilo  Mesh Domiaty 250 gm  0.25 Kilogram"
+  },
+  {
+    "uuid": "PA1X5KG41B6Q2QC1NA9KN7YK10",
+    "direction": "واردة",
+    "counterparty": "شركة عبد المنعم قتيلووابنائه لمنتجات الالبان والاغذيه",
+    "itemCode": "6223004830235",
+    "internalCode": "6223004830235",
+    "description": "Katilo Cheese Natural Istunboly 0.25 Kilogram"
+  },
+  {
+    "uuid": "PA1X5KG41B6Q2QC1NA9KN7YK10",
+    "direction": "واردة",
+    "counterparty": "شركة عبد المنعم قتيلووابنائه لمنتجات الالبان والاغذيه",
+    "itemCode": "6223004830136",
+    "internalCode": "6223004830136",
+    "description": "Katilo  Fetta Light 250 gm  0.25 Kilogram"
+  },
+  {
+    "uuid": "XZ9170QXRVNKDDYTQ0ZMN7YK10",
+    "direction": "واردة",
+    "counterparty": "شركة عبد المنعم قتيلووابنائه لمنتجات الالبان والاغذيه",
+    "itemCode": "6223004830433",
+    "internalCode": "6223004830433",
+    "description": "Katilo Cheese Natural Baramili Iskandarany 0.25 Kilogram"
+  },
+  {
+    "uuid": "XZ9170QXRVNKDDYTQ0ZMN7YK10",
+    "direction": "واردة",
+    "counterparty": "شركة عبد المنعم قتيلووابنائه لمنتجات الالبان والاغذيه",
+    "itemCode": "6223004834110",
+    "internalCode": "6223004834110",
+    "description": "Katilo Mesh Domiaty 0.55 Kilogram"
+  },
+  {
+    "uuid": "W21R4CBSSYAH58E1XKE8N7YK10",
+    "direction": "واردة",
+    "counterparty": "شركة عبد المنعم قتيلووابنائه لمنتجات الالبان والاغذيه",
+    "itemCode": "6223004834219",
+    "internalCode": "6223004834219",
+    "description": "Katilo  Natural Ghee 900 gm  0.9 Kilogram"
+  },
+  {
+    "uuid": "TXV8S1AHNRYK19W4FSSAN7YK10",
+    "direction": "واردة",
+    "counterparty": "شركة عبد المنعم قتيلووابنائه لمنتجات الالبان والاغذيه",
+    "itemCode": "6223004830198",
+    "internalCode": "6223004830198",
+    "description": "Katilo Cheese Natural Low Salt 8 Kilogram"
+  },
+  {
+    "uuid": "TXV8S1AHNRYK19W4FSSAN7YK10",
+    "direction": "واردة",
+    "counterparty": "شركة عبد المنعم قتيلووابنائه لمنتجات الالبان والاغذيه",
+    "itemCode": "6223004830037",
+    "internalCode": "6223004830037",
+    "description": "Katilo  Low Salt Cheese 250 gm  0.25 Kilogram"
+  },
+  {
+    "uuid": "TXV8S1AHNRYK19W4FSSAN7YK10",
+    "direction": "واردة",
+    "counterparty": "شركة عبد المنعم قتيلووابنائه لمنتجات الالبان والاغذيه",
+    "itemCode": "6223004830020",
+    "internalCode": "6223004830020",
+    "description": "Katilo  Low Salt Cheese 500 gm  0.5 Kilogram"
+  },
+  {
+    "uuid": "VZ2805RH18Z6XWR7472AN7YK10",
+    "direction": "واردة",
+    "counterparty": "شركة عبد المنعم قتيلووابنائه لمنتجات الالبان والاغذيه",
+    "itemCode": "6223004830051",
+    "internalCode": "6223004830051",
+    "description": "Katilo  Low Salt Cheese 14 kg  14 Kilogram"
+  },
+  {
+    "uuid": "VZ2805RH18Z6XWR7472AN7YK10",
+    "direction": "واردة",
+    "counterparty": "شركة عبد المنعم قتيلووابنائه لمنتجات الالبان والاغذيه",
+    "itemCode": "6223004834011",
+    "internalCode": "6223004834011",
+    "description": "Katilo  Domiaty Cheese Natural 2 kg  2 Kilogram"
+  },
+  {
+    "uuid": "VZ2805RH18Z6XWR7472AN7YK10",
+    "direction": "واردة",
+    "counterparty": "شركة عبد المنعم قتيلووابنائه لمنتجات الالبان والاغذيه",
+    "itemCode": "6223004834042",
+    "internalCode": "6223004834042",
+    "description": "Katilo   Domiaty Cheese Natural 250 gm  0.25 Kilogram"
+  },
+  {
+    "uuid": "VZ2805RH18Z6XWR7472AN7YK10",
+    "direction": "واردة",
+    "counterparty": "شركة عبد المنعم قتيلووابنائه لمنتجات الالبان والاغذيه",
+    "itemCode": "6223004834158",
+    "internalCode": "6223004834158",
+    "description": "Katilo Mesh Domiaty 3 Kilogram"
+  },
+  {
+    "uuid": "ZGCSDPM5S4EQY2FBJC98N7YK10",
+    "direction": "واردة",
+    "counterparty": "شركة عبد المنعم قتيلووابنائه لمنتجات الالبان والاغذيه",
+    "itemCode": "6223004833007",
+    "internalCode": "6223004833007",
+    "description": "Katilo  Roomy Cheese Big Wheel 13 kg  13 Kilogram"
+  },
+  {
+    "uuid": "H7GPW6C2SZXK977JKVM2K7YK10",
+    "direction": "واردة",
+    "counterparty": "تى تى سى للمنتجات الغذائية",
+    "itemCode": "EG-594753724-141005",
+    "internalCode": "liquid-1001",
+    "description": "White vinegar"
+  },
+  {
+    "uuid": "H7GPW6C2SZXK977JKVM2K7YK10",
+    "direction": "واردة",
+    "counterparty": "تى تى سى للمنتجات الغذائية",
+    "itemCode": "EG-594753724-134008",
+    "internalCode": "Tuna-1001",
+    "description": "Tuna of different weights"
+  },
+  {
+    "uuid": "H7GPW6C2SZXK977JKVM2K7YK10",
+    "direction": "واردة",
+    "counterparty": "تى تى سى للمنتجات الغذائية",
+    "itemCode": "EG-594753724-141012",
+    "internalCode": "liquid-1006",
+    "description": "Pomegranate molasses 325 ml (12 pieces in a carton)"
+  },
+  {
+    "uuid": "H7GPW6C2SZXK977JKVM2K7YK10",
+    "direction": "واردة",
+    "counterparty": "تى تى سى للمنتجات الغذائية",
+    "itemCode": "EG-594753724-124001",
+    "internalCode": "sardin-1001",
+    "description": "sardines 125 g * 50 pieces"
+  },
+  {
+    "uuid": "2Z83AHNTYPPD2128XNB1K7YK10",
+    "direction": "واردة",
+    "counterparty": "تى تى سى للمنتجات الغذائية",
+    "itemCode": "EG-594753724-134008",
+    "internalCode": "Tuna-2003",
+    "description": "Tuna of different weights"
+  },
+  {
+    "uuid": "2Z83AHNTYPPD2128XNB1K7YK10",
+    "direction": "واردة",
+    "counterparty": "تى تى سى للمنتجات الغذائية",
+    "itemCode": "EG-594753724-134008",
+    "internalCode": "liquid-1003",
+    "description": "Tuna of different weights"
+  },
+  {
+    "uuid": "7JDPAW7MXWAPMFJ0XD69H7YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713232",
+    "internalCode": "10304008",
+    "description": "Azima White pepper 10 Gram"
+  },
+  {
+    "uuid": "Q9DSMCQ7G18FVFCSYA01H7YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713003",
+    "internalCode": "10303001",
+    "description": "Azima Whiate Beans 500 Gram"
+  },
+  {
+    "uuid": "Q9DSMCQ7G18FVFCSYA01H7YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713317",
+    "internalCode": "10304021",
+    "description": "Azima Cloves 10 Gram"
+  },
+  {
+    "uuid": "Q9DSMCQ7G18FVFCSYA01H7YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713348",
+    "internalCode": "10304024",
+    "description": "Azima Ginger 30 Gram"
+  },
+  {
+    "uuid": "Q9DSMCQ7G18FVFCSYA01H7YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713355",
+    "internalCode": "10304025",
+    "description": "Azima Cinnamon 40 Gram"
+  },
+  {
+    "uuid": "Q9DSMCQ7G18FVFCSYA01H7YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713386",
+    "internalCode": "10304028",
+    "description": "Azima Sodium carbonate 100 Gram"
+  },
+  {
+    "uuid": "Q9DSMCQ7G18FVFCSYA01H7YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713393",
+    "internalCode": "10304011",
+    "description": "Azima Pepper paprika 40 Gram"
+  },
+  {
+    "uuid": "Q9DSMCQ7G18FVFCSYA01H7YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713409",
+    "internalCode": "10305001",
+    "description": "Azima Flour 1 Kilogram"
+  },
+  {
+    "uuid": "Q9DSMCQ7G18FVFCSYA01H7YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713416",
+    "internalCode": "10304029",
+    "description": "Azima Rosemary 40 Gram"
+  },
+  {
+    "uuid": "Q9DSMCQ7G18FVFCSYA01H7YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713430",
+    "internalCode": "10304012",
+    "description": "Azima Black pepper 20 Gram"
+  },
+  {
+    "uuid": "Q9DSMCQ7G18FVFCSYA01H7YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713447",
+    "internalCode": "10304013",
+    "description": "Azima Black pepper soft 100 Gram"
+  },
+  {
+    "uuid": "Q9DSMCQ7G18FVFCSYA01H7YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713300",
+    "internalCode": "10304020",
+    "description": "Azima Turmeric 40 Gram"
+  },
+  {
+    "uuid": "Q9DSMCQ7G18FVFCSYA01H7YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713454",
+    "internalCode": "10304006",
+    "description": "Azima Ground cumin 100 Gram"
+  },
+  {
+    "uuid": "Q9DSMCQ7G18FVFCSYA01H7YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713478",
+    "internalCode": "10304010",
+    "description": "Azima Chili pepper 100 Gram"
+  },
+  {
+    "uuid": "Q9DSMCQ7G18FVFCSYA01H7YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713485",
+    "internalCode": "10304004",
+    "description": "Azima Spice 100 Gram"
+  },
+  {
+    "uuid": "Q9DSMCQ7G18FVFCSYA01H7YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713492",
+    "internalCode": "10310001",
+    "description": "Azima Black pepper soft 70 Gram"
+  },
+  {
+    "uuid": "Q9DSMCQ7G18FVFCSYA01H7YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713539",
+    "internalCode": "10310004",
+    "description": "Azima Coriander 50 Gram"
+  },
+  {
+    "uuid": "Q9DSMCQ7G18FVFCSYA01H7YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713614",
+    "internalCode": "10304032",
+    "description": "Azima Onion powder 30 Gram"
+  },
+  {
+    "uuid": "Q9DSMCQ7G18FVFCSYA01H7YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713621",
+    "internalCode": "10304033",
+    "description": "Azima Garlic powder 30 Gram"
+  },
+  {
+    "uuid": "Q9DSMCQ7G18FVFCSYA01H7YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713928",
+    "internalCode": "10310005",
+    "description": "Azima Chili pepper 70 Gram"
+  },
+  {
+    "uuid": "Q9DSMCQ7G18FVFCSYA01H7YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713959",
+    "internalCode": "10310008",
+    "description": "Azima Cardamoms 50 Gram"
+  },
+  {
+    "uuid": "Q9DSMCQ7G18FVFCSYA01H7YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713997",
+    "internalCode": "10302002",
+    "description": "Azima Rusk grinded 250 Gram"
+  },
+  {
+    "uuid": "Q9DSMCQ7G18FVFCSYA01H7YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713461",
+    "internalCode": "10304002",
+    "description": "Azima Coriander 100 Gram"
+  },
+  {
+    "uuid": "Q9DSMCQ7G18FVFCSYA01H7YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713294",
+    "internalCode": "10304019",
+    "description": "Azima Curry 40 Gram"
+  },
+  {
+    "uuid": "Q9DSMCQ7G18FVFCSYA01H7YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713324",
+    "internalCode": "10304022",
+    "description": "Azima Black bean 40 Gram"
+  },
+  {
+    "uuid": "Q9DSMCQ7G18FVFCSYA01H7YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713270",
+    "internalCode": "10304017",
+    "description": "Azima Anise 40 Gram"
+  },
+  {
+    "uuid": "Q9DSMCQ7G18FVFCSYA01H7YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713010",
+    "internalCode": "10303002",
+    "description": "Azima Beans,blak eyes 500 Gram"
+  },
+  {
+    "uuid": "Q9DSMCQ7G18FVFCSYA01H7YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713027",
+    "internalCode": "10303011",
+    "description": "Azima Yellow lentils 500 Gram"
+  },
+  {
+    "uuid": "Q9DSMCQ7G18FVFCSYA01H7YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713034",
+    "internalCode": "10303004",
+    "description": "Azima Black lentils 500 Gram"
+  },
+  {
+    "uuid": "Q9DSMCQ7G18FVFCSYA01H7YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713041",
+    "internalCode": "10303005",
+    "description": "Azima Lupine 500 Gram"
+  },
+  {
+    "uuid": "Q9DSMCQ7G18FVFCSYA01H7YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713058",
+    "internalCode": "10303006",
+    "description": "Azima Beans crushed 500 Gram"
+  },
+  {
+    "uuid": "Q9DSMCQ7G18FVFCSYA01H7YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713065",
+    "internalCode": "10303007",
+    "description": "Azima Beans 500 Gram"
+  },
+  {
+    "uuid": "Q9DSMCQ7G18FVFCSYA01H7YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713096",
+    "internalCode": "10303010",
+    "description": "Azima Wheat grated 500 Gram"
+  },
+  {
+    "uuid": "Q9DSMCQ7G18FVFCSYA01H7YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713287",
+    "internalCode": "10304018",
+    "description": "Azima Sesame 40 Gram"
+  },
+  {
+    "uuid": "Q9DSMCQ7G18FVFCSYA01H7YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713119",
+    "internalCode": "10303012",
+    "description": "Azima Chickpeas 500 Gram"
+  },
+  {
+    "uuid": "Q9DSMCQ7G18FVFCSYA01H7YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713126",
+    "internalCode": "10303013",
+    "description": "Azima Chikpea kooking 500 Gram"
+  },
+  {
+    "uuid": "Q9DSMCQ7G18FVFCSYA01H7YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713133",
+    "internalCode": "10307001",
+    "description": "Azima Corn starch 400 Gram"
+  },
+  {
+    "uuid": "Q9DSMCQ7G18FVFCSYA01H7YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713102",
+    "internalCode": "10303003",
+    "description": "Azima Popcorn 500 Gram"
+  },
+  {
+    "uuid": "Q9DSMCQ7G18FVFCSYA01H7YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713164",
+    "internalCode": "10301002",
+    "description": "Azima Rice 5 Kilogram"
+  },
+  {
+    "uuid": "Q9DSMCQ7G18FVFCSYA01H7YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713140",
+    "internalCode": "10302001",
+    "description": "Azima Rusk grinded 500 Gram"
+  },
+  {
+    "uuid": "Q9DSMCQ7G18FVFCSYA01H7YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713256",
+    "internalCode": "10304015",
+    "description": "Azima Cardamoms 10 Gram"
+  },
+  {
+    "uuid": "Q9DSMCQ7G18FVFCSYA01H7YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713225",
+    "internalCode": "10304005",
+    "description": "Azima Ground cumin 30 Gram"
+  },
+  {
+    "uuid": "Q9DSMCQ7G18FVFCSYA01H7YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713263",
+    "internalCode": "10304016",
+    "description": "Azima Mcetkh 5 Gram"
+  },
+  {
+    "uuid": "Q9DSMCQ7G18FVFCSYA01H7YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713201",
+    "internalCode": "10304003",
+    "description": "Azima Spicce 30 Gram"
+  },
+  {
+    "uuid": "Q9DSMCQ7G18FVFCSYA01H7YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713195",
+    "internalCode": "10304001",
+    "description": "Azima Coriander 40 Gram"
+  },
+  {
+    "uuid": "Q9DSMCQ7G18FVFCSYA01H7YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713188",
+    "internalCode": "10304009",
+    "description": "Azima Chili pepper 40 Gram"
+  },
+  {
+    "uuid": "Q9DSMCQ7G18FVFCSYA01H7YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713218",
+    "internalCode": "10304007",
+    "description": "Azima Black pepper soft 20 Gram"
+  },
+  {
+    "uuid": "C7503C84JV4MRDDZ27CWE7YK10",
+    "direction": "واردة",
+    "counterparty": "شركه عبور لاند للصناعات الغذائيه",
+    "itemCode": "6223006520998",
+    "internalCode": "000000000001000642",
+    "description": "Obour land for food industries - Tetra Pak Falamank Cheese 250.000 Gram"
+  },
+  {
+    "uuid": "NWMRQYSAA9M02XMNSKJVE7YK10",
+    "direction": "واردة",
+    "counterparty": "شركه عبور لاند للصناعات الغذائيه",
+    "itemCode": "6223006520899",
+    "internalCode": "000000000001000611",
+    "description": "Obour land for food industries -  Cheddar cheese Tetra pak 125 gm  0.125 Net kilogram"
+  },
+  {
+    "uuid": "NWMRQYSAA9M02XMNSKJVE7YK10",
+    "direction": "واردة",
+    "counterparty": "شركه عبور لاند للصناعات الغذائيه",
+    "itemCode": "6224008709060",
+    "internalCode": "000000000001000197",
+    "description": "Obour Land  Apple juice 1 liter  1.0 Litre"
+  },
+  {
+    "uuid": "NWMRQYSAA9M02XMNSKJVE7YK10",
+    "direction": "واردة",
+    "counterparty": "شركه عبور لاند للصناعات الغذائيه",
+    "itemCode": "6224008709053",
+    "internalCode": "000000000001000195",
+    "description": "Obour Land  Mango juice 1 liter  1.0 Litre"
+  },
+  {
+    "uuid": "NWMRQYSAA9M02XMNSKJVE7YK10",
+    "direction": "واردة",
+    "counterparty": "شركه عبور لاند للصناعات الغذائيه",
+    "itemCode": "6224000147808",
+    "internalCode": "000000000001000009",
+    "description": "Obour Land  Tetra pack olive cheese 125 g  125.0 Gram"
+  },
+  {
+    "uuid": "NWMRQYSAA9M02XMNSKJVE7YK10",
+    "direction": "واردة",
+    "counterparty": "شركه عبور لاند للصناعات الغذائيه",
+    "itemCode": "6224000147600",
+    "internalCode": "000000000001000006",
+    "description": "Obour Land  Istanbully Cheese Tetra Pak 125 g  125.0 Gram"
+  },
+  {
+    "uuid": "WRS632QTY8MN0ND1HGEFB7YK10",
+    "direction": "واردة",
+    "counterparty": "SILO Foods",
+    "itemCode": "6223007945912",
+    "internalCode": "000000001030300004",
+    "description": "Silo Bakery Products Electronic Receipt 1 Piece"
+  },
+  {
+    "uuid": "WRS632QTY8MN0ND1HGEFB7YK10",
+    "direction": "واردة",
+    "counterparty": "SILO Foods",
+    "itemCode": "6223007945912",
+    "internalCode": "000000001030300005",
+    "description": "Silo Bakery Products Electronic Receipt 1 Piece"
+  },
+  {
+    "uuid": "WRS632QTY8MN0ND1HGEFB7YK10",
+    "direction": "واردة",
+    "counterparty": "SILO Foods",
+    "itemCode": "6223007945912",
+    "internalCode": "000000001030300006",
+    "description": "Silo Bakery Products Electronic Receipt 1 Piece"
+  },
+  {
+    "uuid": "WRS632QTY8MN0ND1HGEFB7YK10",
+    "direction": "واردة",
+    "counterparty": "SILO Foods",
+    "itemCode": "6223007945912",
+    "internalCode": "000000001030300218",
+    "description": "Silo Bakery Products Electronic Receipt 1 Piece"
+  },
+  {
+    "uuid": "A97KRNNA82JPVHMPK01EB7YK10",
+    "direction": "واردة",
+    "counterparty": "SILO Foods",
+    "itemCode": "6223007945912",
+    "internalCode": "000000001030300007",
+    "description": "Silo Bakery Products Electronic Receipt 1 Piece"
+  },
+  {
+    "uuid": "CHBJYV21Y0YJYEZZ2HRFB7YK10",
+    "direction": "واردة",
+    "counterparty": "SILO Foods",
+    "itemCode": "6223007945912",
+    "internalCode": "000000001030300257",
+    "description": "Silo Bakery Products Electronic Receipt 1 Piece"
+  },
+  {
+    "uuid": "CHBJYV21Y0YJYEZZ2HRFB7YK10",
+    "direction": "واردة",
+    "counterparty": "SILO Foods",
+    "itemCode": "6223007945912",
+    "internalCode": "000000001030300258",
+    "description": "Silo Bakery Products Electronic Receipt 1 Piece"
+  },
+  {
+    "uuid": "CHBJYV21Y0YJYEZZ2HRFB7YK10",
+    "direction": "واردة",
+    "counterparty": "SILO Foods",
+    "itemCode": "6223007945912",
+    "internalCode": "000000001030300259",
+    "description": "Silo Bakery Products Electronic Receipt 1 Piece"
+  },
+  {
+    "uuid": "GRAMJ4G9F04VQ0GAPCDCB7YK10",
+    "direction": "واردة",
+    "counterparty": "SILO Foods",
+    "itemCode": "6223007945912",
+    "internalCode": "000000001030300593",
+    "description": "Silo Bakery Products Electronic Receipt 1 Piece"
+  },
+  {
+    "uuid": "CDY5R0YXRGK03YCC713CB7YK10",
+    "direction": "واردة",
+    "counterparty": "SILO Foods",
+    "itemCode": "6223007945912",
+    "internalCode": "000000001030300599",
+    "description": "Silo Bakery Products Electronic Receipt 1 Piece"
+  },
+  {
+    "uuid": "DQQCCD7NEXYHV7ZETXKAB7YK10",
+    "direction": "واردة",
+    "counterparty": "HABIBCO TRADE COMPANY",
+    "itemCode": "EG-100316263-3205",
+    "internalCode": "EG-100316263-3205",
+    "description": "ماكينة TG بلس - 2 موس / كيس 5+1"
+  },
+  {
+    "uuid": "MDB05JJQZDD0CBGWX5EBB7YK10",
+    "direction": "واردة",
+    "counterparty": "SILO Foods",
+    "itemCode": "6223007945912",
+    "internalCode": "000000001030300534",
+    "description": "Silo Bakery Products Electronic Receipt 1 Piece"
+  },
+  {
+    "uuid": "MDB05JJQZDD0CBGWX5EBB7YK10",
+    "direction": "واردة",
+    "counterparty": "SILO Foods",
+    "itemCode": "6223007945912",
+    "internalCode": "000000001030300535",
+    "description": "Silo Bakery Products Electronic Receipt 1 Piece"
+  },
+  {
+    "uuid": "MDB05JJQZDD0CBGWX5EBB7YK10",
+    "direction": "واردة",
+    "counterparty": "SILO Foods",
+    "itemCode": "6223007945912",
+    "internalCode": "000000001030300238",
+    "description": "Silo Bakery Products Electronic Receipt 1 Piece"
+  },
+  {
+    "uuid": "MDB05JJQZDD0CBGWX5EBB7YK10",
+    "direction": "واردة",
+    "counterparty": "SILO Foods",
+    "itemCode": "6223007945912",
+    "internalCode": "000000001030300239",
+    "description": "Silo Bakery Products Electronic Receipt 1 Piece"
+  },
+  {
+    "uuid": "142MGA198G0QKHFY0Y7B27YK10",
+    "direction": "واردة",
+    "counterparty": "شركة رسلان للاستيراد والتصدير",
+    "itemCode": "EG-202600459-5201127097354",
+    "internalCode": "043",
+    "description": "نيو كريمة كريمة الكاكاو والبندق 1000  جرام \" بلاستيك \""
+  },
+  {
+    "uuid": "8XR4ZSK626H6Z3Z9EKF787YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713362",
+    "internalCode": "10304026",
+    "description": "Azima Fenugreek 75 Gram"
+  },
+  {
+    "uuid": "8XR4ZSK626H6Z3Z9EKF787YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713508",
+    "internalCode": "10310002",
+    "description": "Azima Ground cumin 70 Gram"
+  },
+  {
+    "uuid": "8XR4ZSK626H6Z3Z9EKF787YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713553",
+    "internalCode": "10310003",
+    "description": "Azima Spicce 70 Gram"
+  },
+  {
+    "uuid": "8XR4ZSK626H6Z3Z9EKF787YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713935",
+    "internalCode": "10310006",
+    "description": "Azima Onion powder 70 Gram"
+  },
+  {
+    "uuid": "8XR4ZSK626H6Z3Z9EKF787YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713942",
+    "internalCode": "10310007",
+    "description": "Azima Garlic powder 70 Gram"
+  },
+  {
+    "uuid": "8XR4ZSK626H6Z3Z9EKF787YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713966",
+    "internalCode": "10310009",
+    "description": "Azima Curry 70 Gram"
+  },
+  {
+    "uuid": "8XR4ZSK626H6Z3Z9EKF787YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713973",
+    "internalCode": "10310010",
+    "description": "Azima Turmeric 70 Gram"
+  },
+  {
+    "uuid": "8XR4ZSK626H6Z3Z9EKF787YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713331",
+    "internalCode": "10304023",
+    "description": "Azima Alory paper 10 Gram"
+  },
+  {
+    "uuid": "8XR4ZSK626H6Z3Z9EKF787YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713379",
+    "internalCode": "10304027",
+    "description": "Azima Chickpea cooking 75 Gram"
+  },
+  {
+    "uuid": "8XR4ZSK626H6Z3Z9EKF787YK10",
+    "direction": "واردة",
+    "counterparty": "عظيمه لتعبئه وتجاره المواد الغذائيه",
+    "itemCode": "6224000713072",
+    "internalCode": "10303008",
+    "description": "Azima Bulgur 500 Gram"
+  },
+  {
+    "uuid": "JJ5DB19MQD09BPA2TRWNZ6YK10",
+    "direction": "واردة",
+    "counterparty": "ماركو يوسف جوهر غالي وشريكته مصنع الفارس للحلاوه الطحينيه والطحينه والعصائر والاستيراد والتصدير",
+    "itemCode": "EG-432779957-3013 halawa",
+    "internalCode": "",
+    "description": "Chocolate Halawa 4200 grams, carton (4 boxes)"
+  },
+  {
+    "uuid": "JJ5DB19MQD09BPA2TRWNZ6YK10",
+    "direction": "واردة",
+    "counterparty": "ماركو يوسف جوهر غالي وشريكته مصنع الفارس للحلاوه الطحينيه والطحينه والعصائر والاستيراد والتصدير",
+    "itemCode": "EG-432779957-3012 halawa",
+    "internalCode": "",
+    "description": "حلاوة سادة 4200جرام\tكرتونه (٤علبه ) "
+  },
+  {
+    "uuid": "Q09VK5SKK7S52WKC1X56Z6YK10",
+    "direction": "واردة",
+    "counterparty": "حسام الدين احمد امين سيد احمد متولي سوبر فود",
+    "itemCode": "6223001363712",
+    "internalCode": "",
+    "description": "PEPSI  Cans multi back  12.0 Piece"
+  },
+  {
+    "uuid": "Q96BX2VQXT6ZGEJSETY6Z6YK10",
+    "direction": "واردة",
+    "counterparty": "ماركو يوسف جوهر غالي وشريكته مصنع الفارس للحلاوه الطحينيه والطحينه والعصائر والاستيراد والتصدير",
+    "itemCode": "EG-432779957-3007 halawa",
+    "internalCode": "",
+    "description": "Plain Halawa 580 grams, carton (24 boxes)"
+  },
+  {
+    "uuid": "Q96BX2VQXT6ZGEJSETY6Z6YK10",
+    "direction": "واردة",
+    "counterparty": "ماركو يوسف جوهر غالي وشريكته مصنع الفارس للحلاوه الطحينيه والطحينه والعصائر والاستيراد والتصدير",
+    "itemCode": "EG-432779957-Tahini1001",
+    "internalCode": "",
+    "description": "Tahini 125 grams, standing carton (24 boxes)"
+  },
+  {
+    "uuid": "Q96BX2VQXT6ZGEJSETY6Z6YK10",
+    "direction": "واردة",
+    "counterparty": "ماركو يوسف جوهر غالي وشريكته مصنع الفارس للحلاوه الطحينيه والطحينه والعصائر والاستيراد والتصدير",
+    "itemCode": "EG-432779957-3005 halawa",
+    "internalCode": "",
+    "description": "Plain Halawa 140 grams, carton (24 pieces)"
+  },
+  {
+    "uuid": "Q96BX2VQXT6ZGEJSETY6Z6YK10",
+    "direction": "واردة",
+    "counterparty": "ماركو يوسف جوهر غالي وشريكته مصنع الفارس للحلاوه الطحينيه والطحينه والعصائر والاستيراد والتصدير",
+    "itemCode": "EG-432779957-3001 halawa",
+    "internalCode": "",
+    "description": "Halawa Bar Plain 20 gm (20 pieces x 6 boxes)"
+  },
+  {
+    "uuid": "Q96BX2VQXT6ZGEJSETY6Z6YK10",
+    "direction": "واردة",
+    "counterparty": "ماركو يوسف جوهر غالي وشريكته مصنع الفارس للحلاوه الطحينيه والطحينه والعصائر والاستيراد والتصدير",
+    "itemCode": "EG-432779957-3021 halawa",
+    "internalCode": "",
+    "description": "Al Fares Halva Bar 32 gm Export Carton (24 Pieces x 6 Boxes)"
+  },
+  {
+    "uuid": "Q96BX2VQXT6ZGEJSETY6Z6YK10",
+    "direction": "واردة",
+    "counterparty": "ماركو يوسف جوهر غالي وشريكته مصنع الفارس للحلاوه الطحينيه والطحينه والعصائر والاستيراد والتصدير",
+    "itemCode": "EG-432779957-3011 halawa",
+    "internalCode": "",
+    "description": "Halawa with chocolate 760 grams, standing carton (8 boxes)"
+  },
+  {
+    "uuid": "Q96BX2VQXT6ZGEJSETY6Z6YK10",
+    "direction": "واردة",
+    "counterparty": "ماركو يوسف جوهر غالي وشريكته مصنع الفارس للحلاوه الطحينيه والطحينه والعصائر والاستيراد والتصدير",
+    "itemCode": "EG-432779957-Tahini1002",
+    "internalCode": "",
+    "description": "Tahini 250 grams, standing carton (24 boxes)"
+  },
+  {
+    "uuid": "Q96BX2VQXT6ZGEJSETY6Z6YK10",
+    "direction": "واردة",
+    "counterparty": "ماركو يوسف جوهر غالي وشريكته مصنع الفارس للحلاوه الطحينيه والطحينه والعصائر والاستيراد والتصدير",
+    "itemCode": "EG-432779957-3016 halawa",
+    "internalCode": "",
+    "description": "Halawa 1500 grams carton (4 boxes)"
+  },
+  {
+    "uuid": "Q96BX2VQXT6ZGEJSETY6Z6YK10",
+    "direction": "واردة",
+    "counterparty": "ماركو يوسف جوهر غالي وشريكته مصنع الفارس للحلاوه الطحينيه والطحينه والعصائر والاستيراد والتصدير",
+    "itemCode": "EG-432779957-3015 halawa",
+    "internalCode": "",
+    "description": "Halawa 1000 grams standing carton (6 boxes)"
+  },
+  {
+    "uuid": "Q96BX2VQXT6ZGEJSETY6Z6YK10",
+    "direction": "واردة",
+    "counterparty": "ماركو يوسف جوهر غالي وشريكته مصنع الفارس للحلاوه الطحينيه والطحينه والعصائر والاستيراد والتصدير",
+    "itemCode": "EG-432779957-3008 halawa",
+    "internalCode": "",
+    "description": "Plain Halawa 760 gm, Standing Carton (8 Boxes)"
+  },
+  {
+    "uuid": "Q96BX2VQXT6ZGEJSETY6Z6YK10",
+    "direction": "واردة",
+    "counterparty": "ماركو يوسف جوهر غالي وشريكته مصنع الفارس للحلاوه الطحينيه والطحينه والعصائر والاستيراد والتصدير",
+    "itemCode": "EG-432779957-Tahini1000",
+    "internalCode": "",
+    "description": "Tahini envelope, 20 grams, carton (6 boxes)"
+  },
+  {
+    "uuid": "6Q273YYN2D0G0BKYT0HTY6YK10",
+    "direction": "واردة",
+    "counterparty": "حسام الدين احمد امين سيد احمد متولي سوبر فود",
+    "itemCode": "6223001360063",
+    "internalCode": "",
+    "description": "PEPSI  Cans multi back  24.0 Piece"
+  },
+  {
+    "uuid": "6Q273YYN2D0G0BKYT0HTY6YK10",
+    "direction": "واردة",
+    "counterparty": "حسام الدين احمد امين سيد احمد متولي سوبر فود",
+    "itemCode": "6223000082201",
+    "internalCode": "",
+    "description": "Fayrouz Pineapple Non alcoholic malted beverages 0.33 Litre"
+  },
+  {
+    "uuid": "AZQ0VRQSRCWP17Q42XS9Y6YK10",
+    "direction": "واردة",
+    "counterparty": "حسام الدين احمد امين سيد احمد متولي سوبر فود",
+    "itemCode": "6223001360056",
+    "internalCode": "",
+    "description": "AQUAFINA  Cans multi back  12.0 Piece"
+  },
+  {
+    "uuid": "GDNX919XW0SNV3BGHXWGX6YK10",
+    "direction": "واردة",
+    "counterparty": "ماركو يوسف جوهر غالي وشريكته مصنع الفارس للحلاوه الطحينيه والطحينه والعصائر والاستيراد والتصدير",
+    "itemCode": "EG-432779957-3003 halawa",
+    "internalCode": "",
+    "description": "Halawa Bar Jumbo Plain 70 gm (12 Pieces x 6 Boxes)"
+  },
+  {
+    "uuid": "GDNX919XW0SNV3BGHXWGX6YK10",
+    "direction": "واردة",
+    "counterparty": "ماركو يوسف جوهر غالي وشريكته مصنع الفارس للحلاوه الطحينيه والطحينه والعصائر والاستيراد والتصدير",
+    "itemCode": "EG-432779957-3004 halawa",
+    "internalCode": "",
+    "description": "Halawa Bar Jumbo Chocolate 70 gm (12 Pieces x 6 Boxes)"
+  },
+  {
+    "uuid": "H7R81CN4YP1X2N5VFV02X6YK10",
+    "direction": "واردة",
+    "counterparty": "ماركو يوسف جوهر غالي وشريكته مصنع الفارس للحلاوه الطحينيه والطحينه والعصائر والاستيراد والتصدير",
+    "itemCode": "EG-432779957-3006 halawa",
+    "internalCode": "",
+    "description": "Plain Halawa 285 grams, carton (24 boxes)"
+  },
+  {
+    "uuid": "H7R81CN4YP1X2N5VFV02X6YK10",
+    "direction": "واردة",
+    "counterparty": "ماركو يوسف جوهر غالي وشريكته مصنع الفارس للحلاوه الطحينيه والطحينه والعصائر والاستيراد والتصدير",
+    "itemCode": "EG-432779957- Honey 2001",
+    "internalCode": "",
+    "description": "Molasses 400 grams, carton (24 boxes)"
+  },
+  {
+    "uuid": "H7R81CN4YP1X2N5VFV02X6YK10",
+    "direction": "واردة",
+    "counterparty": "ماركو يوسف جوهر غالي وشريكته مصنع الفارس للحلاوه الطحينيه والطحينه والعصائر والاستيراد والتصدير",
+    "itemCode": "EG-432779957- Honey 2000",
+    "internalCode": "",
+    "description": "Molasses 750 grams, carton (12 boxes)"
+  },
+  {
+    "uuid": "QYCN7AKQRB9ZB06V10VSV6YK10",
+    "direction": "واردة",
+    "counterparty": "شركة الاسكندريه الزراعيه",
+    "itemCode": "6224001105661",
+    "internalCode": "000000180000000328",
+    "description": "Lamar Pomegranate Juice No preservatives 200 Millilitre"
+  },
+  {
+    "uuid": "QYCN7AKQRB9ZB06V10VSV6YK10",
+    "direction": "واردة",
+    "counterparty": "شركة الاسكندريه الزراعيه",
+    "itemCode": "6224008637028",
+    "internalCode": "000000180000000342",
+    "description": "Lamar Mango Juice No preservatives 1 Litre"
+  },
+  {
+    "uuid": "MJ1HZ6X8M8V2RZW4JDXBP6YK10",
+    "direction": "واردة",
+    "counterparty": "شركة الاسكندريه الزراعيه",
+    "itemCode": "6224001105012",
+    "internalCode": "000000180000000409",
+    "description": "Lamar Skimmed Milk No powder add 1 Litre"
+  },
+  {
+    "uuid": "MJ1HZ6X8M8V2RZW4JDXBP6YK10",
+    "direction": "واردة",
+    "counterparty": "شركة الاسكندريه الزراعيه",
+    "itemCode": "6224001105029",
+    "internalCode": "000000180000000408",
+    "description": "Lamar Semi Skimmed Milk No powder add 1 Litre"
+  },
+  {
+    "uuid": "MJ1HZ6X8M8V2RZW4JDXBP6YK10",
+    "direction": "واردة",
+    "counterparty": "شركة الاسكندريه الزراعيه",
+    "itemCode": "6224008637264",
+    "internalCode": "000000180000000154",
+    "description": "Lamar Flavour Milk Fortified with vitamin A and D3 1 Litre"
+  },
+  {
+    "uuid": "MJ1HZ6X8M8V2RZW4JDXBP6YK10",
+    "direction": "واردة",
+    "counterparty": "شركة الاسكندريه الزراعيه",
+    "itemCode": "6224001105302",
+    "internalCode": "000000180000000029",
+    "description": "Lamar Skimmed Milk No powder add 200 Millimetre"
+  },
+  {
+    "uuid": "MJ1HZ6X8M8V2RZW4JDXBP6YK10",
+    "direction": "واردة",
+    "counterparty": "شركة الاسكندريه الزراعيه",
+    "itemCode": "6224001105005",
+    "internalCode": "000000180000000407",
+    "description": "Lamar Full Cream Milk No powder add 1 Litre"
+  },
+  {
+    "uuid": "MJ1HZ6X8M8V2RZW4JDXBP6YK10",
+    "direction": "واردة",
+    "counterparty": "شركة الاسكندريه الزراعيه",
+    "itemCode": "6224001105036",
+    "internalCode": "000000180000000022",
+    "description": "Lamar LAMAR Full Cream Milk No powder add 200 Millilitre"
+  },
+  {
+    "uuid": "MJ1HZ6X8M8V2RZW4JDXBP6YK10",
+    "direction": "واردة",
+    "counterparty": "شركة الاسكندريه الزراعيه",
+    "itemCode": "6224001105425",
+    "internalCode": "000000180000000337",
+    "description": "Lamar Pineapple Juice No preservatives 1 Litre"
+  },
+  {
+    "uuid": "MJ1HZ6X8M8V2RZW4JDXBP6YK10",
+    "direction": "واردة",
+    "counterparty": "شركة الاسكندريه الزراعيه",
+    "itemCode": "6224001105104",
+    "internalCode": "000000180000000125",
+    "description": "Lamar Mango Drink No preservatives 1 Litre"
+  },
+  {
+    "uuid": "9JK0M4X66DEC65M7V7DSH6YK10",
+    "direction": "واردة",
+    "counterparty": "الشركة المصرية للمنتجات الورقية والصحية",
+    "itemCode": "6223001241379",
+    "internalCode": "20100459",
+    "description": "Tamara Facial Tissue Bale 18 packs 444 Sheets 3 ply. 18 Piece"
+  },
+  {
+    "uuid": "9JK0M4X66DEC65M7V7DSH6YK10",
+    "direction": "واردة",
+    "counterparty": "الشركة المصرية للمنتجات الورقية والصحية",
+    "itemCode": "6223001241126",
+    "internalCode": "20100506",
+    "description": "Zeina Trio Facial Tissue Promo Bale Bundle of 3 *500 Sheets 3 ply 6 Promo Bundles 18 Pieces 18 Piece"
+  },
+  {
+    "uuid": "9JK0M4X66DEC65M7V7DSH6YK10",
+    "direction": "واردة",
+    "counterparty": "الشركة المصرية للمنتجات الورقية والصحية",
+    "itemCode": "6223001240174",
+    "internalCode": "20100403",
+    "description": "Zeina Set OF 5 Bags 60 bags 100 Sheet 60 Piece"
+  },
+  {
+    "uuid": "9JK0M4X66DEC65M7V7DSH6YK10",
+    "direction": "واردة",
+    "counterparty": "الشركة المصرية للمنتجات الورقية والصحية",
+    "itemCode": "6223001243748",
+    "internalCode": "20600099",
+    "description": "Zeina Bale Kitchen Ultra 24 Rolls 6 Pieces 24 Roll"
+  },
+  {
+    "uuid": "9JK0M4X66DEC65M7V7DSH6YK10",
+    "direction": "واردة",
+    "counterparty": "الشركة المصرية للمنتجات الورقية والصحية",
+    "itemCode": "6223001243724",
+    "internalCode": "20500181",
+    "description": "Zeina Bale Toilet Ultra 36 Rolls 6 Pieces 36 Roll"
+  },
+  {
+    "uuid": "9JK0M4X66DEC65M7V7DSH6YK10",
+    "direction": "واردة",
+    "counterparty": "الشركة المصرية للمنتجات الورقية والصحية",
+    "itemCode": "6223001242765",
+    "internalCode": "20100498",
+    "description": "Zeina Classic Facial Tissue Bale 18 packs 480 Sheets. 18 Pieces 18 Piece"
+  },
+  {
+    "uuid": "9JK0M4X66DEC65M7V7DSH6YK10",
+    "direction": "واردة",
+    "counterparty": "الشركة المصرية للمنتجات الورقية والصحية",
+    "itemCode": "6223001241287",
+    "internalCode": "20100395",
+    "description": "Zeina Aroma Facial Tissue Oud Scent Promo Bale Bundle of 3 *500 Sheets 2 ply 6 Promo Bundles 18 Pieces 18 Piece"
+  },
+  {
+    "uuid": "9JK0M4X66DEC65M7V7DSH6YK10",
+    "direction": "واردة",
+    "counterparty": "الشركة المصرية للمنتجات الورقية والصحية",
+    "itemCode": "6223001243885",
+    "internalCode": "20100549",
+    "description": "Zeina Aroma Facial Tissue Apple Cinnamon Scent Promo Bale Bundle of 3 *500 Sheets 3 ply 6 Promo Bundles 18 Piece"
+  },
+  {
+    "uuid": "9JK0M4X66DEC65M7V7DSH6YK10",
+    "direction": "واردة",
+    "counterparty": "الشركة المصرية للمنتجات الورقية والصحية",
+    "itemCode": "6223001243106",
+    "internalCode": "20100499",
+    "description": "Zeina Classic Facial Tissue Promo Bale Bundle of 3 *480 Sheets 2 ply 6 Promo Bundles 18 Pieces 18 Piece"
+  },
+  {
+    "uuid": "9JK0M4X66DEC65M7V7DSH6YK10",
+    "direction": "واردة",
+    "counterparty": "الشركة المصرية للمنتجات الورقية والصحية",
+    "itemCode": "6223001242123",
+    "internalCode": "20100510",
+    "description": "Zeina Tissues 18 bags 400 Sheet 18 Piece"
+  },
+  {
+    "uuid": "9JK0M4X66DEC65M7V7DSH6YK10",
+    "direction": "واردة",
+    "counterparty": "الشركة المصرية للمنتجات الورقية والصحية",
+    "itemCode": "6223001242468",
+    "internalCode": "20500151",
+    "description": "Zeina Toilet Compressed Tissue 36 Rolls 36 Roll"
+  },
+  {
+    "uuid": "9JK0M4X66DEC65M7V7DSH6YK10",
+    "direction": "واردة",
+    "counterparty": "الشركة المصرية للمنتجات الورقية والصحية",
+    "itemCode": "6223001242475",
+    "internalCode": "20500157",
+    "description": "Zeina TIRO Toilet 36 Rolls 36 Roll"
+  },
+  {
+    "uuid": "9JK0M4X66DEC65M7V7DSH6YK10",
+    "direction": "واردة",
+    "counterparty": "الشركة المصرية للمنتجات الورقية والصحية",
+    "itemCode": "6223001241706",
+    "internalCode": "20100488",
+    "description": "Tamara Facial Tissue Promo Bale Bundle of 3 * 660 Sheets 3 ply 6 Promo Bundles 18 Pieces 18 Piece"
+  },
+  {
+    "uuid": "9JK0M4X66DEC65M7V7DSH6YK10",
+    "direction": "واردة",
+    "counterparty": "الشركة المصرية للمنتجات الورقية والصحية",
+    "itemCode": "6223001241652",
+    "internalCode": "20100487",
+    "description": "Tamara Tissue 3 ply Set OF 18 Bags 660 Sheet 18.0 Piece 18 Piece"
+  },
+  {
+    "uuid": "9JK0M4X66DEC65M7V7DSH6YK10",
+    "direction": "واردة",
+    "counterparty": "الشركة المصرية للمنتجات الورقية والصحية",
+    "itemCode": "6223001241409",
+    "internalCode": "20100460",
+    "description": "Tamara Facial Tissue Promo Bale Bundle of 3 *444 Sheets 3 ply 6 Promo Bundles 18 Pieces 18 Piece"
+  },
+  {
+    "uuid": "9JK0M4X66DEC65M7V7DSH6YK10",
+    "direction": "واردة",
+    "counterparty": "الشركة المصرية للمنتجات الورقية والصحية",
+    "itemCode": "6223001242130",
+    "internalCode": "20100511",
+    "description": "Zeina Tissues 24 bags 400 Sheet 24 Piece"
+  },
+  {
+    "uuid": "AKFF29X727AGZE3A5BQXC6YK10",
+    "direction": "واردة",
+    "counterparty": "الشركة المصرية للمنتجات الورقية والصحية",
+    "itemCode": "6223001240686",
+    "internalCode": "20600093",
+    "description": "Zeina TRIO KITCHEN 24 Roll 24.0 Roll 24 Roll"
+  },
+  {
+    "uuid": "AKFF29X727AGZE3A5BQXC6YK10",
+    "direction": "واردة",
+    "counterparty": "الشركة المصرية للمنتجات الورقية والصحية",
+    "itemCode": "6223001240662",
+    "internalCode": "20100505",
+    "description": "Zeina TRIO Tissue 3 ply Bag 18 bags 500 Sheet 18.0 Piece 18 Piece"
+  },
+  {
+    "uuid": "AKFF29X727AGZE3A5BQXC6YK10",
+    "direction": "واردة",
+    "counterparty": "الشركة المصرية للمنتجات الورقية والصحية",
+    "itemCode": "6223001240174",
+    "internalCode": "20100402",
+    "description": "Zeina Set OF 5 Bags 60 bags 100 Sheet 60 Piece"
+  },
+  {
+    "uuid": "AKFF29X727AGZE3A5BQXC6YK10",
+    "direction": "واردة",
+    "counterparty": "الشركة المصرية للمنتجات الورقية والصحية",
+    "itemCode": "6223001242550",
+    "internalCode": "21000042",
+    "description": "Zeina Jumbo Industerial 6 Roll Large 6 Roll"
+  },
+  {
+    "uuid": "AKFF29X727AGZE3A5BQXC6YK10",
+    "direction": "واردة",
+    "counterparty": "الشركة المصرية للمنتجات الورقية والصحية",
+    "itemCode": "6223001242567",
+    "internalCode": "21000044",
+    "description": "Zeina Jumbo Industerial Roll XXL 6 Roll 6 Roll"
+  },
+  {
+    "uuid": "AKFF29X727AGZE3A5BQXC6YK10",
+    "direction": "واردة",
+    "counterparty": "الشركة المصرية للمنتجات الورقية والصحية",
+    "itemCode": "6223001242543",
+    "internalCode": "21000043",
+    "description": "Zeina Jumbo Industerial XL 6 Rolls 6 Roll"
+  },
+  {
+    "uuid": "AKFF29X727AGZE3A5BQXC6YK10",
+    "direction": "واردة",
+    "counterparty": "الشركة المصرية للمنتجات الورقية والصحية",
+    "itemCode": "6223001240457",
+    "internalCode": "20600081",
+    "description": "Zeina Kitchen Classic Tissue 20 Rolls 20 Roll 20 Piece"
+  },
+  {
+    "uuid": "AKFF29X727AGZE3A5BQXC6YK10",
+    "direction": "واردة",
+    "counterparty": "الشركة المصرية للمنتجات الورقية والصحية",
+    "itemCode": "6223001242413",
+    "internalCode": "20600094",
+    "description": "Zeina Kitchen Compressed Tissue 24 Rolls 24 Roll"
+  },
+  {
+    "uuid": "AKFF29X727AGZE3A5BQXC6YK10",
+    "direction": "واردة",
+    "counterparty": "الشركة المصرية للمنتجات الورقية والصحية",
+    "itemCode": "6223001242420",
+    "internalCode": "20500152",
+    "description": "Zeina Toilet Compressed Tissue 36 Rolls 36 Roll"
+  },
+  {
+    "uuid": "AKFF29X727AGZE3A5BQXC6YK10",
+    "direction": "واردة",
+    "counterparty": "الشركة المصرية للمنتجات الورقية والصحية",
+    "itemCode": "6223001240846",
+    "internalCode": "20100392",
+    "description": "Zeina Aroma Facial Tissue Peach Scent Bale 18 packs 500 sheets 2 ply 18 Pieces 18 Piece"
+  },
+  {
+    "uuid": "AKFF29X727AGZE3A5BQXC6YK10",
+    "direction": "واردة",
+    "counterparty": "الشركة المصرية للمنتجات الورقية والصحية",
+    "itemCode": "6223001242116",
+    "internalCode": "20100509",
+    "description": "Zeina Tissue 18 Bag 400 Sheet 18 Piece"
+  },
+  {
+    "uuid": "7J07YRYVRPQMF9Q38CJCN7YK10",
+    "direction": "واردة",
+    "counterparty": "شركة عبد المنعم قتيلووابنائه لمنتجات الالبان والاغذيه",
+    "itemCode": "6223004835643",
+    "internalCode": "6223004835643",
+    "description": "Katilo Cheese Processed Roomy 0.25 Kilogram"
+  },
+  {
+    "uuid": "7J07YRYVRPQMF9Q38CJCN7YK10",
+    "direction": "واردة",
+    "counterparty": "شركة عبد المنعم قتيلووابنائه لمنتجات الالبان والاغذيه",
+    "itemCode": "6223004830044",
+    "internalCode": "6223004830044",
+    "description": "Katilo  Low Salt Cheese 8 kg  8 Kilogram"
+  },
+  {
+    "uuid": "7J07YRYVRPQMF9Q38CJCN7YK10",
+    "direction": "واردة",
+    "counterparty": "شركة عبد المنعم قتيلووابنائه لمنتجات الالبان والاغذيه",
+    "itemCode": "6223004830402",
+    "internalCode": "6223004830402",
+    "description": "Katilo  Baramili Isk. Cheese 8 kg  8 Kilogram"
+  },
+  {
+    "uuid": "7J07YRYVRPQMF9Q38CJCN7YK10",
+    "direction": "واردة",
+    "counterparty": "شركة عبد المنعم قتيلووابنائه لمنتجات الالبان والاغذيه",
+    "itemCode": "6223004830167",
+    "internalCode": "6223004830167",
+    "description": "Katilo Cheese Fetta 8.00 Kilogram"
+  },
+  {
+    "uuid": "EMM0ZRS4QAZYE9PW7K13K7YK10",
+    "direction": "واردة",
+    "counterparty": "تى تى سى للمنتجات الغذائية",
+    "itemCode": "EG-594753724-125001",
+    "internalCode": "Can-3002",
+    "description": "canned pineapple"
+  },
+  {
+    "uuid": "KZN5M9SS6YCKVK3B483RC7YK10",
+    "direction": "واردة",
+    "counterparty": "شركة رسلان للاستيراد والتصدير",
+    "itemCode": "EG-202600459-54881000055",
+    "internalCode": "02200",
+    "description": "اعشاب   أحمد   توت ممزوج 20فتله"
+  },
+  {
+    "uuid": "SHBAY3GK2QW5ABSS14XFZ6YK10",
+    "direction": "واردة",
+    "counterparty": "ماركو يوسف جوهر غالي وشريكته مصنع الفارس للحلاوه الطحينيه والطحينه والعصائر والاستيراد والتصدير",
+    "itemCode": "EG-432779957-Tahini1003",
+    "internalCode": "",
+    "description": "Tahini 480 grams, standing carton (12 boxes)"
+  },
+  {
+    "uuid": "0SSVMFX6VMDHMZ0PBV8BP6YK10",
+    "direction": "واردة",
+    "counterparty": "شركة الاسكندريه الزراعيه",
+    "itemCode": "6224001105005",
+    "internalCode": "000000180000000027",
+    "description": "Lamar Full Cream Milk No powder add 1 Litre"
+  },
+  {
+    "uuid": "1B369WHZFYJW2FBYJW79N7YK10",
+    "direction": "واردة",
+    "counterparty": "شركة عبد المنعم قتيلووابنائه لمنتجات الالبان والاغذيه",
+    "itemCode": "6223004834004",
+    "internalCode": "6223004834004",
+    "description": "Katilo Cheese Natural Domiaty 11.00 Kilogram"
+  },
+  {
+    "uuid": "1B369WHZFYJW2FBYJW79N7YK10",
+    "direction": "واردة",
+    "counterparty": "شركة عبد المنعم قتيلووابنائه لمنتجات الالبان والاغذيه",
+    "itemCode": "6223004830143",
+    "internalCode": "6223004830143",
+    "description": "Katilo  Fetta Light 500 gm  0.5 Kilogram"
+  },
+  {
+    "uuid": "1B369WHZFYJW2FBYJW79N7YK10",
+    "direction": "واردة",
+    "counterparty": "شركة عبد المنعم قتيلووابنائه لمنتجات الالبان والاغذيه",
+    "itemCode": "6223004833038",
+    "internalCode": "6223004833038",
+    "description": "Katilo  Roomy Slices Vacumed 454 gm ( 24 * 454 gm )  0.454 Piece"
+  }
+]
