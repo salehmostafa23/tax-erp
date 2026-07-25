@@ -217,23 +217,12 @@ def _eta_refresh_token():
         return token
     return None
 
-def eta_get_details_with_retry(uuid_val):
+def _portal_led():
     token=st.session_state.get("eta_token","")
-    if not token: return None,"no_token"
-    url=f"{ETA_API_BASE}/api/v1.0/documents/{uuid_val}/details"
-    headers={"Authorization":f"Bearer {token}"}
-    r=http_requests.get(url,headers=headers,timeout=30,verify=False)
-    if r.status_code==200:
-        return r.json(),None
-    if r.status_code in [401,403]:
-        new_token=_eta_refresh_token()
-        if new_token:
-            headers={"Authorization":f"Bearer {new_token}"}
-            r=http_requests.get(url,headers=headers,timeout=30,verify=False)
-            if r.status_code==200:
-                return r.json(),None
-            return None,f"HTTP {r.status_code}"
-    return None,f"HTTP {r.status_code}"
+    if token:
+        st.markdown('<span style="display:inline-flex;align-items:center;gap:.3rem;font-size:.75rem;color:#55efc4;"><span style="width:7px;height:7px;border-radius:50%;background:#55efc4;box-shadow:0 0 6px #55efc4;"></span>متصل بالبورتال</span>',unsafe_allow_html=True)
+    else:
+        st.markdown('<span style="display:inline-flex;align-items:center;gap:.3rem;font-size:.75rem;color:#ff6b6b;"><span style="width:7px;height:7px;border-radius:50%;background:#ff6b6b;box-shadow:0 0 6px #ff6b6b;"></span>غير متصل — اربط من تاب الربط</span>',unsafe_allow_html=True)
 
 def _fix_vat_in_records(records):
     fixed=[]
@@ -2065,9 +2054,13 @@ elif page=="📄 Portal الفواتير الإلكترونية":
         fetched_codes=set(c.get('uuid','') for c in codes_db)
         period_unfetched=[u for u in period_uuids if u['uuid'] not in fetched_codes]
 
-        st.markdown(f"""<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(116,185,255,.06);border:1px solid rgba(116,185,255,.15);color:#74b9ff;font-size:.82rem;">
-            📦 الفترة: <strong>{df_str}</strong> → <strong>{dt_str}</strong> | فواتير الفترة: <strong>{len(period_uuids)}</strong> | متبقي: <strong>{len(period_unfetched)}</strong> | الأصناف المحفوظة: <strong>{len(codes_db)}</strong>
-        </div>""",unsafe_allow_html=True)
+        c_led1,c_led2=st.columns([3,1])
+        with c_led1:
+            st.markdown(f"""<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(116,185,255,.06);border:1px solid rgba(116,185,255,.15);color:#74b9ff;font-size:.82rem;">
+                📦 الفترة: <strong>{df_str}</strong> → <strong>{dt_str}</strong> | فواتير الفترة: <strong>{len(period_uuids)}</strong> | متبقي: <strong>{len(period_unfetched)}</strong> | الأصناف المحفوظة: <strong>{len(codes_db)}</strong>
+            </div>""",unsafe_allow_html=True)
+        with c_led2:
+            _portal_led()
 
         if period_unfetched:
             if st.button(f"🔄 استخراج أكواد {len(period_unfetched)} فاتورة في الفترة المحددة",key="load_all_codes",type="primary",use_container_width=True):
@@ -2077,19 +2070,19 @@ elif page=="📄 Portal الفواتير الإلكترونية":
                 else:
                     progress=st.progress(0,text=f"جاري تحميل أكواد {len(period_unfetched)} فاتورة...")
                     new_codes=[]
-                    errors=0
+                    failed_uuids=[]
                     done_count=[0]
-                    def _fetch_one(uu):
-                        d,e=eta_get_details_with_retry(uu['uuid'])
-                        return uu,d,e
+                    def _fetch_one(tok,uu):
+                        d,e=eta_get_document_details(tok,uu['uuid'])
+                        return uu,d,e,e
                     with ThreadPoolExecutor(max_workers=5) as pool:
-                        futures={pool.submit(_fetch_one,u):u for u in period_unfetched}
+                        futures={pool.submit(_fetch_one,token,u):u for u in period_unfetched}
                         for f in as_completed(futures):
                             done_count[0]+=1
                             progress.progress(min(done_count[0]/len(period_unfetched),1.0),text=f"{done_count[0]}/{len(period_unfetched)} فاتورة...")
-                            uu,doc,err=f.result()
+                            uu,doc,err,_=f.result()
                             if err or not doc:
-                                errors+=1
+                                failed_uuids.append(uu)
                                 continue
                             document=doc.get('document',{})
                             for line in document.get('invoiceLines',[]):
@@ -2097,16 +2090,34 @@ elif page=="📄 Portal الفواتير الإلكترونية":
                                     'uuid':uu['uuid'],'direction':'صادرة' if uu['direction']=='out' else 'واردة','counterparty':uu['name'],
                                     'itemCode':line.get('itemCode',''),'internalCode':line.get('internalCode',''),'description':line.get('description','')
                                 })
+                    if failed_uuids:
+                        new_token=_eta_refresh_token()
+                        if new_token:
+                            retried=0
+                            retried_ok=0
+                            with ThreadPoolExecutor(max_workers=5) as pool:
+                                futures={pool.submit(_fetch_one,new_token,u):u for u in failed_uuids}
+                                for f in as_completed(futures):
+                                    retried+=1
+                                    progress.progress(min((len(period_unfetched)+retried)/(len(period_unfetched)+len(failed_uuids)),1.0),text=f"إعادة محاولة {retried}/{len(failed_uuids)}...")
+                                    uu,doc,err,_=f.result()
+                                    if doc:
+                                        retried_ok+=1
+                                        document=doc.get('document',{})
+                                        for line in document.get('invoiceLines',[]):
+                                            new_codes.append({
+                                                'uuid':uu['uuid'],'direction':'صادرة' if uu['direction']=='out' else 'واردة','counterparty':uu['name'],
+                                                'itemCode':line.get('itemCode',''),'internalCode':line.get('internalCode',''),'description':line.get('description','')
+                                            })
+                            failed_uuids=[u for u in failed_uuids if u['uuid'] not in set(c.get('uuid','') for c in new_codes)]
                     progress.empty()
                     if new_codes:
                         all_codes=codes_db+new_codes
                         saved=save_codes_db(all_codes)
                         codes_db=saved
                         st.success(f"تم تحميل {len(new_codes)} صنف — إجمالي الأصناف: {len(codes_db)}")
-                    elif errors:
-                        st.warning(f"حدث {errors} خطأ — تأكد من اتصال البورتال")
-                    else:
-                        st.warning("لم يتم العثور على أصناف في الفواتير")
+                    if failed_uuids:
+                        st.warning(f"{len(failed_uuids)} فاتورة لم تُستخرج (قد تكون غير موجودة في البورتال)")
 
         if codes_db:
             st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot" style="background:#74b9ff;"></div><h3>بحث في الأكواد</h3></div>',unsafe_allow_html=True)
@@ -2168,9 +2179,13 @@ elif page=="🏷️ الاستعلام عن الأكواد":
     fetched_uuids=set(c.get('uuid','') for c in codes_db)
     period_unfetched=[u for u in period_uuids if u['uuid'] not in fetched_uuids]
 
-    st.markdown(f"""<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(116,185,255,.06);border:1px solid rgba(116,185,255,.15);color:#74b9ff;font-size:.82rem;margin-bottom:1rem;">
-        📦 الفترة: <strong>{df_str}</strong> → <strong>{dt_str}</strong> | فواتير الفترة: <strong>{len(period_uuids)}</strong> | متبقي: <strong>{len(period_unfetched)}</strong> | الأصناف المحفوظة: <strong>{len(codes_db)}</strong>
-    </div>""",unsafe_allow_html=True)
+    c_led1,c_led2=st.columns([3,1])
+    with c_led1:
+        st.markdown(f"""<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(116,185,255,.06);border:1px solid rgba(116,185,255,.15);color:#74b9ff;font-size:.82rem;margin-bottom:1rem;">
+            📦 الفترة: <strong>{df_str}</strong> → <strong>{dt_str}</strong> | فواتور الفترة: <strong>{len(period_uuids)}</strong> | متبقي: <strong>{len(period_unfetched)}</strong> | الأصناف المحفوظة: <strong>{len(codes_db)}</strong>
+        </div>""",unsafe_allow_html=True)
+    with c_led2:
+        _portal_led()
 
     if period_unfetched:
         if st.button(f"🔄 استخراج أكواد {len(period_unfetched)} فاتورة في الفترة المحددة",key="refresh_codes",type="primary",use_container_width=True):
@@ -2180,19 +2195,19 @@ elif page=="🏷️ الاستعلام عن الأكواد":
             else:
                 progress=st.progress(0,text=f"جاري استخراج الأكواد من {len(period_unfetched)} فاتورة...")
                 new_codes=[]
-                errors=0
+                failed_uuids=[]
                 done_count=[0]
-                def _fetch_standalone(uu):
-                    d,e=eta_get_details_with_retry(uu['uuid'])
-                    return uu,d,e
+                def _fetch_standalone(tok,uu):
+                    d,e=eta_get_document_details(tok,uu['uuid'])
+                    return uu,d,e,e
                 with ThreadPoolExecutor(max_workers=5) as pool:
-                    futures={pool.submit(_fetch_standalone,u):u for u in period_unfetched}
+                    futures={pool.submit(_fetch_standalone,token,u):u for u in period_unfetched}
                     for f in as_completed(futures):
                         done_count[0]+=1
                         progress.progress(min(done_count[0]/len(period_unfetched),1.0),text=f"{done_count[0]}/{len(period_unfetched)} فاتورة...")
-                        uu,doc,err=f.result()
+                        uu,doc,err,_=f.result()
                         if err or not doc:
-                            errors+=1
+                            failed_uuids.append(uu)
                             continue
                         document=doc.get('document',{})
                         for line in document.get('invoiceLines',[]):
@@ -2204,16 +2219,38 @@ elif page=="🏷️ الاستعلام عن الأكواد":
                                 'quantity':line.get('quantity',0),'unitType':line.get('unitType',''),
                                 'unitPrice':unit_val.get('amountEGP',0) if isinstance(unit_val,dict) else 0,'salesTotal':line.get('salesTotal',0)
                             })
+                if failed_uuids:
+                    new_token=_eta_refresh_token()
+                    if new_token:
+                        retried=0
+                        retried_ok=0
+                        with ThreadPoolExecutor(max_workers=5) as pool:
+                            futures={pool.submit(_fetch_standalone,new_token,u):u for u in failed_uuids}
+                            for f in as_completed(futures):
+                                retried+=1
+                                progress.progress(min((len(period_unfetched)+retried)/(len(period_unfetched)+len(failed_uuids)),1.0),text=f"إعادة محاولة {retried}/{len(failed_uuids)}...")
+                                uu,doc,err,_=f.result()
+                                if doc:
+                                    retried_ok+=1
+                                    document=doc.get('document',{})
+                                    for line in document.get('invoiceLines',[]):
+                                        unit_val=line.get('unitValue',{})
+                                        new_codes.append({
+                                            'uuid':uu['uuid'],'direction':'صادر' if uu['direction']=='out' else 'وارد',
+                                            'counterparty':uu['name'],'itemCode':line.get('itemCode',''),'internalCode':line.get('internalCode',''),
+                                            'description':line.get('description',''),'itemType':line.get('itemType',''),
+                                            'quantity':line.get('quantity',0),'unitType':line.get('unitType',''),
+                                            'unitPrice':unit_val.get('amountEGP',0) if isinstance(unit_val,dict) else 0,'salesTotal':line.get('salesTotal',0)
+                                        })
+                        failed_uuids=[u for u in failed_uuids if u['uuid'] not in set(c.get('uuid','') for c in new_codes)]
                 progress.empty()
                 if new_codes:
                     all_codes=codes_db+new_codes
                     saved=save_codes_db(all_codes)
                     codes_db=saved
                     st.success(f"تم استخراج {len(new_codes)} صنف — إجمالي: {len(codes_db)} صنف")
-                elif errors:
-                    st.warning(f"حدث {errors} خطأ — تأكد من اتصال البورتال")
-                else:
-                    st.warning("لم يتم العثور على أصناف جديدة")
+                if failed_uuids:
+                    st.warning(f"{len(failed_uuids)} فاتورة لم تُستخرج (قد تكون غير موجودة في البورتال)")
 
     st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot"></div><h3>بحث عن صنف</h3></div>',unsafe_allow_html=True)
     st.markdown('<div class="erp-card">',unsafe_allow_html=True)
