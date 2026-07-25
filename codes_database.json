@@ -1398,5 +1398,285 @@
     "itemCode": "6223004833038",
     "internalCode": "6223004833038",
     "description": "Katilo  Roomy Slices Vacumed 454 gm ( 24 * 454 gm )  0.454 Piece"
+  },
+  {
+    "uuid": "0ESP325605595FTY58KBB7YK10",
+    "direction": "واردة",
+    "counterparty": "SILO Foods",
+    "itemCode": "6223007945912",
+    "internalCode": "000000001030300599",
+    "description": "عيش لبناني  35 جم( 5 قطع )"
+  },
+  {
+    "uuid": "HQVPGRP74104X7QFMHG1Z6YK10",
+    "direction": "واردة",
+    "counterparty": "حسام الدين احمد امين سيد احمد متولي سوبر فود",
+    "itemCode": "6223001363712",
+    "internalCode": "",
+    "description": "بيبسى 390م متعددة العبوات  12.0 قطعه"
+  },
+  {
+    "uuid": "RQB0QMXQX249CNYEW64HY6YK10",
+    "direction": "واردة",
+    "counterparty": "ماركو يوسف جوهر غالي وشريكته مصنع الفارس للحلاوه الطحينيه والطحينه والعصائر والاستيراد والتصدير",
+    "itemCode": "EG-432779957-3013 halawa",
+    "internalCode": "",
+    "description": "حلاوة شكولاتة 4200 جرام كرتونه (٤علبه ) "
+  },
+  {
+    "uuid": "1HR6HABTAY44VKGPV0PEN7YK10",
+    "direction": "واردة",
+    "counterparty": "شركة عبد المنعم قتيلووابنائه لمنتجات الالبان والاغذيه",
+    "itemCode": "6223004835674",
+    "internalCode": "6223004835674",
+    "description": "[FP010107017] جبن رومى طبيعى مطبوخ 500 جم"
+  },
+  {
+    "uuid": "1HR6HABTAY44VKGPV0PEN7YK10",
+    "direction": "واردة",
+    "counterparty": "شركة عبد المنعم قتيلووابنائه لمنتجات الالبان والاغذيه",
+    "itemCode": "6223004835629",
+    "internalCode": "6223004835629",
+    "description": "[FP010106017] جبن كريمى 500 جم"
+  },
+  {
+    "uuid": "1HR6HABTAY44VKGPV0PEN7YK10",
+    "direction": "واردة",
+    "counterparty": "شركة عبد المنعم قتيلووابنائه لمنتجات الالبان والاغذيه",
+    "itemCode": "6223004834240",
+    "internalCode": "6223004834240",
+    "description": "[FP010205018] سمن طبيعى 450 جم"
+  },
+  {
+    "uuid": "1HR6HABTAY44VKGPV0PEN7YK10",
+    "direction": "واردة",
+    "counterparty": "شركة عبد المنعم قتيلووابنائه لمنتجات الالبان والاغذيه",
+    "itemCode": "6223004835667",
+    "internalCode": "6223004835667",
+    "description": "[FP0101060 15] جبن كريمى 3 كجم"
+  },
+  {
+    "uuid": "3DVSRG9020YANNB8XZPGB7YK10",
+    "direction": "واردة",
+    "counterparty": "SILO Foods",
+    "itemCode": "6223007945912",
+    "internalCode": "000000001030300007",
+    "description": "توست حبوب"
+  },
+  {
+    "uuid": "VWPNDGPJ66FB9BWYT7H3Y6YK10",
+    "direction": "واردة",
+    "counterparty": "حسام الدين احمد امين سيد احمد متولي سوبر فود",
+    "itemCode": "6223001363712",
+    "internalCode": "",
+    "description": "بيبسى 390 متعددة العبوات  12.0 قطعه"
+  },
+  {
+    "uuid": "1FVQENNR9K33RTQAWT0ZX6YK10",
+    "direction": "واردة",
+    "counterparty": "ماركو يوسف جوهر غالي وشريكته مصنع الفارس للحلاوه الطحينيه والطحينه والعصائر والاستيراد والتصدير",
+    "itemCode": "EG-432779957-3007 halawa",
+    "internalCode": "",
+    "description": "حلاوة سادة 560جرام كرتونه (٢٤علبه)"
+  },
+  {
+    "uuid": "1FVQENNR9K33RTQAWT0ZX6YK10",
+    "direction": "واردة",
+    "counterparty": "ماركو يوسف جوهر غالي وشريكته مصنع الفارس للحلاوه الطحينيه والطحينه والعصائر والاستيراد والتصدير",
+    "itemCode": "EG-432779957-3008 halawa",
+    "internalCode": "",
+    "description": "حلاوة سادة 720جرام قائم كرتونه(٨ علبة) "
+  },
+  {
+    "uuid": "1FVQENNR9K33RTQAWT0ZX6YK10",
+    "direction": "واردة",
+    "counterparty": "ماركو يوسف جوهر غالي وشريكته مصنع الفارس للحلاوه الطحينيه والطحينه والعصائر والاستيراد والتصدير",
+    "itemCode": "EG-432779957-3015 halawa",
+    "internalCode": "",
+    "description": "حلاوة 1000 جرام قائم كرتونه عرض شهر رمضان ( ٦ علب )"
+  },
+  {
+    "uuid": "1FVQENNR9K33RTQAWT0ZX6YK10",
+    "direction": "واردة",
+    "counterparty": "ماركو يوسف جوهر غالي وشريكته مصنع الفارس للحلاوه الطحينيه والطحينه والعصائر والاستيراد والتصدير",
+    "itemCode": "EG-432779957-3011 halawa",
+    "internalCode": "",
+    "description": "حلاوة بالشكولاتة 720جرام قائم كرتونه (٨علبه) "
+  },
+  {
+    "uuid": "1FVQENNR9K33RTQAWT0ZX6YK10",
+    "direction": "واردة",
+    "counterparty": "ماركو يوسف جوهر غالي وشريكته مصنع الفارس للحلاوه الطحينيه والطحينه والعصائر والاستيراد والتصدير",
+    "itemCode": "EG-432779957-3003 halawa",
+    "internalCode": "",
+    "description": "حلاوة بار جامبو سادة 70 جرام  كرتونه (12 قطعة × 6 علبة)"
+  },
+  {
+    "uuid": "1FVQENNR9K33RTQAWT0ZX6YK10",
+    "direction": "واردة",
+    "counterparty": "ماركو يوسف جوهر غالي وشريكته مصنع الفارس للحلاوه الطحينيه والطحينه والعصائر والاستيراد والتصدير",
+    "itemCode": "EG-432779957-3005 halawa",
+    "internalCode": "",
+    "description": "حلاوة سادة 130جرام كرتونه ( ٢٤ قطعة )"
+  },
+  {
+    "uuid": "W2TT93DST6EA8DACB9PQF6YK10",
+    "direction": "واردة",
+    "counterparty": "الشركة المصرية للمنتجات الورقية والصحية",
+    "itemCode": "6223001241379",
+    "internalCode": "20100459",
+    "description": "D تمارا  444 م (18 كيس)"
+  },
+  {
+    "uuid": "W2TT93DST6EA8DACB9PQF6YK10",
+    "direction": "واردة",
+    "counterparty": "الشركة المصرية للمنتجات الورقية والصحية",
+    "itemCode": "6223001243724",
+    "internalCode": "20500181",
+    "description": "S زينه تواليت الترا (6 كيس*6 بكرة)"
+  },
+  {
+    "uuid": "W2TT93DST6EA8DACB9PQF6YK10",
+    "direction": "واردة",
+    "counterparty": "الشركة المصرية للمنتجات الورقية والصحية",
+    "itemCode": "6223001243748",
+    "internalCode": "20600099",
+    "description": "S زينه مطبخ الترا (6 كيس* 4 بكرة )"
+  },
+  {
+    "uuid": "W2TT93DST6EA8DACB9PQF6YK10",
+    "direction": "واردة",
+    "counterparty": "الشركة المصرية للمنتجات الورقية والصحية",
+    "itemCode": "6223001242413",
+    "internalCode": "20600094",
+    "description": "S3 (زينه مطبخ مضغوط (6 كيس* 4 بكرة (3+1"
+  },
+  {
+    "uuid": "W2TT93DST6EA8DACB9PQF6YK10",
+    "direction": "واردة",
+    "counterparty": "الشركة المصرية للمنتجات الورقية والصحية",
+    "itemCode": "6223001242765",
+    "internalCode": "20100498",
+    "description": "D زينه الوان 480 م (18 كيس)"
+  },
+  {
+    "uuid": "W2TT93DST6EA8DACB9PQF6YK10",
+    "direction": "واردة",
+    "counterparty": "الشركة المصرية للمنتجات الورقية والصحية",
+    "itemCode": "6223001243885",
+    "internalCode": "20100549",
+    "description": "B زينه أروما تفاح بالقرفة500م(6مج*3 كيس)"
+  },
+  {
+    "uuid": "W2TT93DST6EA8DACB9PQF6YK10",
+    "direction": "واردة",
+    "counterparty": "الشركة المصرية للمنتجات الورقية والصحية",
+    "itemCode": "6223001242130",
+    "internalCode": "20100511",
+    "description": "زينه الوان 400 م (6 مج*4 كيس) D"
+  },
+  {
+    "uuid": "W2TT93DST6EA8DACB9PQF6YK10",
+    "direction": "واردة",
+    "counterparty": "الشركة المصرية للمنتجات الورقية والصحية",
+    "itemCode": "6223001243106",
+    "internalCode": "20100499",
+    "description": "D ( زينه الوان 480 م (6 مج*3 كيس"
+  },
+  {
+    "uuid": "W2TT93DST6EA8DACB9PQF6YK10",
+    "direction": "واردة",
+    "counterparty": "الشركة المصرية للمنتجات الورقية والصحية",
+    "itemCode": "6223001242420",
+    "internalCode": "20500152",
+    "description": "S8 زينه تواليت مضغوط (6 كيس * 6 بكرة)"
+  },
+  {
+    "uuid": "W2TT93DST6EA8DACB9PQF6YK10",
+    "direction": "واردة",
+    "counterparty": "الشركة المصرية للمنتجات الورقية والصحية",
+    "itemCode": "6223001242468",
+    "internalCode": "20500151",
+    "description": "S7 زينه تواليت مضغوط (18 كيس * 2 بكرة)"
+  },
+  {
+    "uuid": "W2TT93DST6EA8DACB9PQF6YK10",
+    "direction": "واردة",
+    "counterparty": "الشركة المصرية للمنتجات الورقية والصحية",
+    "itemCode": "6223001242475",
+    "internalCode": "20500157",
+    "description": "S5 ((1+5)زينه تواليت تريو (6 كيس*6 بكرة"
+  },
+  {
+    "uuid": "W2TT93DST6EA8DACB9PQF6YK10",
+    "direction": "واردة",
+    "counterparty": "الشركة المصرية للمنتجات الورقية والصحية",
+    "itemCode": "6223001241706",
+    "internalCode": "20100488",
+    "description": "D تمارا  660 م (6 مج*3 كيس)"
+  },
+  {
+    "uuid": "W2TT93DST6EA8DACB9PQF6YK10",
+    "direction": "واردة",
+    "counterparty": "الشركة المصرية للمنتجات الورقية والصحية",
+    "itemCode": "6223001241652",
+    "internalCode": "20100487",
+    "description": "D تمارا  660 م (18 كيس)"
+  },
+  {
+    "uuid": "W2TT93DST6EA8DACB9PQF6YK10",
+    "direction": "واردة",
+    "counterparty": "الشركة المصرية للمنتجات الورقية والصحية",
+    "itemCode": "6223001241409",
+    "internalCode": "20100460",
+    "description": "D تمارا 444 م(6مج * 3كيس)"
+  },
+  {
+    "uuid": "W2TT93DST6EA8DACB9PQF6YK10",
+    "direction": "واردة",
+    "counterparty": "الشركة المصرية للمنتجات الورقية والصحية",
+    "itemCode": "6223001242123",
+    "internalCode": "20100510",
+    "description": "زينه الوان 400 م (6 مج*3 كيس) D"
+  },
+  {
+    "uuid": "XKJ3H072D6M96GX05YY2Y6YK10",
+    "direction": "واردة",
+    "counterparty": "الشركة المصرية للمنتجات الورقية والصحية",
+    "itemCode": "6223001241126",
+    "internalCode": "20100506",
+    "description": "D (زينه تريو 500م إصدارالصيف (6 مج*3 كيس"
+  },
+  {
+    "uuid": "XKJ3H072D6M96GX05YY2Y6YK10",
+    "direction": "واردة",
+    "counterparty": "الشركة المصرية للمنتجات الورقية والصحية",
+    "itemCode": "6223001240174",
+    "internalCode": "20100403",
+    "description": "B ( زينه كلاسيك 100 م (12 مج*5 كيس"
+  },
+  {
+    "uuid": "XKJ3H072D6M96GX05YY2Y6YK10",
+    "direction": "واردة",
+    "counterparty": "الشركة المصرية للمنتجات الورقية والصحية",
+    "itemCode": "6223001241287",
+    "internalCode": "20100395",
+    "description": "B زينه أروما عود 500 م (6 مج*3 كيس)"
+  },
+  {
+    "uuid": "XKJ3H072D6M96GX05YY2Y6YK10",
+    "direction": "واردة",
+    "counterparty": "الشركة المصرية للمنتجات الورقية والصحية",
+    "itemCode": "6223001242567",
+    "internalCode": "21000044",
+    "description": " (6بكرة) XXL  زينه برو جامبو رول"
+  },
+  {
+    "uuid": "XKJ3H072D6M96GX05YY2Y6YK10",
+    "direction": "واردة",
+    "counterparty": "الشركة المصرية للمنتجات الورقية والصحية",
+    "itemCode": "6223001242116",
+    "internalCode": "20100509",
+    "description": "زينه الوان 400 م ( 18 كيس ) D"
   }
 ]
