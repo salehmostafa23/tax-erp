@@ -309,6 +309,20 @@ def _portal_led():
 GPC_API_BASE="https://gpc-api.gs1.org/api"
 GPC_DATA_FILE=os.path.join(DATA_DIR,"gpc_database.json")
 GS1_DATA_FILE=os.path.join(DATA_DIR,"gs1_products.json")
+SUPPLIER_CODES_FILE=os.path.join(DATA_DIR,"supplier_codes.json")
+
+def _gpc_load_cache():
+    data=gh_read("gpc_database.json")
+    if data: return data
+    if os.path.exists(GPC_DATA_FILE):
+        try:
+            with open(GPC_DATA_FILE,'r',encoding='utf-8') as f: return json.load(f)
+        except: pass
+    return None
+
+def _gpc_save_cache(data):
+    gh_write("gpc_database.json",data)
+    with open(GPC_DATA_FILE,'w',encoding='utf-8') as f: json.dump(data,f,ensure_ascii=False,indent=2,default=str)
 _GPC_HEADERS={
     'Content-Type':'application/json;charset=utf-8',
     'Accept':'application/json, text/plain, */*',
@@ -406,16 +420,6 @@ def _gpc_search(bricks,q):
             results.append(b)
     return results
 
-def _gpc_load_cache():
-    if os.path.exists(GPC_DATA_FILE):
-        try:
-            with open(GPC_DATA_FILE,'r',encoding='utf-8') as f: return json.load(f)
-        except: pass
-    return None
-
-def _gpc_save_cache(data):
-    with open(GPC_DATA_FILE,'w',encoding='utf-8') as f: json.dump(data,f,ensure_ascii=False,indent=2,default=str)
-
 GS1_API_BASE="https://external-api.gs1eg.org"
 def _gs1_login(email,password):
     try:
@@ -446,6 +450,8 @@ def _gs1_get_products(auth):
     return all_products
 
 def _load_gs1_db():
+    data=gh_read("gs1_products.json")
+    if data: return data
     if os.path.exists(GS1_DATA_FILE):
         try:
             with open(GS1_DATA_FILE,'r',encoding='utf-8') as f: return json.load(f)
@@ -453,7 +459,21 @@ def _load_gs1_db():
     return []
 
 def _save_gs1_db(products):
+    gh_write("gs1_products.json",products)
     with open(GS1_DATA_FILE,'w',encoding='utf-8') as f: json.dump(products,f,ensure_ascii=False,indent=2,default=str)
+
+def _load_supplier_codes():
+    data=gh_read("supplier_codes.json")
+    if data: return data
+    if os.path.exists(SUPPLIER_CODES_FILE):
+        try:
+            with open(SUPPLIER_CODES_FILE,'r',encoding='utf-8') as f: return json.load(f)
+        except: pass
+    return []
+
+def _save_supplier_codes(data):
+    gh_write("supplier_codes.json",data)
+    with open(SUPPLIER_CODES_FILE,'w',encoding='utf-8') as f: json.dump(data,f,ensure_ascii=False,indent=2,default=str)
 
 def _standalone_portal_tab():
     codes_db=load_codes_db()
@@ -781,6 +801,71 @@ def _standalone_gs1_tab():
             <div class="erp-empty-icon">📦</div>
             <h3 style="color:#fff;">لم يتم رفع أي أكواد بعد</h3>
             <p style="color:var(--text2);">ارفع ملف Excel يحتوي أكواد GS1 لبدء البحث</p>
+        </div>""",unsafe_allow_html=True)
+
+def _standalone_supplier_codes_tab():
+    st.markdown('<div class="erp-section"><div class="erp-section-dot" style="background:#a29bfe;box-shadow:0 0 12px #a29bfe;"></div><h3>🏷️ أكواد أصناف الموردين المحفوظة</h3></div>',unsafe_allow_html=True)
+    sup_db=_load_supplier_codes()
+    cu=get_current_user()
+    is_admin=cu and cu.get('role')=='admin'
+    if is_admin:
+        st.markdown('<div class="erp-section" style="margin-bottom:1rem"><div class="erp-section-dot"></div><h3>رفع أكواد أصناف الموردين</h3></div>',unsafe_allow_html=True)
+        st.caption("الملف لازم يكون الأعمدة: A = الكود • B = اسم الكود • C = وصف الكود • D = الرقم الضريبي للمورد • E = اسم المورد")
+        uploaded_file=st.file_uploader("ارفع ملف Excel",type=["xlsx","xls"],key="sup_codes_upload")
+        if uploaded_file:
+            try:
+                upload_df=pd.read_excel(uploaded_file,header=0)
+                cols=list(upload_df.columns)
+                if len(cols)<5:
+                    st.error("الملف محتاج 5 أعمدة على الأقل (A إلى E)")
+                else:
+                    new_items=[]
+                    for _,row in upload_df.iterrows():
+                        code=str(row.get(cols[0],'')).strip()
+                        if not code or code=='nan' or code=='None': continue
+                        name=str(row.get(cols[1],'')).strip()
+                        if name=='nan' or name=='None': name=''
+                        desc=str(row.get(cols[2],'')).strip()
+                        if desc=='nan' or desc=='None': desc=''
+                        tax=str(row.get(cols[3],'')).strip()
+                        if tax=='nan' or tax=='None': tax=''
+                        supplier=str(row.get(cols[4],'')).strip()
+                        if supplier=='nan' or supplier=='None': supplier=''
+                        new_items.append({'code':code,'name':name,'description':desc,'tax_number':tax,'supplier_name':supplier})
+                    st.success(f"تم تحميل {len(new_items)} كود من الملف")
+                    st.markdown(f'<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(162,155,254,.06);border:1px solid rgba(162,155,254,.15);color:#a29bfe;font-size:.82rem;">'
+                        f'📊 الملف: <strong>{len(new_items)}</strong> كود | القاعدة الحالية: <strong>{len(sup_db)}</strong> كود</div>',unsafe_allow_html=True)
+                    if st.button("💾 حفظ في القاعدة",key="sup_save_db",type="primary",use_container_width=True):
+                        _save_supplier_codes(new_items)
+                        st.success(f"تم حفظ {len(new_items)} كود")
+                        st.rerun()
+            except Exception as e:
+                st.error(f"خطأ في قراءة الملف: {e}")
+    if sup_db:
+        st.markdown(f'<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot" style="background:#a29bfe;"></div><h3>الأكواد المحفوظة ({len(sup_db)})</h3></div>',unsafe_allow_html=True)
+        sup_search=st.text_input("ابحث باسم الكود أو الكود أو اسم المورد",key="sup_search",placeholder="اكتب كلمة للبحث...")
+        filtered=sup_db
+        if sup_search.strip():
+            sq=sup_search.strip().lower()
+            filtered=[p for p in sup_db if sq in str(p.get('code','')).lower() or sq in str(p.get('name','')).lower() or sq in str(p.get('description','')).lower() or sq in str(p.get('tax_number','')).lower() or sq in str(p.get('supplier_name','')).lower()]
+        if filtered:
+            sup_rows=[{'الكود':p.get('code',''),'الاسم':p.get('name',''),'الوصف':p.get('description',''),'الرقم الضريبي':p.get('tax_number',''),'المورد':p.get('supplier_name','')} for p in filtered]
+            sup_df=pd.DataFrame(sup_rows)
+            st.dataframe(sup_df,use_container_width=True,height=400)
+            excel_buf=BytesIO()
+            sup_df.to_excel(excel_buf,index=False,engine='xlsxwriter')
+            excel_buf.seek(0)
+            st.download_button("📊 تحميل القائمة",data=excel_buf.getvalue(),file_name="supplier_codes.xlsx",mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",key="dl_sup")
+            if is_admin and st.button("🗑️ مسح القاعدة",key="sup_clear_db"):
+                _save_supplier_codes([])
+                st.rerun()
+        else:
+            st.info(f"لم يتم العثور على نتائج لكلمة: {sup_search.strip()}")
+    else:
+        st.markdown("""<div class="erp-empty" style="padding:2rem;margin-top:1rem;text-align:center;">
+            <div class="erp-empty-icon">🏷️</div>
+            <h3 style="color:#fff;">لم يتم رفع أي أكواد بعد</h3>
+            <p style="color:var(--text2);">ارفع ملف Excel يحتوي أكواد أصناف الموردين لبدء البحث</p>
         </div>""",unsafe_allow_html=True)
 
 def _fix_vat_in_records(records):
@@ -2906,10 +2991,11 @@ elif page=="🏷️ الاستعلام عن الأكواد":
     st.markdown(f"""<div class="erp-topbar"><div><h2>{page}</h2><p>بحث واستعلام عن أكواد الأصناف في الفواتير الإلكترونية</p></div>
 <div class="erp-topbar-right"><span class="erp-badge">🏷️ أكواد</span></div></div>""", unsafe_allow_html=True)
 
-    _tab1,_tab2,_tab3=st.tabs(["🔗 أكواد البورتال","🔬 GPC Browser","🏷️ أكواد GS1"])
+    _tab1,_tab2,_tab3,_tab4=st.tabs(["🔗 أكواد البورتال","🔬 GPC Browser","🏷️ أكواد GS1","🏷️ أكواد الموردين"])
     with _tab1: _standalone_portal_tab()
     with _tab2: _standalone_gpc_tab()
     with _tab3: _standalone_gs1_tab()
+    with _tab4: _standalone_supplier_codes_tab()
 
 # ====================== الاستعلام عن ممول ======================
 elif page=="🔍 الاستعلام عن ممول":
