@@ -1164,6 +1164,8 @@ with st.sidebar:
 RECEIPTS_FILE=os.path.join(DATA_DIR,"receipts_registry.json")
 
 def load_receipts():
+    data=gh_read("receipts_registry.json")
+    if data: return data
     if os.path.exists(RECEIPTS_FILE):
         try:
             with open(RECEIPTS_FILE,'r',encoding='utf-8') as f: return json.load(f)
@@ -1171,6 +1173,7 @@ def load_receipts():
     return []
 
 def save_receipts(data):
+    gh_write("receipts_registry.json",data)
     with open(RECEIPTS_FILE,'w',encoding='utf-8') as f: json.dump(data,f,ensure_ascii=False,indent=2)
 
 FORM41_FILE = os.path.join(DATA_DIR, "form41_data.json")
