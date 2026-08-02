@@ -836,8 +836,14 @@ def _standalone_supplier_codes_tab():
                     st.markdown(f'<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(162,155,254,.06);border:1px solid rgba(162,155,254,.15);color:#a29bfe;font-size:.82rem;">'
                         f'📊 الملف: <strong>{len(new_items)}</strong> كود | القاعدة الحالية: <strong>{len(sup_db)}</strong> كود</div>',unsafe_allow_html=True)
                     if st.button("💾 حفظ في القاعدة",key="sup_save_db",type="primary",use_container_width=True):
-                        _save_supplier_codes(new_items)
-                        st.success(f"تم حفظ {len(new_items)} كود")
+                        existing_codes={str(p.get('code','')).strip() for p in sup_db}
+                        added=0;skipped=0
+                        for item in new_items:
+                            if str(item['code']).strip() in existing_codes:
+                                skipped+=1;continue
+                            sup_db.append(item);existing_codes.add(str(item['code']).strip());added+=1
+                        _save_supplier_codes(sup_db)
+                        st.success(f"تمت إضافة {added} كود{'، وتم تخطي '+str(skipped)+' مكرر' if skipped else ''} — الإجمالي الآن {len(sup_db)}")
                         st.rerun()
             except Exception as e:
                 st.error(f"خطأ في قراءة الملف: {e}")
