@@ -2105,7 +2105,7 @@ elif page == "💰 القيمة المضافة":
 # ====================== MARKET ======================
 elif page=="🛒 فواتير الماركت":
     if not user_has_permission(page): st.error("لا تملك صلاحية الوصول");st.stop()
-    _tab_mkt1,_tab_mkt2=st.tabs(["📝 إنشاء Template","📋 سجل الريسيتات"])
+    _tab_mkt1,_tab_mkt2,_tab_mkt3=st.tabs(["📝 إنشاء Template","📋 سجل الريسيتات","✏️ تعديل الأكواد"])
 
     with _tab_mkt1:
         st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>فواتير الماركت — إنشاء Template Portal</h3></div>',unsafe_allow_html=True)
@@ -2297,6 +2297,49 @@ elif page=="🛒 فواتير الماركت":
                 <h3 style="color:#fff;">لا توجد سجلات بعد</h3>
                 <p style="color:var(--text2);">سيظهر السجل هنا تلقائياً عند إنشاء Templates من الريسيتات</p>
             </div>""",unsafe_allow_html=True)
+
+    with _tab_mkt3:
+        st.markdown('<div class="erp-section"><div class="erp-section-dot" style="background:#a29bfe;"></div><h3>✏️ تعديل الأكواد</h3></div>',unsafe_allow_html=True)
+        barcodes_db=load_barcodes()
+        if not barcodes_db:
+            st.markdown("""<div class="erp-empty" style="padding:2rem;margin-top:1rem;text-align:center;">
+                <div class="erp-empty-icon">✏️</div>
+                <h3 style="color:#fff;">لا توجد أكواد محفوظة بعد</h3>
+                <p style="color:var(--text2);">احفظ الأكواد أولاً من الخطوة 2 في إنشاء Template</p>
+            </div>""",unsafe_allow_html=True)
+        else:
+            bc_search=st.text_input("ابحث برقم internal code",key="bc_edit_search",placeholder="اكتب الكود الداخلي...")
+            filtered_bc=barcodes_db
+            if bc_search.strip():
+                sq=bc_search.strip().lower()
+                filtered_bc=[b for b in barcodes_db if sq in str(b.get('internal_code','')).lower() or sq in str(b.get('barcode','')).lower()]
+            if filtered_bc:
+                st.markdown(f'<div style="padding:.5rem 1rem;border-radius:10px;background:rgba(162,155,254,.06);border:1px solid rgba(162,155,254,.15);color:#a29bfe;font-size:.82rem;">🔍 تم العثور على <strong>{len(filtered_bc)}</strong> كود</div>',unsafe_allow_html=True)
+                display_df=pd.DataFrame([{'الكود الداخلي':b.get('internal_code',''),'الباركود':b.get('barcode','')} for b in filtered_bc])
+                st.dataframe(display_df,use_container_width=True,height=250)
+                ic_options=[str(b.get('internal_code','')).strip() for b in filtered_bc]
+                edit_ic=st.selectbox("اختر الكود الداخلي للتعديل",options=ic_options,key="bc_edit_tab_ic")
+                if edit_ic:
+                    cur_bc=next((b.get('barcode','') for b in barcodes_db if str(b.get('internal_code','')).strip()==edit_ic),'')
+                    nc1,nc2=st.columns([2,1])
+                    with nc1:
+                        new_bc=st.text_input("الباركود الجديد",value=cur_bc,key="bc_edit_tab_val")
+                    with nc2:
+                        st.write("")
+                        if st.button("💾 حفظ التعديل",key="bc_tab_save_edit",type="primary",use_container_width=True):
+                            for b in barcodes_db:
+                                if str(b.get('internal_code','')).strip()==edit_ic:
+                                    b['barcode']=new_bc.strip();break
+                            save_barcodes(barcodes_db)
+                            st.success("تم حفظ التعديل!")
+                            st.rerun()
+                    if st.button("🗑️ حذف هذا الكود",key="bc_tab_del",type="secondary"):
+                        barcodes_db=[b for b in barcodes_db if str(b.get('internal_code','')).strip()!=edit_ic]
+                        save_barcodes(barcodes_db)
+                        st.success("تم حذف الكود!")
+                        st.rerun()
+            else:
+                st.info(f"لا توجد أكواد مطابقة لـ: {bc_search.strip()}")
 
 # ====================== PORTAL ELECTRONIC INVOICES ======================
 elif page=="📄 Portal الفواتير الإلكترونية":
