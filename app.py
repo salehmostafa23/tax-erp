@@ -1182,6 +1182,21 @@ def save_receipts(data):
     gh_write("receipts_registry.json",data)
     with open(RECEIPTS_FILE,'w',encoding='utf-8') as f: json.dump(data,f,ensure_ascii=False,indent=2)
 
+BARCODES_FILE=os.path.join(DATA_DIR,"barcodes_db.json")
+
+def load_barcodes():
+    data=gh_read("barcodes_db.json")
+    if data: return data
+    if os.path.exists(BARCODES_FILE):
+        try:
+            with open(BARCODES_FILE,'r',encoding='utf-8') as f: return json.load(f)
+        except: pass
+    return []
+
+def save_barcodes(data):
+    gh_write("barcodes_db.json",data)
+    with open(BARCODES_FILE,'w',encoding='utf-8') as f: json.dump(data,f,ensure_ascii=False,indent=2)
+
 FORM41_FILE = os.path.join(DATA_DIR, "form41_data.json")
 VAT_FILE = os.path.join(DATA_DIR, "vat_data.json")
 PORTAL_OUT_FILE = os.path.join(DATA_DIR, "portal_outgoing.json")
@@ -2132,26 +2147,52 @@ elif page=="🛒 فواتير الماركت":
                 <div><h3>الخطوة 2 — Barcodes</h3><p>العمود B: رقم الصنف الداخلي | العمود G: الباركود</p></div>
             </div></div>""",unsafe_allow_html=True)
             st.markdown('<div class="erp-card">',unsafe_allow_html=True)
+            barcodes_db=load_barcodes()
+            barcodes_map={str(b.get('internal_code','')).strip():str(b.get('barcode','')).strip() for b in barcodes_db if str(b.get('internal_code','')).strip()}
             up=st.file_uploader("ارفع Barcodes",type=['xlsx','xls'],key="bc_up",label_visibility="collapsed")
             if up:
                 try:
                     bmap=read_barcodes(up)
                     if not bmap: st.error("لا توجد بيانات")
                     else:
-                        st.markdown(f'<div style="margin:.5rem 0;padding:.6rem 1rem;border-radius:10px;background:rgba(0,184,148,.08);border:1px solid rgba(0,184,148,.15);color:#55efc4;font-size:.82rem;">✓ {len(bmap)} صنف مرتبط</div>',unsafe_allow_html=True)
-                        st.session_state['barcode_map']=bmap
+                        st.markdown(f'<div style="margin:.5rem 0;padding:.6rem 1rem;border-radius:10px;background:rgba(0,184,148,.08);border:1px solid rgba(0,184,148,.15);color:#55efc4;font-size:.82rem;">✓ {len(bmap)} صنف مرتبط من الملف</div>',unsafe_allow_html=True)
                         st.dataframe(pd.DataFrame(list(bmap.items())[:10],columns=['الكود الداخلي','الباركود']),use_container_width=True)
-                        c1,c2=st.columns(2)
-                        with c1:
-                            if st.button("← السابق",key="prev2"):
-                                st.session_state['mkt_step']=1;st.rerun()
-                        with c2:
-                            if st.button("التالي ←",key="next2",type="primary"):
-                                st.session_state['mkt_step']=3;st.rerun()
+                        merged={**barcodes_map,**bmap}
+                        if st.button("💾 حفظ الأكواد في القاعدة",key="save_barcodes_db",type="primary"):
+                            new_db=[{'internal_code':k,'barcode':v} for k,v in merged.items()]
+                            save_barcodes(new_db)
+                            st.success(f"تم حفظ {len(new_db)} كود");st.rerun()
                 except Exception as e: st.error(f"خطأ: {e}")
+            if barcodes_db:
+                st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot" style="background:#00cec9;"></div><h3>الأكواد المحفوظة ({})</h3></div>'.format(len(barcodes_db)),unsafe_allow_html=True)
+                bmap_df=pd.DataFrame(barcodes_db,columns=['internal_code','barcode'])
+                st.dataframe(bmap_df,use_container_width=True,height=250)
+                st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot" style="background:#fdcb6e;"></div><h3>تعديل كود</h3></div>',unsafe_allow_html=True)
+                ec_cols=[str(b.get('internal_code','')).strip() for b in barcodes_db]
+                edit_ic=st.selectbox("اختر الكود الداخلي",options=ec_cols,key="bc_edit_ic")
+                if edit_ic:
+                    current_bc=next((b.get('barcode','') for b in barcodes_db if str(b.get('internal_code','')).strip()==edit_ic),'')
+                    new_bc=st.text_input("الباركود الجديد",value=current_bc,key="bc_edit_val")
+                    if st.button("💾 حفظ التعديل",key="bc_save_edit",type="primary"):
+                        for b in barcodes_db:
+                            if str(b.get('internal_code','')).strip()==edit_ic:
+                                b['barcode']=new_bc.strip();break
+                        save_barcodes(barcodes_db)
+                        st.success("تم حفظ التعديل!");st.rerun()
+                st.session_state['barcode_map']=barcodes_map
             else:
-                if st.button("← السابق",key="prev2b"):
+                st.session_state['barcode_map']={}
+            c1,c2=st.columns(2)
+            with c1:
+                if st.button("← السابق",key="prev2"):
                     st.session_state['mkt_step']=1;st.rerun()
+            with c2:
+                if st.button("التالي ←",key="next2",type="primary"):
+                    if barcodes_map:
+                        st.session_state['barcode_map']=barcodes_map
+                        st.session_state['mkt_step']=3;st.rerun()
+                    else:
+                        st.error("احفظ الأكواد أولاً قبل الانتقال للخطوة 3")
             st.markdown('</div>',unsafe_allow_html=True)
         elif cs==3:
             hd='detail_df' in st.session_state and not st.session_state['detail_df'].empty
