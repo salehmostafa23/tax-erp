@@ -17,6 +17,8 @@ from github_storage import gh_read, gh_write
 
 st.set_page_config(page_title="Tax Management System", page_icon="🏢", layout="wide", initial_sidebar_state="expanded")
 
+st.markdown('<style>a[href*="manage"],a[data-testid="stManageApp"],section[data-testid="stSidebar"]+div>a,a[title="Manage app"],div[data-testid="stStatusWidget"],div[data-testid="stDecoration"]{display:none!important;} div[data-testid="stToolbar"] button[kind="headerNoPadding"]:nth-child(4){display:none!important;} div[data-testid="stToolbar"]{justify-content:flex-end;}</style><script>window.addEventListener("keydown",function(e){if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="c"&&!e.shiftKey){e.stopPropagation();}var t=e.target.tagName.toLowerCase();if(t==="input"||t==="textarea"||e.target.isContentEditable)return;if(e.key.toLowerCase()==="c"||e.key.toLowerCase()==="r"){e.preventDefault();e.stopPropagation();}});</script>',unsafe_allow_html=True)
+
 # ====================== DIRS ======================
 DATA_DIR = os.path.dirname(os.path.abspath(__file__))
 
