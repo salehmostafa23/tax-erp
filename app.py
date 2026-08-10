@@ -17,7 +17,29 @@ from github_storage import gh_read, gh_write
 
 st.set_page_config(page_title="Tax Management System", page_icon="🏢", layout="wide", initial_sidebar_state="expanded")
 
-st.markdown('<style>a[href*="manage"],a[data-testid="stManageApp"],section[data-testid="stSidebar"]+div>a,a[title="Manage app"],div[data-testid="stStatusWidget"],div[data-testid="stDecoration"]{display:none!important;} div[data-testid="stToolbar"] button[kind="headerNoPadding"]:nth-child(4){display:none!important;} div[data-testid="stToolbar"]{justify-content:flex-end;}</style><script>window.addEventListener("keydown",function(e){if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="c"&&!e.shiftKey){e.stopPropagation();}var t=e.target.tagName.toLowerCase();if(t==="input"||t==="textarea"||e.target.isContentEditable)return;if(e.key.toLowerCase()==="c"||e.key.toLowerCase()==="r"){e.preventDefault();e.stopPropagation();}});</script>',unsafe_allow_html=True)
+st.markdown('''<style>a[href*="manage"],a[data-testid="stManageApp"],a[title="Manage app"]{display:none!important;}</style>
+<script>
+function _erpHideManage(){
+  try{
+    var d=window.parent.document;
+    if(!d) return;
+    var css='a[href*="manage"],a[data-testid="stManageApp"],a[title="Manage app"],div[data-testid="stStatusWidget"],div[data-testid="stDecoration"]{display:none!important;}';
+    var s=d.createElement('style');s.innerHTML=css;d.head.appendChild(s);
+    function rem(){var els=d.querySelectorAll('a[href*="manage"],a[data-testid="stManageApp"],a[title="Manage app"]');for(var i=0;i<els.length;i++){els[i].style.display='none';els[i].remove();}}
+    rem();
+    var obs=new MutationObserver(rem);obs.observe(d.body,{childList:true,subtree:true});
+    d.addEventListener('keydown',function(e){
+      var t=(e.target&&e.target.tagName)?e.target.tagName.toLowerCase():'';
+      if(t==='input'||t==='textarea'||(e.target&&e.target.isContentEditable))return;
+      var k=(e.key||'').toLowerCase();
+      if((e.ctrlKey||e.metaKey)&&k==='c'&&!e.shiftKey){e.stopPropagation();}
+      if(k==='c'||k==='r'){e.preventDefault();e.stopPropagation();}
+    },true);
+  }catch(err){}
+}
+if(window.parent&&window.parent.document&&window.parent.document.readyState==='complete'){_erpHideManage();}
+else{window.addEventListener('load',_erpHideManage);}
+</script>''',unsafe_allow_html=True)
 
 # ====================== DIRS ======================
 DATA_DIR = os.path.dirname(os.path.abspath(__file__))
