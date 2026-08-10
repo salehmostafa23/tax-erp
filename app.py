@@ -52,6 +52,7 @@ ADMIN_PAGE="👥 إدارة المستخدمين"
 def _hash_pw(pw,salt="tax_erp_salt_2024"):
     return hashlib.sha256(f"{salt}{pw}".encode()).hexdigest()
 
+@st.cache_data(ttl=300, show_spinner=False)
 def load_users():
     gh=gh_read("users.json")
     if gh is not None:
@@ -68,6 +69,7 @@ def load_users():
 def save_users(data):
     with open(USERS_FILE,'w',encoding='utf-8') as f: json.dump(data,f,ensure_ascii=False,indent=2,default=str)
     gh_write("users.json",data)
+    load_users.clear()
 
 def authenticate_user(username,password):
     users=load_users()
@@ -193,6 +195,7 @@ def eta_get_document_pdf(token, uuid_val):
     return None, f"HTTP {r.status_code}"
 
 CODES_DB_FILE=os.path.join(DATA_DIR,"codes_database.json")
+@st.cache_data(ttl=300, show_spinner=False)
 def load_codes_db():
     gh=gh_read("codes_database.json")
     if gh is not None and isinstance(gh,list) and len(gh)>0:
@@ -221,6 +224,7 @@ def save_codes_db(data):
             unique.append(c)
     with open(CODES_DB_FILE,'w',encoding='utf-8') as f: json.dump(unique,f,ensure_ascii=False,indent=2,default=str)
     gh_write("codes_database.json",unique)
+    load_codes_db.clear()
     return unique
 
 def eta_get_document_details(token, uuid_val):
@@ -335,6 +339,7 @@ GPC_DATA_FILE=os.path.join(DATA_DIR,"gpc_database.json")
 GS1_DATA_FILE=os.path.join(DATA_DIR,"gs1_products.json")
 SUPPLIER_CODES_FILE=os.path.join(DATA_DIR,"supplier_codes.json")
 
+@st.cache_data(ttl=600, show_spinner=False)
 def _gpc_load_cache():
     data=gh_read("gpc_database.json")
     if data: return data
@@ -347,6 +352,7 @@ def _gpc_load_cache():
 def _gpc_save_cache(data):
     gh_write("gpc_database.json",data)
     with open(GPC_DATA_FILE,'w',encoding='utf-8') as f: json.dump(data,f,ensure_ascii=False,indent=2,default=str)
+    _gpc_load_cache.clear()
 _GPC_HEADERS={
     'Content-Type':'application/json;charset=utf-8',
     'Accept':'application/json, text/plain, */*',
@@ -473,6 +479,7 @@ def _gs1_get_products(auth):
         except: break
     return all_products
 
+@st.cache_data(ttl=600, show_spinner=False)
 def _load_gs1_db():
     data=gh_read("gs1_products.json")
     if data: return data
@@ -485,7 +492,9 @@ def _load_gs1_db():
 def _save_gs1_db(products):
     gh_write("gs1_products.json",products)
     with open(GS1_DATA_FILE,'w',encoding='utf-8') as f: json.dump(products,f,ensure_ascii=False,indent=2,default=str)
+    _load_gs1_db.clear()
 
+@st.cache_data(ttl=600, show_spinner=False)
 def _load_supplier_codes():
     data=gh_read("supplier_codes.json")
     if data: return data
@@ -498,6 +507,7 @@ def _load_supplier_codes():
 def _save_supplier_codes(data):
     gh_write("supplier_codes.json",data)
     with open(SUPPLIER_CODES_FILE,'w',encoding='utf-8') as f: json.dump(data,f,ensure_ascii=False,indent=2,default=str)
+    _load_supplier_codes.clear()
 
 def _standalone_portal_tab():
     codes_db=load_codes_db()
@@ -1193,6 +1203,7 @@ with st.sidebar:
 # ====================== DATA ======================
 RECEIPTS_FILE=os.path.join(DATA_DIR,"receipts_registry.json")
 
+@st.cache_data(ttl=300, show_spinner=False)
 def load_receipts():
     data=gh_read("receipts_registry.json")
     if data: return data
@@ -1205,9 +1216,11 @@ def load_receipts():
 def save_receipts(data):
     gh_write("receipts_registry.json",data)
     with open(RECEIPTS_FILE,'w',encoding='utf-8') as f: json.dump(data,f,ensure_ascii=False,indent=2)
+    load_receipts.clear()
 
 BARCODES_FILE=os.path.join(DATA_DIR,"barcodes_db.json")
 
+@st.cache_data(ttl=300, show_spinner=False)
 def load_barcodes():
     data=gh_read("barcodes_db.json")
     if data: return data
@@ -1220,6 +1233,7 @@ def load_barcodes():
 def save_barcodes(data):
     gh_write("barcodes_db.json",data)
     with open(BARCODES_FILE,'w',encoding='utf-8') as f: json.dump(data,f,ensure_ascii=False,indent=2)
+    load_barcodes.clear()
 
 FORM41_FILE = os.path.join(DATA_DIR, "form41_data.json")
 VAT_FILE = os.path.join(DATA_DIR, "vat_data.json")
@@ -1232,6 +1246,8 @@ def _gh_key(f):
 def save_data(f,d):
     with open(f,'w',encoding='utf-8') as fh: json.dump(d,fh,ensure_ascii=False,indent=2,default=str)
     gh_write(_gh_key(f),d)
+    load_data.clear()
+@st.cache_data(ttl=300, show_spinner=False)
 def load_data(f):
     gh=gh_read(_gh_key(f))
     if gh is not None:
@@ -1359,6 +1375,7 @@ def fmt(n):
 MONTHS={1:'يناير',2:'فبراير',3:'مارس',4:'أبريل',5:'مايو',6:'يونيو',7:'يوليو',8:'أغسطس',9:'سبتمبر',10:'أكتوبر',11:'نوفمبر',12:'ديسمبر'}
 REQUESTS_FILE=os.path.join(DATA_DIR,"requests_registry.json")
 
+@st.cache_data(ttl=300, show_spinner=False)
 def load_requests():
     gh=gh_read("requests_registry.json")
     if gh is not None:
@@ -1373,6 +1390,7 @@ def load_requests():
 def save_requests(data):
     with open(REQUESTS_FILE,'w',encoding='utf-8') as f: json.dump(data,f,ensure_ascii=False,indent=2,default=str)
     gh_write("requests_registry.json",data)
+    load_requests.clear()
 
 
 def _replace_in_paragraph(para, old, new):
