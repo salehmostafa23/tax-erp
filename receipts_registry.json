@@ -142,5 +142,14 @@
     "upload_date": "2026-08-11T10:36:45.371301",
     "items_count": 3,
     "matched": 2
+  },
+  {
+    "receipt_number": "202022-02160226",
+    "receipt_date": "2026-08-12",
+    "receiver_name": "كتيبة",
+    "file_name": "202022-02160226_2026-08-12_كتيبة.xlsx",
+    "upload_date": "2026-08-12T07:56:12.358262",
+    "items_count": 12,
+    "matched": 11
   }
 ]
