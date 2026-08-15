@@ -160,5 +160,14 @@
     "upload_date": "2026-08-15T07:11:44.842407",
     "items_count": 3,
     "matched": 0
+  },
+  {
+    "receipt_number": "501033-02169421-1",
+    "receipt_date": "2026-08-10",
+    "receiver_name": "المصرية لتجارة الادوية",
+    "file_name": "501033-02169421-1_2026-08-10_المصرية لتجارة الادوية.xlsx",
+    "upload_date": "2026-08-15T07:25:17.126835",
+    "items_count": 2,
+    "matched": 1
   }
 ]
