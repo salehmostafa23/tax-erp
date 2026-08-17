@@ -48,5 +48,15 @@
       "🏷️ الاستعلام عن الأكواد"
     ],
     "created_at": "2026-08-15T06:13:59.204629"
+  },
+  {
+    "username": "amin",
+    "password": "4e7cb9ef3fcbb332c00f4dee8a62f40d13b9b04c84ed1cd1eeac4b717ff750ce",
+    "display_name": "مكتب الأمين",
+    "role": "user",
+    "permissions": [
+      "📑 اقرار 10 قيمة مضافة"
+    ],
+    "created_at": "2026-08-17T09:29:46.042292"
   }
 ]
