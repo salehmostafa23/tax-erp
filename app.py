@@ -3345,7 +3345,7 @@ elif page=="📑 اقرار 10 قيمة مضافة":
                 prep_month=st.selectbox("الشهر",range(1,13),format_func=lambda x:f"{x} - {MONTHS[x]}",key="prep_month")
             with pc2:
                 prep_year=st.selectbox("السنة",range(2020,2031),key="prep_year")
-            prep_file=st.file_uploader("ارفع شيت التحضير",type=["xlsx","xls"],key="prep_upload")
+            prep_file=st.file_uploader("ارفع شيت التحضير",type=["xlsx","xls","zip"],key="prep_upload")
             if prep_file:
                 st.markdown(f'<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(253,203,110,.06);border:1px solid rgba(253,203,110,.15);color:#fdcb6e;font-size:.82rem;">📎 {prep_file.name}</div>',unsafe_allow_html=True)
                 if st.button("💾 حفظ التحضير",key="save_prep",type="primary"):
@@ -3385,7 +3385,9 @@ elif page=="📑 اقرار 10 قيمة مضافة":
                 with cols[0]:
                     st.markdown(f'📎 **{p.get("file_name","")}** — {MONTHS.get(p.get("month",1),"")}/{p.get("year","")} — {sz} KB')
                 with cols[1]:
-                    st.download_button("📥 تحميل",data=base64.b64decode(p.get('file_b64','')),file_name=p.get('file_name','prep.xlsx'),mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",key=f"dl_prep_{p.get('id','')}",use_container_width=True)
+                    dl_name=p.get('file_name','prep.xlsx')
+                    dl_mime="application/zip" if dl_name.lower().endswith('.zip') else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    st.download_button("📥 تحميل",data=base64.b64decode(p.get('file_b64','')),file_name=dl_name,mime=dl_mime,key=f"dl_prep_{p.get('id','')}",use_container_width=True)
                 with cols[2]:
                     if is_admin and st.button("🗑️",key=f"del_prep_{p.get('id','')}",use_container_width=True):
                         prep_data=[r for r in prep_data if r.get('id')!=p.get('id')]
@@ -3407,7 +3409,7 @@ elif page=="📑 اقرار 10 قيمة مضافة":
                 decl_month=st.selectbox("الشهر",range(1,13),format_func=lambda x:f"{x} - {MONTHS[x]}",key="decl_month")
             with dc2:
                 decl_year=st.selectbox("السنة",range(2020,2031),key="decl_year")
-            decl_file=st.file_uploader("ارفع ملف الاقرار",type=["xlsx","xls","pdf"],key="decl_upload")
+            decl_file=st.file_uploader("ارفع ملف الاقرار",type=["xlsx","xls","pdf","zip"],key="decl_upload")
             if decl_file:
                 st.markdown(f'<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(0,206,201,.06);border:1px solid rgba(0,206,201,.15);color:#00cec9;font-size:.82rem;">📎 {decl_file.name}</div>',unsafe_allow_html=True)
                 if st.button("💾 حفظ الاقرار",key="save_decl",type="primary"):
@@ -3447,7 +3449,9 @@ elif page=="📑 اقرار 10 قيمة مضافة":
                 with cols[0]:
                     st.markdown(f'📎 **{d.get("file_name","")}** — {MONTHS.get(d.get("month",1),"")}/{d.get("year","")} — {sz} KB')
                 with cols[1]:
-                    st.download_button("📥 تحميل",data=base64.b64decode(d.get('file_b64','')),file_name=d.get('file_name','decl.xlsx'),mime="application/octet-stream",key=f"dl_decl_{d.get('id','')}",use_container_width=True)
+                    dl_name=d.get('file_name','decl.xlsx')
+                    dl_mime="application/zip" if dl_name.lower().endswith('.zip') else "application/octet-stream"
+                    st.download_button("📥 تحميل",data=base64.b64decode(d.get('file_b64','')),file_name=dl_name,mime=dl_mime,key=f"dl_decl_{d.get('id','')}",use_container_width=True)
                 with cols[2]:
                     if is_admin and st.button("🗑️",key=f"del_decl_{d.get('id','')}",use_container_width=True):
                         decl_data=[r for r in decl_data if r.get('id')!=d.get('id')]
