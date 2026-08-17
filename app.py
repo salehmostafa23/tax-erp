@@ -46,7 +46,7 @@ DATA_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # ====================== USERS ======================
 USERS_FILE=os.path.join(DATA_DIR,"users.json")
-ALL_PAGES=["🏠 الرئيسية","📋 نموذج 41","💰 القيمة المضافة","🛒 فواتير الماركت","📄 Portal الفواتير الإلكترونية","🔍 الاستعلام عن ممول","🏷️ الاستعلام عن الأكواد"]
+ALL_PAGES=["🏠 الرئيسية","📋 نموذج 41","💰 القيمة المضافة","🛒 فواتير الماركت","📄 Portal الفواتير الإلكترونية","🔍 الاستعلام عن ممول","🏷️ الاستعلام عن الأكواد","📑 اقرار 10 قيمة مضافة"]
 ADMIN_PAGE="👥 إدارة المستخدمين"
 
 def _hash_pw(pw,salt="tax_erp_salt_2024"):
@@ -1391,6 +1391,39 @@ def save_requests(data):
     with open(REQUESTS_FILE,'w',encoding='utf-8') as f: json.dump(data,f,ensure_ascii=False,indent=2,default=str)
     gh_write("requests_registry.json",data)
     load_requests.clear()
+
+VAT10_PREP_FILE=os.path.join(DATA_DIR,"vat10_preparations.json")
+VAT10_DECL_FILE=os.path.join(DATA_DIR,"vat10_declarations.json")
+
+@st.cache_data(ttl=300, show_spinner=False)
+def load_vat10_prep():
+    data=gh_read("vat10_preparations.json")
+    if data: return data
+    if os.path.exists(VAT10_PREP_FILE):
+        try:
+            with open(VAT10_PREP_FILE,'r',encoding='utf-8') as f: return json.load(f)
+        except: pass
+    return []
+
+def save_vat10_prep(data):
+    with open(VAT10_PREP_FILE,'w',encoding='utf-8') as f: json.dump(data,f,ensure_ascii=False,indent=2)
+    gh_write("vat10_preparations.json",data)
+    load_vat10_prep.clear()
+
+@st.cache_data(ttl=300, show_spinner=False)
+def load_vat10_decl():
+    data=gh_read("vat10_declarations.json")
+    if data: return data
+    if os.path.exists(VAT10_DECL_FILE):
+        try:
+            with open(VAT10_DECL_FILE,'r',encoding='utf-8') as f: return json.load(f)
+        except: pass
+    return []
+
+def save_vat10_decl(data):
+    with open(VAT10_DECL_FILE,'w',encoding='utf-8') as f: json.dump(data,f,ensure_ascii=False,indent=2)
+    gh_write("vat10_declarations.json",data)
+    load_vat10_decl.clear()
 
 
 def _replace_in_paragraph(para, old, new):
@@ -3289,3 +3322,136 @@ elif page=="🔍 الاستعلام عن ممول":
         sup_df.to_excel(excel_buf,index=False,engine='xlsxwriter')
         excel_buf.seek(0)
         st.download_button("📊 تحميل قائمة الممولين",data=excel_buf.getvalue(),file_name="suppliers.xlsx",mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",key="dl_sup")
+
+# ====================== VAT10 DECLARATION ======================
+elif page=="📑 اقرار 10 قيمة مضافة":
+    if not user_has_permission(page): st.error("لا تملك صلاحية الوصول");st.stop()
+
+    st.markdown(f"""<div class="erp-topbar"><div><h2>{page}</h2><p>تحضيرات الاقرار والاقرارات الشهرية</p></div>
+<div class="erp-topbar-right"><span class="erp-badge">📑 VAT 10</span></div></div>""", unsafe_allow_html=True)
+
+    _vtab1,_vtab2=st.tabs(["📝 تحضيرات الاقرار","📋 الاقرار"])
+
+    with _vtab1:
+        st.markdown('<div class="erp-section"><div class="erp-section-dot" style="background:#fdcb6e;"></div><h3>تحضيرات الاقرار</h3></div>',unsafe_allow_html=True)
+        prep_data=load_vat10_prep()
+        cu=get_current_user()
+        is_admin=cu and cu.get('role')=='admin'
+
+        if is_admin:
+            st.markdown('<div class="erp-section" style="margin-bottom:1rem"><div class="erp-section-dot"></div><h3>رفع شيت تحضير</h3></div>',unsafe_allow_html=True)
+            pc1,pc2=st.columns(2)
+            with pc1:
+                prep_month=st.selectbox("الشهر",range(1,13),format_func=lambda x:f"{x} - {MONTHS[x]}",key="prep_month")
+            with pc2:
+                prep_year=st.selectbox("السنة",range(2020,2031),key="prep_year")
+            prep_file=st.file_uploader("ارفع شيت التحضير",type=["xlsx","xls"],key="prep_upload")
+            if prep_file:
+                st.markdown(f'<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(253,203,110,.06);border:1px solid rgba(253,203,110,.15);color:#fdcb6e;font-size:.82rem;">📎 {prep_file.name}</div>',unsafe_allow_html=True)
+                if st.button("💾 حفظ التحضير",key="save_prep",type="primary"):
+                    file_bytes=prep_file.read()
+                    file_b64=base64.b64encode(file_bytes).decode('utf-8')
+                    new_rec={
+                        'id':str(uuid.uuid4()),
+                        'month':prep_month,
+                        'year':prep_year,
+                        'file_name':prep_file.name,
+                        'file_size':len(file_bytes),
+                        'file_b64':file_b64,
+                        'upload_date':datetime.now().isoformat()
+                    }
+                    prep_data.append(new_rec)
+                    save_vat10_prep(prep_data)
+                    st.success(f"تم حفظ {prep_file.name} — {MONTHS[prep_month]}/{prep_year}")
+                    st.rerun()
+
+        st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot" style="background:#fdcb6e;"></div><h3>تحضيرات محفوظة</h3></div>',unsafe_allow_html=True)
+        fpc1,fpc2=st.columns(2)
+        with fpc1:
+            filter_prep_month=st.selectbox("فلتر بالشهر",["الكل"]+[f"{i} - {MONTHS[i]}" for i in range(1,13)],key="filter_prep_month")
+        with fpc2:
+            filter_prep_year=st.selectbox("فلتر بالسنة",["الكل"]+list(range(2020,2031)),key="filter_prep_year")
+        filtered_prep=prep_data
+        if filter_prep_month!="الكل":
+            pm_idx=[i for i in range(1,13) if f"{i} - {MONTHS[i]}"==filter_prep_month][0]
+            filtered_prep=[p for p in filtered_prep if p.get('month')==pm_idx]
+        if filter_prep_year!="الكل":
+            filtered_prep=[p for p in filtered_prep if p.get('year')==int(filter_prep_year)]
+        if filtered_prep:
+            st.markdown(f'<div style="padding:.5rem 1rem;border-radius:10px;background:rgba(253,203,110,.06);border:1px solid rgba(253,203,110,.15);color:#fdcb6e;font-size:.82rem;">📊 عدد الملفات: <strong>{len(filtered_prep)}</strong></div>',unsafe_allow_html=True)
+            for p in reversed(filtered_prep):
+                sz=round(p.get('file_size',0)/1024)
+                cols=st.columns([3,1,1,1])
+                with cols[0]:
+                    st.markdown(f'📎 **{p.get("file_name","")}** — {MONTHS.get(p.get("month",1),"")}/{p.get("year","")} — {sz} KB')
+                with cols[1]:
+                    st.download_button("📥 تحميل",data=base64.b64decode(p.get('file_b64','')),file_name=p.get('file_name','prep.xlsx'),mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",key=f"dl_prep_{p.get('id','')}",use_container_width=True)
+                with cols[2]:
+                    if is_admin and st.button("🗑️",key=f"del_prep_{p.get('id','')}",use_container_width=True):
+                        prep_data=[r for r in prep_data if r.get('id')!=p.get('id')]
+                        save_vat10_prep(prep_data)
+                        st.success("تم الحذف");st.rerun()
+        else:
+            st.info("لا توجد تحضيرات محفوظة" + ("" if filter_prep_month=="الكل" and filter_prep_year=="الكل" else " في الفترة المحددة"))
+
+    with _vtab2:
+        st.markdown('<div class="erp-section"><div class="erp-section-dot" style="background:#00cec9;"></div><h3>الاقرار</h3></div>',unsafe_allow_html=True)
+        decl_data=load_vat10_decl()
+        cu=get_current_user()
+        is_admin=cu and cu.get('role')=='admin'
+
+        if is_admin:
+            st.markdown('<div class="erp-section" style="margin-bottom:1rem"><div class="erp-section-dot"></div><h3>رفع اقرار</h3></div>',unsafe_allow_html=True)
+            dc1,dc2=st.columns(2)
+            with dc1:
+                decl_month=st.selectbox("الشهر",range(1,13),format_func=lambda x:f"{x} - {MONTHS[x]}",key="decl_month")
+            with dc2:
+                decl_year=st.selectbox("السنة",range(2020,2031),key="decl_year")
+            decl_file=st.file_uploader("ارفع ملف الاقرار",type=["xlsx","xls","pdf"],key="decl_upload")
+            if decl_file:
+                st.markdown(f'<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(0,206,201,.06);border:1px solid rgba(0,206,201,.15);color:#00cec9;font-size:.82rem;">📎 {decl_file.name}</div>',unsafe_allow_html=True)
+                if st.button("💾 حفظ الاقرار",key="save_decl",type="primary"):
+                    file_bytes=decl_file.read()
+                    file_b64=base64.b64encode(file_bytes).decode('utf-8')
+                    new_rec={
+                        'id':str(uuid.uuid4()),
+                        'month':decl_month,
+                        'year':decl_year,
+                        'file_name':decl_file.name,
+                        'file_size':len(file_bytes),
+                        'file_b64':file_b64,
+                        'upload_date':datetime.now().isoformat()
+                    }
+                    decl_data.append(new_rec)
+                    save_vat10_decl(decl_data)
+                    st.success(f"تم حفظ {decl_file.name} — {MONTHS[decl_month]}/{decl_year}")
+                    st.rerun()
+
+        st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot" style="background:#00cec9;"></div><h3>اقرارات محفوظة</h3></div>',unsafe_allow_html=True)
+        fdc1,fdc2=st.columns(2)
+        with fdc1:
+            filter_decl_month=st.selectbox("فلتر بالشهر",["الكل"]+[f"{i} - {MONTHS[i]}" for i in range(1,13)],key="filter_decl_month")
+        with fdc2:
+            filter_decl_year=st.selectbox("فلتر بالسنة",["الكل"]+list(range(2020,2031)),key="filter_decl_year")
+        filtered_decl=decl_data
+        if filter_decl_month!="الكل":
+            dm_idx=[i for i in range(1,13) if f"{i} - {MONTHS[i]}"==filter_decl_month][0]
+            filtered_decl=[d for d in filtered_decl if d.get('month')==dm_idx]
+        if filter_decl_year!="الكل":
+            filtered_decl=[d for d in filtered_decl if d.get('year')==int(filter_decl_year)]
+        if filtered_decl:
+            st.markdown(f'<div style="padding:.5rem 1rem;border-radius:10px;background:rgba(0,206,201,.06);border:1px solid rgba(0,206,201,.15);color:#00cec9;font-size:.82rem;">📊 عدد الملفات: <strong>{len(filtered_decl)}</strong></div>',unsafe_allow_html=True)
+            for d in reversed(filtered_decl):
+                sz=round(d.get('file_size',0)/1024)
+                cols=st.columns([3,1,1,1])
+                with cols[0]:
+                    st.markdown(f'📎 **{d.get("file_name","")}** — {MONTHS.get(d.get("month",1),"")}/{d.get("year","")} — {sz} KB')
+                with cols[1]:
+                    st.download_button("📥 تحميل",data=base64.b64decode(d.get('file_b64','')),file_name=d.get('file_name','decl.xlsx'),mime="application/octet-stream",key=f"dl_decl_{d.get('id','')}",use_container_width=True)
+                with cols[2]:
+                    if is_admin and st.button("🗑️",key=f"del_decl_{d.get('id','')}",use_container_width=True):
+                        decl_data=[r for r in decl_data if r.get('id')!=d.get('id')]
+                        save_vat10_decl(decl_data)
+                        st.success("تم الحذف");st.rerun()
+        else:
+            st.info("لا توجد اقرارات محفوظة" + ("" if filter_decl_month=="الكل" and filter_decl_year=="الكل" else " في الفترة المحددة"))
