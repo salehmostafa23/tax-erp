@@ -286,5 +286,14 @@
     "upload_date": "2026-08-18T09:30:26.353068",
     "items_count": 3,
     "matched": 2
+  },
+  {
+    "receipt_number": "201011-06105006",
+    "receipt_date": "2026-08-20",
+    "receiver_name": "فاطمة محمد علي حسين",
+    "file_name": "201011-06105006_2026-08-20_فاطمة محمد علي حسين.xlsx",
+    "upload_date": "2026-08-20T06:34:16.754277",
+    "items_count": 2,
+    "matched": 1
   }
 ]
