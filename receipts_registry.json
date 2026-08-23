@@ -376,5 +376,14 @@
     "upload_date": "2026-08-23T08:19:03.866813",
     "items_count": 7,
     "matched": 6
+  },
+  {
+    "receipt_number": "201011-02179615",
+    "receipt_date": "2026-08-23",
+    "receiver_name": "فوج تطهير الصحراء الغربية",
+    "file_name": "201011-02179615_2026-08-23_فوج تطهير الصحراء الغربية.xlsx",
+    "upload_date": "2026-08-23T08:32:58.852341",
+    "items_count": 4,
+    "matched": 3
   }
 ]
