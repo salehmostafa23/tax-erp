@@ -1452,6 +1452,25 @@ def _set_para_text(para, new_text):
         para.clear()
         para.add_run(new_text)
 
+def _doc_rename_official(doc):
+    import re as _re
+    targets=list(doc.paragraphs)
+    for tb in doc.tables:
+        for row in tb.rows:
+            for cell in row.cells:
+                targets.extend(cell.paragraphs)
+    for s in doc.sections:
+        for part in [s.header,s.footer]:
+            targets.extend(part.paragraphs)
+    for para in targets:
+        if 'القطاع المالي' in para.text:
+            _replace_in_paragraph(para,'القطاع المالي','الإدارة العامة المالية')
+        if 'رئيس' in para.text:
+            full=''.join(r.text for r in para.runs)
+            new=_re.sub(r'\bرئيس\b','مدير',full)
+            if new!=full:
+                _set_para_text(para,new)
+
 def gen_form41_word(supplier_name, tax_number, results, export_date_str, request_date_str=None, request_number=None):
     template_path=os.path.join(DATA_DIR,"جواب نموذج 41.docx")
     if not os.path.exists(template_path):
@@ -1461,6 +1480,7 @@ def gen_form41_word(supplier_name, tax_number, results, export_date_str, request
         from docx.shared import Pt
         from docx.enum.text import WD_LINE_SPACING
         doc=Document(template_path)
+        _doc_rename_official(doc)
         req=str(request_number) if request_number else tax_number
         formatted_tax=tax_number
         if len(tax_number)==9:
@@ -1532,6 +1552,7 @@ def gen_vat_word(supplier_name, tax_number, results, export_date_str, request_da
         from docx.shared import Pt
         from docx.enum.text import WD_LINE_SPACING
         doc=Document(template_path)
+        _doc_rename_official(doc)
         req=str(request_number) if request_number else tax_number
         formatted_tax=tax_number
         if len(tax_number)==9:
@@ -1935,7 +1956,7 @@ elif page == "📋 نموذج 41":
                     if rec['model_month']==qm and rec['model_year']==qy:
                         for row in rec.get('records',[]):
                             if str(row.get('رقم التسجيل الضريبي','')).strip()==qt.strip():
-                                rc=dict(row);rc['فترة الخصم']=f"{qm}/{qy}";rc['رقم المدفوعة']=rec.get('payment_number','');rc['تاريخ المدفوعة']=rec.get('payment_date','');res.append(rc)
+                                rc=dict(row);rc['فترة الخصم']=f"{qm}/{qy}";rc['رقم المدفوعة']=rec.get('payment_number','');rc['تاريخ المدفوعة']=_fmt_date_dmy(rec.get('payment_date',''));res.append(rc)
                 if res:
                     sn=res[0].get('اسم الممول','');td=sum(_sf(r.get('المحصل لحساب الضريبة',0)) for r in res)
                     s1,s2,s3,s4=st.columns(4)
@@ -1968,9 +1989,9 @@ elif page == "📋 نموذج 41":
                         for row in rec.get('records',[]):
                             if qt.strip():
                                 if str(row.get('رقم التسجيل الضريبي','')).strip()==qt.strip():
-                                    rc=dict(row);rc['الفترة']=f"{rec['model_month']}/{rec['model_year']}";rc['رقم المدفوعة']=rec.get('payment_number','');rc['تاريخ المدفوعة']=rec.get('payment_date','');res.append(rc)
+                                    rc=dict(row);rc['الفترة']=f"{rec['model_month']}/{rec['model_year']}";rc['رقم المدفوعة']=rec.get('payment_number','');rc['تاريخ المدفوعة']=_fmt_date_dmy(rec.get('payment_date',''));res.append(rc)
                             else:
-                                rc=dict(row);rc['الفترة']=f"{rec['model_month']}/{rec['model_year']}";rc['رقم المدفوعة']=rec.get('payment_number','');rc['تاريخ المدفوعة']=rec.get('payment_date','');res.append(rc)
+                                rc=dict(row);rc['الفترة']=f"{rec['model_month']}/{rec['model_year']}";rc['رقم المدفوعة']=rec.get('payment_number','');rc['تاريخ المدفوعة']=_fmt_date_dmy(rec.get('payment_date',''));res.append(rc)
                 st.session_state['f41_period_res']=res
                 st.session_state['f41_period_sel']=sel
                 st.session_state['f41_period_qt']=qt
@@ -2097,7 +2118,7 @@ elif page == "💰 القيمة المضافة":
                     if rec['model_month']==qm and rec['model_year']==qy:
                         for row in rec.get('records',[]):
                             if str(row.get('رقم التسجيل الضريبي','')).strip()==qt.strip():
-                                rc=dict(row);rc['فترة الخصم']=f"{qm}/{qy}";rc['رقم المدفوعة']=rec.get('payment_number','');rc['تاريخ المدفوعة']=rec.get('payment_date','');res.append(rc)
+                                rc=dict(row);rc['فترة الخصم']=f"{qm}/{qy}";rc['رقم المدفوعة']=rec.get('payment_number','');rc['تاريخ المدفوعة']=_fmt_date_dmy(rec.get('payment_date',''));res.append(rc)
                 if res:
                     sn=res[0].get('اسم الممول','')
                     s1,s2,s3=st.columns(3)
@@ -2133,9 +2154,9 @@ elif page == "💰 القيمة المضافة":
                         for row in rec.get('records',[]):
                             if qt.strip():
                                 if str(row.get('رقم التسجيل الضريبي','')).strip()==qt.strip():
-                                    rc=dict(row);rc['الفترة']=f"{rec['model_month']}/{rec['model_year']}";rc['رقم المدفوعة']=rec.get('payment_number','');rc['تاريخ المدفوعة']=rec.get('payment_date','');res.append(rc)
+                                    rc=dict(row);rc['الفترة']=f"{rec['model_month']}/{rec['model_year']}";rc['رقم المدفوعة']=rec.get('payment_number','');rc['تاريخ المدفوعة']=_fmt_date_dmy(rec.get('payment_date',''));res.append(rc)
                             else:
-                                rc=dict(row);rc['الفترة']=f"{rec['model_month']}/{rec['model_year']}";rc['رقم المدفوعة']=rec.get('payment_number','');rc['تاريخ المدفوعة']=rec.get('payment_date','');res.append(rc)
+                                rc=dict(row);rc['الفترة']=f"{rec['model_month']}/{rec['model_year']}";rc['رقم المدفوعة']=rec.get('payment_number','');rc['تاريخ المدفوعة']=_fmt_date_dmy(rec.get('payment_date',''));res.append(rc)
                 st.session_state['vat_period_res']=res
                 st.session_state['vat_period_sel']=sel
                 st.session_state['vat_period_qt']=qt
