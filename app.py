@@ -1553,6 +1553,24 @@ def gen_vat_word(supplier_name, tax_number, results, export_date_str, request_da
         if request_date_str:
             for para in doc.paragraphs:
                 _replace_in_paragraph(para, 'بتاريخ 8/4/2026', f'بتاريخ {request_date_str}')
+        has_vat=any(_sf(r.get('20% قيمة مضافة',0))>0 for r in results)
+        has_sched=any(_sf(r.get('ضريبة الجدول',0))>0 for r in results)
+        if has_vat and has_sched:
+            types_str='ضريبة القيمة المضافة وضريبة الجدول'
+        elif has_vat:
+            types_str='ضريبة القيمة المضافة'
+        elif has_sched:
+            types_str='ضريبة الجدول'
+        else:
+            types_str='الضريبة'
+        rdate=request_date_str if request_date_str else '8/4/2026'
+        preamble=(f'إيماءا الى كتابكم بتاريخ {rdate} بشأن موافاتكم بشهادة معتمدة بقيمة المبالغ التي تم خصمها تحت حساب {types_str} '
+                  f'من الفواتير الخاصة بتعاملكم مع جهاز الخدمات العامة للقوات المسلحة والتي تم سدادها لمصلحة الضرائب المصرية '
+                  f'يرجى العلم ان بيان المبالغ المستقطعة تحت حساب {types_str} كما يلي :')
+        for para in doc.paragraphs:
+            if 'إيماءا' in para.text or 'كتابكم' in para.text:
+                _set_para_text(para, preamble)
+                break
         t=doc.tables[0]
         hdr_cell=t.cell(0,2)
         for p in hdr_cell.paragraphs:
