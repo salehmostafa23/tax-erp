@@ -529,5 +529,14 @@
     "upload_date": "2026-08-29T09:54:27.145212",
     "items_count": 2,
     "matched": 1
+  },
+  {
+    "receipt_number": "201011-03158854 (1)",
+    "receipt_date": "2026-08-29",
+    "receiver_name": "الكتيبة 97 طرق",
+    "file_name": "201011-03158854 (1)_2026-08-29_الكتيبة 97 طرق.xlsx",
+    "upload_date": "2026-08-29T10:09:09.122721",
+    "items_count": 8,
+    "matched": 7
   }
 ]
