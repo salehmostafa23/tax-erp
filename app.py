@@ -363,7 +363,7 @@ def _eta_build_cades(data_bytes,cert_der,issuer_der,serial_num,get_sig):
            +_attr(_ETA_ATTR_SIGNING_TIME,utctime)
            +_attr(_ETA_ATTR_SIGNING_CERT_V2,signing_cv2))
     signed_attrs=_eta_tlv(0xA0,attrs)
-    signature=get_sig(signed_attrs)
+    signature=get_sig(attrs)
     if not signature:
         raise ValueError("فشل الحصول على التوقيع من المفتاح")
     sid=_eta_tlv(0x30,issuer_der+serial_der)
@@ -4106,6 +4106,57 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                                 st.success("✅ تم الاتصال بالبورتال — الآن اضغط زر (🚀 رحّل) لإكمال الترحيل")
                                 st.rerun()
 
+                st.markdown("---")
+                st.markdown("#### 📤 ترحيل فاتورة مُوقّعة جاهزة (للسحابة أو أي جهاز من غير كارت)")
+                st.caption("لو النسخة دي من غير كارت توقيع (زي السحابة): نزّل الفاتورة غير الموقعة من زر (⬇️ نزّل الفاتورة) اللي هيظهر بعد ضغطة رحّل، وقّعها على **جهاز الكارت** بالأمر المذكور، ثم ارفع الملف الناتج هنا ليُرحَّل مباشرة.")
+                signed_up=st.file_uploader("ارفع ملف JSON المُوقّع (ينتهي بـ .signed.json)",type=["json"],key="rent_signed_up")
+                if signed_up is not None:
+                    try:
+                        _sd=json.loads(signed_up.getvalue().decode("utf-8"))
+                    except Exception as _e:
+                        st.error("الملف ليس JSON صالحًا: "+str(_e)[:150])
+                        _sd=None
+                    if _sd is not None:
+                        if not isinstance(_sd.get("signatures"),list) or not _sd["signatures"]:
+                            st.warning("⚠️ هذا الملف **غير موقّع** (signatures فاضية) — البورتال مش هيقبله، لازم يتوقّع محليًا الأول.")
+                        if st.button("🚀 ترحيل الموقّعة مباشرة للبورتال",key="rent_submit_signed",type="primary",use_container_width=True):
+                            _stok=st.session_state.get("eta_token")
+                            if not _stok:
+                                st.error("أُرسِّل بيانات الاتصال بالبورتال أولًا من الجزء (🔐 الاتصال بالبورتال) بالأعلى")
+                            else:
+                                with st.spinner("جاري ترحيل الفاتورة المُوقّعة..."):
+                                    _st,_sr=eta_submit_invoice(_stok,_sd)
+                                    if _st==401:
+                                        _nt=_eta_refresh_token()
+                                        if _nt and _nt!=_stok:
+                                            st.session_state["eta_token"]=_nt
+                                            _stok=_nt
+                                            _st,_sr=eta_submit_invoice(_stok,_sd)
+                                if _st in (200,201,202):
+                                    _done=False; _doc_uuid=""; _rej=0
+                                    _items=_sr.get("acceptedDocuments") if isinstance(_sr,dict) else None
+                                    if not isinstance(_items,list):
+                                        _items=(_sr.get("documents") if isinstance(_sr,dict) else None) or []
+                                    for _it in _items or []:
+                                        if isinstance(_it,dict):
+                                            _done=True
+                                            _doc_uuid=_it.get("uuid","")
+                                    _rejs=_sr.get("rejectedDocuments") if isinstance(_sr,dict) else None
+                                    if isinstance(_rejs,list) and _rejs: _rej=len(_rejs)
+                                    st.success(f"✅ البورتال استلم الفاتورة (HTTP {_st})")
+                                    if _done:
+                                        st.success("📍 تم اعتمادها رسميًا. UUID: "+str(_doc_uuid or "قام البورتال بتعيين UUID"))
+                                        st.balloons()
+                                    elif _rej:
+                                        st.error(f"❌ رفض البورتال {_rej} إرسالية - الأغلب أن التوقيع غير صالح أو البيانات ناقصة")
+                                    else:
+                                        st.warning("⏳ قيد المعالجة - اضغط زر (🚀 رحّل) العادي بعدها للتحقق من الوصول")
+                                    with st.expander("🔎 رد البورتال التفصيلي"):
+                                        st.json(_sr if isinstance(_sr,dict) else {"raw":str(_sr)})
+                                else:
+                                    _msg=str(_sr.get("message",_sr.get("error",""))) if isinstance(_sr,dict) else str(_sr)
+                                    st.error(f"الرد: HTTP {_st} - {_msg or 'خطأ غير معروف'}")
+
                 if st.button("🚀 رحّل Direct للبورتال",key="rent_submit",type="primary",use_container_width=True):
                     tax_no=tax_in.strip()
                     civ_val=civ_in.strip()
@@ -4186,8 +4237,15 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                                 st.info("✍️ الفاتورة أُرسلت مُوقّعة إلكترونيًا (CAdES-BES)")
                             else:
                                 _why=sres.get("reason","لا توجد وسيلة توقيع")
-                                st.warning(f"⚠️ تعذر التوقيع: {_why}. ستُرسل الفاتورة **من غير توقيع إلكتروني** وقد يرفضها البورتال.")
-                                st.caption("ستفتح نافذة PowerShell ظاهرة مع نافذة PIN للكارت - لو مادخلتهاش انتظر ثم أعد الضغط على رحّل. بديل: ارفع PFX exportable بالكود والشيفرة في تب شهادة التوقيع.")
+                                st.error(f"❌ تعذر التوقيع: {_why}")
+                                st.warning("البورتال يرفض أي فاتورة من غير توقيع إلكتروني (حسب إعداد الملف) — **لم يتم إرسال الفاتورة**، وده مقصود حتى لا تضيع بلا فائدة.")
+                                st.markdown("**كيف تكمل؟**")
+                                st.markdown("1️⃣ **على جهاز فيه الكارت:** من التطبيق المحلي (`localhost:8501`) دوس (🚀 رحّل) — التوقيع هيتم تلقائيًا بعد نافذة PIN.")
+                                st.markdown("2️⃣ **من النسخة السحابية:** نزّل الفاتورة بالزر أدناه، وعلى **جهاز الكارت** افتح مجلد المشروع وشغّل الأمر:")
+                                st.code('python sign_json.py "فاتورة.json"',language="bash")
+                                st.markdown("ثم ارجع هنا وارفع الملف الناتج `.signed.json` من قسم (📤 ترحيل فاتورة مُوقّعة جاهزة) للترحيل مباشرة.")
+                                st.download_button("⬇️ نزّل الفاتورة (غير موقعة) لتوقيعها محليًا ثم رفعها هنا",data=json.dumps(document,ensure_ascii=False,indent=2).encode("utf-8"),file_name=f"{civ_val}.json",mime="application/json",key="rent_dl_unsigned")
+                                st.stop()
                             status,resp=eta_submit_invoice(token,document)
                             if status==401:
                                 ntoken=_eta_refresh_token()
