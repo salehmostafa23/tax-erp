@@ -280,6 +280,19 @@ def eta_submission_status(token, submission_uuid):
         data={"raw":r.text[:600]}
     return r.status_code,data
 
+def eta_reconcile_document(token, internal_id):
+    url=f"{ETA_API_BASE}/api/v1.0/documents/reconcile"
+    headers={"Authorization":f"Bearer {token}"}
+    try:
+        r=http_requests.get(url,headers=headers,params={"internalId":internal_id},timeout=30,verify=False)
+    except Exception as e:
+        return None, {"error":str(e)}
+    try:
+        data=r.json()
+    except Exception:
+        data={"raw":r.text[:800]}
+    return r.status_code,data
+
 def _extract_barcode_from_line(line):
     import re
     all_strs=[]
@@ -3889,75 +3902,52 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                             }
                             status,resp=eta_submit_invoice(token,document)
                             if status in (200,201,202):
-                                sub_uuid=""
-                                doc_uuids=[]
-                                if isinstance(resp,dict):
-                                    for k in ("submissionUuid","submissionId","uuid","documentUuid"):
-                                        v=resp.get(k,"")
-                                        if isinstance(v,str) and v:
-                                            if k=="documentUuid": doc_uuids.append(v)
-                                            elif not sub_uuid: sub_uuid=v
-                                    acc=resp.get("acceptedDocuments")
-                                    if isinstance(acc,list):
-                                        for a in acc:
-                                            if isinstance(a,dict):
-                                                uv=a.get("uuid",a.get("documentUuid",""))
-                                                if isinstance(uv,str) and uv:
-                                                    doc_uuids.append(uv)
-                                                    if not sub_uuid: sub_uuid=uv
-                                if not sub_uuid and doc_uuids:
-                                    sub_uuid=doc_uuids[0]
-                                st.success(f"✅ تم استلام الفاتورة للمعالجة (HTTP {status}) - جاري الاستعلام عن حالة الترحيل من البورتال...")
+                                st.success(f"✅ البورتال استلم الفاتورة للمعالجة (HTTP {status}) - جاري التحقق من وصولها فعلاً في البورتال...")
                                 verdict_label="معالجة"
-                                details=""
-                                if sub_uuid:
-                                    tries=0
-                                    while tries<6:
-                                        tries+=1
-                                        time.sleep(3)
-                                        st2,ires=eta_submission_status(token,sub_uuid)
-                                        if not isinstance(ires,dict): continue
-                                        verdict=(str(ires.get("submissionStatus",ires.get("status","")))).strip().lower()
-                                        if verdict and verdict not in ("processing","sent","submitted",""):
-                                            verdict_label=verdict; details=ires; break
-                                    if verdict_label.lower()=="معالجة" and doc_uuids:
-                                        for du in doc_uuids:
-                                            tries=0
-                                            while tries<4 and verdict_label.lower()=="معالجة":
-                                                tries+=1
-                                                time.sleep(3)
-                                                st3,dres=eta_submission_status(token,du)
-                                                if not isinstance(dres,dict): continue
-                                                verdict=(str(dres.get("submissionStatus",dres.get("status","")))).strip().lower()
-                                                if verdict and verdict not in ("processing","sent","submitted",""):
-                                                    verdict_label=verdict; details=dres; break
-                                            if verdict_label.lower()!="معالجة": break
-                                else:
-                                    st.warning("لم يتم العثور على UUID خاص بالترحيل من رد البورتال - هسأل البورتال عن آخر الترحيلات للتحقق من وصول الفاتورة.")
-                                if verdict_label.lower() in ("accepted","succeeded","success","complete","completed"):
-                                    st.success("✅ الفاتورة **تم اعتمادها** في البورتال وسوف تظهر في الفواتير الصادرة")
+                                details={}
+                                # authoritative check: reconcile by internal id
+                                rc_code,rc_res=eta_reconcile_document(token,civ_val)
+                                rc_items=[]
+                                if isinstance(rc_res,list):
+                                    rc_items=rc_res
+                                elif isinstance(rc_res,dict):
+                                    for k in ("documents","data","items"):
+                                        v=rc_res.get(k)
+                                        if isinstance(v,list):
+                                            rc_items=v; break
+                                if not rc_items and isinstance(rc_res,dict) and rc_res.get("status"):
+                                    rc_items=[rc_res]
+                                if rc_items:
+                                    it=rc_items[0] if isinstance(rc_items[0],dict) else {}
+                                    rc_status=str(it.get("status",it.get("documentStatus",""))).strip().lower()
+                                    if rc_status:
+                                        verdict_label=rc_status
+                                        details=it
+                                if verdict_label.lower() in ("accepted","validated","delivered","issued","success","complete","submitted"):
+                                    st.success("✅ الفاتورة **وصلت وتم اعتمادها** في البورتال - هتظهر في الفواتير الصادرة")
+                                    st.markdown(f'<div style="padding:.5rem 1rem;border-radius:10px;background:rgba(0,206,201,.06);border:1px solid rgba(0,206,201,.15);color:#00cec9;font-size:.82rem;">🆔 UUID: <strong>{it.get("documentUuid",it.get("uuid","-"))}</strong></div>',unsafe_allow_html=True)
                                     st.balloons()
-                                elif verdict_label.lower() in ("rejected","partialsuccess","failed"):
+                                elif verdict_label.lower() in ("rejected","declined","failed","invalid","partial"):
                                     st.error("❌ البورتال **رفض** الفاتورة ولم تظهر في الفواتير")
                                     if isinstance(details,dict):
                                         errs=[]
                                         for ek in ("error","message"):
-                                            if details.get(ek): errs.append(str(details.get(ek)))
-                                        rej=details.get("rejectedDocuments")
-                                        if isinstance(rej,list):
-                                            for rj in rej[:5]:
-                                                if isinstance(rj,dict):
-                                                    e2=rj.get("error",{})
-                                                    msgv=e2.get("message") if isinstance(e2,dict) else e2
-                                                    if msgv: errs.append(str(msgv))
+                                            if isinstance(details.get(ek),str) and details.get(ek): errs.append(details.get(ek))
+                                        rej=details.get("rejection")
+                                        if isinstance(rej,dict):
+                                            for rk in ("details","message"):
+                                                rv=rej.get(rk)
+                                                if rv and rv not in errs: errs.append(str(rv))
                                         if errs:
                                             st.code("\n".join(errs))
-                                    st.markdown('<div style="padding:.7rem 1rem;border-radius:10px;background:rgba(255,107,107,.07);border:1px solid rgba(255,107,107,.15);color:#ff6b6b;font-size:.8rem;">💡 الأغلب أن السبب هو أن الفاتورة مش <strong>مُوقّعة إلكترونيًا</strong> (شهادة الشركة CAdES مطلوبة إجباريًا من البورتال) — محتاجين نضيف شهادة التوقيع في الخطوة الجاية.</div>',unsafe_allow_html=True)
-                                elif verdict_label.lower() in ("pending","partial","invalid") or (details and isinstance(details,dict) and details.get("submissionStatus")):
-                                    st.warning("⏳ الفاتورة لسه **قيد المعالجة** في البورتال — هتظهر في الفواتير الصادرة فور اعتمادها)")
+                                    st.markdown('<div style="padding:.7rem 1rem;border-radius:10px;background:rgba(255,107,107,.07);border:1px solid rgba(255,107,107,.15);color:#ff6b6b;font-size:.8rem;">💡 أغلب الظن أن السبب: الفاتورة مش <strong>مُوقّعة إلكترونيًا</strong> (شهادة الشركة CAdES مطلوبة إجباريًا للبورتال) — هنضيف شهادة التوقيع في الخطوة الجاية عشان تظهر الفاتورة.</div>',unsafe_allow_html=True)
                                 else:
-                                    # timeout or unknown -> try recent submissions fallback
-                                    st.info("⏳ لم نستطع تحديد الحالة النهائية الآن - الفاتورة هتظهر في الفواتير الصادرة فور اعتمادها. افتح صفحة Portal واضغط سحب/تحديث للتحقق.")
+                                    st.warning("⏳ البورتال لم يُرجع نتيجة قاطعة بعد - الفاتورة ممكن تكون **لسه قيد التثبيت** أو **لم يتم قبولها** (الأغلب للسبب ده: مش مُوقّعة إلكترونيًا). الجدول التالي يوضح ما رده البورتال:")
+                                with st.expander("🔎 رد البورتال التفصيلي"):
+                                    st.markdown("**رد الإرسال (Submission):**")
+                                    st.json(resp if isinstance(resp,dict) else {"raw":str(resp)})
+                                    st.markdown("**رد الاستعلام (Reconcile):**")
+                                    st.json(rc_res if isinstance(rc_res,dict) else {"raw":rc_res})
                             else:
                                 msg=[]
                                 msg.append(f"الرد: HTTP {status}")
