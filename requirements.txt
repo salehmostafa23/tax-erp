@@ -5,3 +5,4 @@ python-docx
 xlsxwriter
 requests
 reportlab
+cryptography

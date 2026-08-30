@@ -14,6 +14,11 @@ import time
 import openpyxl
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from github_storage import gh_read, gh_write
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives.serialization import pkcs12
+from cryptography.hazmat.primitives.serialization import Encoding
+from cryptography.x509.oid import NameOID
 
 st.set_page_config(page_title="Tax Management System", page_icon="🏢", layout="wide", initial_sidebar_state="expanded")
 
@@ -292,6 +297,115 @@ def eta_reconcile_document(token, internal_id):
     except Exception:
         data={"raw":r.text[:800]}
     return r.status_code,data
+
+def eta_strip_nulls(obj):
+    if isinstance(obj,dict):
+        return {k:eta_strip_nulls(v) for k,v in obj.items() if v is not None}
+    if isinstance(obj,list): return [eta_strip_nulls(x) for x in obj]
+    return obj
+
+_ETA_SHA256_OID=b"\x06\x09\x60\x86\x48\x01\x65\x03\x04\x02\x01"
+_ETA_RSASHA256_OID=b"\x06\x09\x2a\x86\x48\x86\xf7\x0d\x01\x01\x0b"
+_ETA_DIGEST_DATA_OID=b"\x06\x09\x2a\x86\x48\x86\xf7\x0d\x01\x07\x05"
+_ETA_SIGNED_DATA_OID=b"\x06\x09\x2a\x86\x48\x86\xf7\x0d\x01\x07\x02"
+_ETA_ATTR_CONTENT_TYPE=b"\x06\x09\x2a\x86\x48\x86\xf7\x0d\x01\x09\x03"
+_ETA_ATTR_MESSAGE_DIGEST=b"\x06\x09\x2a\x86\x48\x86\xf7\x0d\x01\x09\x04"
+_ETA_ATTR_SIGNING_TIME=b"\x06\x09\x2a\x86\x48\x86\xf7\x0d\x01\x09\x05"
+_ETA_ATTR_SIGNING_CERT_V2=b"\x06\x0a\x2a\x86\x48\x86\xf7\x0d\x01\x10\x02\x2f"
+
+def _eta_tlv(tag,content):
+    l=len(content)
+    if l<0x80: return bytes([tag,l])+content
+    out=bytearray(); n=l; c=0
+    while n>0:
+        out.append(n&0xFF); n>>=8; c+=1
+    out.reverse()
+    return bytes([tag,0x80|c])+bytes(out)+content
+
+def _eta_int_der(n):
+    b=n.to_bytes((n.bit_length()+7)//8 or 1,"big")
+    if b[0]&0x80: b=b"\x00"+b
+    return _eta_tlv(0x02,b)
+
+def eta_canonical(doc):
+    def _scalar(v):
+        if isinstance(v,bool): return '"true"' if v else '"false"'
+        return '"'+str(v)+'"'
+    def _walk(obj):
+        if isinstance(obj,dict):
+            out=""
+            for k,v in obj.items():
+                out+='"'+k.upper()+'"'
+                if isinstance(v,list):
+                    for item in v:
+                        out+='"'+k.upper()+'"'
+                        out+=_walk(item)
+                else:
+                    out+=_walk(v)
+            return out
+        if isinstance(obj,list): return "".join(_walk(x) for x in obj)
+        return _scalar(obj)
+    return _walk(doc)
+
+def _eta_cades_sign(data_bytes,pfx_bytes,password=""):
+    pw=None
+    if password:
+        try:
+            pw=password if isinstance(password,bytes) else password.encode("utf-8")
+        except Exception: pw=None
+    key,cert,extra=pkcs12.load_key_and_certificates(pfx_bytes,pw)
+    if cert is None:
+        raise ValueError("الملف لا يحتوي على شهادة/مفتاح (تأكد من كلمة السر وأن الملف exportable)")
+    cert_der=cert.public_bytes(Encoding.DER)
+    issuer_der=cert.issuer.public_bytes()
+    serial_der=_eta_int_der(cert.serial_number)
+    canon_hash=hashlib.sha256(data_bytes).digest()
+    cert_hash=hashlib.sha256(cert_der).digest()
+    utctime=_eta_tlv(0x17,datetime.now().strftime("%y%m%d%H%M%SZ").encode("ascii"))
+    esccert=_eta_tlv(0x30,_eta_tlv(0x04,cert_hash))
+    signing_cv2=_eta_tlv(0x30,esccert)
+    def _attr(oid,value_der):
+        return _eta_tlv(0x30,oid+_eta_tlv(0x31,value_der))
+    attrs=(_attr(_ETA_ATTR_CONTENT_TYPE,_ETA_DIGEST_DATA_OID)
+           +_attr(_ETA_ATTR_MESSAGE_DIGEST,_eta_tlv(0x04,canon_hash))
+           +_attr(_ETA_ATTR_SIGNING_TIME,utctime)
+           +_attr(_ETA_ATTR_SIGNING_CERT_V2,signing_cv2))
+    signed_attrs=_eta_tlv(0xA0,attrs)
+    signature=key.sign(signed_attrs,padding.PKCS1v15(),hashes.SHA256())
+    sid=_eta_tlv(0x30,issuer_der+serial_der)
+    signer_info=_eta_tlv(0x30,
+        b"\x02\x01\x01"
+        +sid
+        +_eta_tlv(0x30,_ETA_SHA256_OID)
+        +signed_attrs
+        +_eta_tlv(0x30,_ETA_RSASHA256_OID)
+        +_eta_tlv(0x04,signature))
+    digest_algs=_eta_tlv(0x31,_ETA_SHA256_OID)
+    encap=_eta_tlv(0x30,_ETA_DIGEST_DATA_OID)
+    certs=_eta_tlv(0xA0,cert_der)
+    signer_infos=_eta_tlv(0x31,signer_info)
+    signed_data=_eta_tlv(0x30,
+        b"\x02\x01\x03"
+        +digest_algs
+        +encap
+        +certs
+        +signer_infos)
+    content_info=_eta_tlv(0x30,_ETA_SIGNED_DATA_OID+_eta_tlv(0xA0,signed_data))
+    return base64.b64encode(content_info).decode("ascii")
+
+def eta_sign_json_document(document,pfx_bytes,password=""):
+    try:
+        to_sign={k:v for k,v in document.items() if k!="signatures"}
+        clean=eta_strip_nulls(to_sign)
+        text=json.dumps(clean,ensure_ascii=False,separators=(",",":"))
+        lit=json.loads(text,parse_float=str,parse_int=str)
+        canonical=eta_canonical(lit)
+        sig=_eta_cades_sign(canonical.encode("utf-8"),pfx_bytes,password)
+        out=dict(clean)
+        out["signatures"]=[{"signatureType":"CAdES","value":sig}]
+        return {"document":out,"signature":sig}
+    except Exception as e:
+        return {"error":str(e)}
 
 def _extract_barcode_from_line(line):
     import re
@@ -3830,6 +3944,26 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                 with s2: st.markdown(f'<div class="erp-stat s-orange"><div class="erp-stat-label">إجمالي الضرائب</div><div class="erp-stat-value">{fmt(t_tax)}</div></div>',unsafe_allow_html=True)
                 with s3: st.markdown(f'<div class="erp-stat s-green"><div class="erp-stat-label">الإجمالي</div><div class="erp-stat-value">{fmt(t_gross)}</div></div>',unsafe_allow_html=True)
 
+                with st.expander("🔏 شهادة التوقيع الإلكتروني (مطلوبة للموافقة في البورتال)"):
+                    st.caption("البورتال يطلب الفاتورة **مُوقّعة إلكترونيًا** (CAdES-BES) بشهادة الشركة. ارفع ملف الشهادة **exportable** بصيغة PFX بس (استخرجها بكلمة سر) — بدونها البورتال سيرفض الفاتورة.")
+                    c_pfx=st.file_uploader("",type=["pfx","p12"],key="rent_pfx",accept_multiple_files=False)
+                    c_pw=st.text_input("كلمة سر الشهادة PFX",type="password",key="rent_pfx_pw")
+                    if c_pfx is not None:
+                        pfx_bytes=c_pfx.getvalue()
+                        if len(pfx_bytes)>0:
+                            st.session_state["rent_pfx_bytes"]=pfx_bytes
+                            st.session_state["rent_pfx_pw"]=c_pw
+                            try:
+                                _k,_c,_e=serialization.pkcs12.load_key_and_certificates(pfx_bytes,None)
+                                if _c is None:
+                                    st.warning("تعذر قراءة الشهادة من الملف بكلمة السر الفارغة")
+                                else:
+                                    st.success(f"✅ الشهادة مقروءة: {_c.subject.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value}")
+                            except Exception as _err:
+                                st.warning(f"لم يتم التحقق من كلمة السر بعد - سيتم لقرأتها عند الإرسال: {str(_err)[:120]}")
+                        else:
+                            st.session_state.pop("rent_pfx_bytes",None)
+
                 if st.button("🚀 رحّل Direct للبورتال",key="rent_submit",type="primary",use_container_width=True):
                     tax_no=tax_in.strip()
                     civ_val=civ_in.strip()
@@ -3900,6 +4034,13 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                                 "tables":{},
                                 "signatures":[]
                             }
+                            rent_pfx_bytes=st.session_state.get("rent_pfx_bytes")
+                            if rent_pfx_bytes:
+                                sres=eta_sign_json_document(document,rent_pfx_bytes,st.session_state.get("rent_pfx_pw",""))
+                                if sres.get("error"):
+                                    st.error(f"❌ فشل توقيع الفاتورة؛ لن يتم الإرسال: {sres['error']}")
+                                    st.stop()
+                                document=sres["document"]
                             status,resp=eta_submit_invoice(token,document)
                             if status in (200,201,202):
                                 st.success(f"✅ البورتال استلم الفاتورة للمعالجة (HTTP {status}) - جاري التحقق من وصولها فعلاً في البورتال...")
@@ -3940,7 +4081,10 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                                                 if rv and rv not in errs: errs.append(str(rv))
                                         if errs:
                                             st.code("\n".join(errs))
-                                    st.markdown('<div style="padding:.7rem 1rem;border-radius:10px;background:rgba(255,107,107,.07);border:1px solid rgba(255,107,107,.15);color:#ff6b6b;font-size:.8rem;">💡 أغلب الظن أن السبب: الفاتورة مش <strong>مُوقّعة إلكترونيًا</strong> (شهادة الشركة CAdES مطلوبة إجباريًا للبورتال) — هنضيف شهادة التوقيع في الخطوة الجاية عشان تظهر الفاتورة.</div>',unsafe_allow_html=True)
+                                    if rent_pfx_bytes:
+                                        st.markdown('<div style="padding:.7rem 1rem;border-radius:10px;background:rgba(255,107,107,.07);border:1px solid rgba(255,107,107,.15);color:#ff6b6b;font-size:.8rem;">💡 الفاتورة رُحّلت **مُوقّعة** لكن البورتال رفضها — الأغلب أن **الشهادة المرفوعة مختلفة عن شهادة التسجيل الضريبي** لهذا الرقم (يجب أن تكون نفس شهادة eSeal المرتبطة بـ {tax_no})، أو الشهادة منتهية الصلاحية.</div>',unsafe_allow_html=True)
+                                    else:
+                                        st.markdown('<div style="padding:.7rem 1rem;border-radius:10px;background:rgba(255,107,107,.07);border:1px solid rgba(255,107,107,.15);color:#ff6b6b;font-size:.8rem;">💡 أغلب الظن أن السبب: الفاتورة مش <strong>مُوقّعة إلكترونيًا</strong> (شهادة الشركة CAdES مطلوبة إجباريًا للبورتال) — ارفع الشهادة أعلاه ثم أعد المحاولة.</div>',unsafe_allow_html=True)
                                 else:
                                     st.warning("⏳ البورتال لم يُرجع نتيجة قاطعة بعد - الفاتورة ممكن تكون **لسه قيد التثبيت** أو **لم يتم قبولها** (الأغلب للسبب ده: مش مُوقّعة إلكترونيًا). الجدول التالي يوضح ما رده البورتال:")
                                 with st.expander("🔎 رد البورتال التفصيلي"):
