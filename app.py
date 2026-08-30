@@ -3890,11 +3890,23 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                             status,resp=eta_submit_invoice(token,document)
                             if status in (200,201,202):
                                 sub_uuid=""
+                                doc_uuids=[]
                                 if isinstance(resp,dict):
-                                    for k in ("submissionUuid","submissionId","uuid"):
+                                    for k in ("submissionUuid","submissionId","uuid","documentUuid"):
                                         v=resp.get(k,"")
                                         if isinstance(v,str) and v:
-                                            sub_uuid=v; break
+                                            if k=="documentUuid": doc_uuids.append(v)
+                                            elif not sub_uuid: sub_uuid=v
+                                    acc=resp.get("acceptedDocuments")
+                                    if isinstance(acc,list):
+                                        for a in acc:
+                                            if isinstance(a,dict):
+                                                uv=a.get("uuid",a.get("documentUuid",""))
+                                                if isinstance(uv,str) and uv:
+                                                    doc_uuids.append(uv)
+                                                    if not sub_uuid: sub_uuid=uv
+                                if not sub_uuid and doc_uuids:
+                                    sub_uuid=doc_uuids[0]
                                 st.success(f"✅ تم استلام الفاتورة للمعالجة (HTTP {status}) - جاري الاستعلام عن حالة الترحيل من البورتال...")
                                 verdict_label="معالجة"
                                 details=""
@@ -3908,8 +3920,20 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                                         verdict=(str(ires.get("submissionStatus",ires.get("status","")))).strip().lower()
                                         if verdict and verdict not in ("processing","sent","submitted",""):
                                             verdict_label=verdict; details=ires; break
+                                    if verdict_label.lower()=="معالجة" and doc_uuids:
+                                        for du in doc_uuids:
+                                            tries=0
+                                            while tries<4 and verdict_label.lower()=="معالجة":
+                                                tries+=1
+                                                time.sleep(3)
+                                                st3,dres=eta_submission_status(token,du)
+                                                if not isinstance(dres,dict): continue
+                                                verdict=(str(dres.get("submissionStatus",dres.get("status","")))).strip().lower()
+                                                if verdict and verdict not in ("processing","sent","submitted",""):
+                                                    verdict_label=verdict; details=dres; break
+                                            if verdict_label.lower()!="معالجة": break
                                 else:
-                                    st.markdown(f'<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(255,107,107,.07);border:1px solid rgba(255,107,107,.15);color:#ff6b6b;font-size:.82rem;">⚠️ لم يتم العثور على UUID للترحيل - تأكد من سحب الفواتير من البورتال للتحقق من وصول الفاتورة.</div>',unsafe_allow_html=True)
+                                    st.warning("لم يتم العثور على UUID خاص بالترحيل من رد البورتال - هسأل البورتال عن آخر الترحيلات للتحقق من وصول الفاتورة.")
                                 if verdict_label.lower() in ("accepted","succeeded","success","complete","completed"):
                                     st.success("✅ الفاتورة **تم اعتمادها** في البورتال وسوف تظهر في الفواتير الصادرة")
                                     st.balloons()
@@ -3929,8 +3953,11 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                                         if errs:
                                             st.code("\n".join(errs))
                                     st.markdown('<div style="padding:.7rem 1rem;border-radius:10px;background:rgba(255,107,107,.07);border:1px solid rgba(255,107,107,.15);color:#ff6b6b;font-size:.8rem;">💡 الأغلب أن السبب هو أن الفاتورة مش <strong>مُوقّعة إلكترونيًا</strong> (شهادة الشركة CAdES مطلوبة إجباريًا من البورتال) — محتاجين نضيف شهادة التوقيع في الخطوة الجاية.</div>',unsafe_allow_html=True)
+                                elif verdict_label.lower() in ("pending","partial","invalid") or (details and isinstance(details,dict) and details.get("submissionStatus")):
+                                    st.warning("⏳ الفاتورة لسه **قيد المعالجة** في البورتال — هتظهر في الفواتير الصادرة فور اعتمادها)")
                                 else:
-                                    st.info("⏳ الفاتورة لسه **قيد المعالجة** في البورتال — هتظهر في الفواتير الصادرة فور اعتمادها (افتح صفحة Portal واضغط سحب/تحديث).")
+                                    # timeout or unknown -> try recent submissions fallback
+                                    st.info("⏳ لم نستطع تحديد الحالة النهائية الآن - الفاتورة هتظهر في الفواتير الصادرة فور اعتمادها. افتح صفحة Portal واضغط سحب/تحديث للتحقق.")
                             else:
                                 msg=[]
                                 msg.append(f"الرد: HTTP {status}")
