@@ -3562,6 +3562,7 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
 
     with _tab_rent:
         import re as _rent_re
+        from html.parser import HTMLParser as _rent_htmlP
         RENT_META={
             "G127409":{"name":"إيجار","barcode":"6224003512283","js":"ايجار"},
             "G127411":{"name":"كهرباء","barcode":"6224003512290","js":"كهرباء"},
@@ -3580,6 +3581,82 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
             return text
 
         _ALLCODES=('G127409','G127411','G134260')
+
+        class _RentHtmlTableParser(_rent_htmlP):
+            def __init__(self):
+                _rent_htmlP.__init__(self, convert_charrefs=True)
+                self.tables=[]; self.rows=None; self.row=None; self.cell=None
+            def handle_starttag(self,tag,attrs):
+                t=tag.lower()
+                if t=='table':
+                    self.rows=[]; self.tables.append(self.rows)
+                elif t=='tr' and self.rows is not None:
+                    self.row=[]; self.rows.append(self.row)
+                elif t in ('td','th') and self.row is not None:
+                    self.cell=[]; self.row.append(self.cell)
+            def handle_data(self,data):
+                if self.cell is not None:
+                    self.cell.append(data)
+            def handle_endtag(self,tag):
+                t=tag.lower()
+                if t in ('td','th'):
+                    self.cell=None
+                elif t=='tr':
+                    self.row=None
+                elif t=='table':
+                    self.rows=None
+
+        def _rent_rcell(cell):
+            if cell is None: return ''
+            if isinstance(cell,str): return cell.strip()
+            if isinstance(cell,list): return ''.join(cell).strip()
+            return ''
+
+        def _rent_fnum(txt):
+            if not txt: return ''
+            m=_rent_re.search(r'(\d[\d,]*(?:\.\d+)?)',txt)
+            if not m: return ''
+            raw=m.group(1)
+            if raw.startswith(('0','6224')): return ''
+            if raw.isdigit():
+                for c in _ALLCODES:
+                    if int(raw)==int(c[1:]) or (1900<=int(raw)<=2100): return ''
+            try: f=float(raw.replace(',',''))
+            except Exception: return ''
+            if 1<=f<10**9: return f"{f:g}"
+            return ''
+
+        def _rent_table_value(tables,code):
+            for tb in tables:
+                col=None
+                for row in tb:
+                    if col is not None: break
+                    for ci,txt in enumerate([_rent_rcell(c) for c in row]):
+                        if 'سعر الوحدة' in txt or 'سعر الوحده' in txt:
+                            col=ci; break
+                if col is None: continue
+                for row in tb:
+                    cells=[_rent_rcell(c) for c in row]
+                    for ci,txt in enumerate(cells):
+                        if code in txt and col<len(cells) and col!=ci:
+                            v=_rent_fnum(cells[col])
+                            if v: return v
+            return ''
+
+        def _rent_tables(html):
+            p=_RentHtmlTableParser()
+            try:
+                p.feed(html); p.close()
+            except Exception:
+                pass
+            tbls=[]
+            for tb in p.tables:
+                rows=[]
+                for row in tb:
+                    cells=[_rent_rcell(c) for c in row]
+                    if cells: rows.append(cells)
+                if rows: tbls.append(rows)
+            return tbls
 
         def _rent_collapse(html):
             txt=_rent_re.sub(r'</(td|th|tr|p|div|li|span|br|strong|b|h\d)>','\n',html,flags=_rent_re.I)
@@ -3638,10 +3715,11 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
         def _rent_parse(html_bytes):
             html=_rent_clean_html(html_bytes)
             lines=_rent_collapse(html)
+            tables=_rent_tables(html)
             info={'rent':'','elec':'','water':'','tax_num':'','civ':'','so_ref':''}
-            info['rent']=_rent_val_near(lines,'G127409')
-            info['elec']=_rent_val_near(lines,'G127411')
-            info['water']=_rent_val_near(lines,'G134260')
+            info['rent']=_rent_table_value(tables,'G127409') or _rent_val_near(lines,'G127409')
+            info['elec']=_rent_table_value(tables,'G127411') or _rent_val_near(lines,'G127411')
+            info['water']=_rent_table_value(tables,'G134260') or _rent_val_near(lines,'G134260')
             info['tax_num']=_rent_num_after(lines,'الرقم الضريبي') or _rent_num_after(lines,'الرقم الضريبى')
             civ=_rent_re.search(r'(CIV[-0-9A-Za-z_]+)',lines)
             if civ: info['civ']=civ.group(1)
