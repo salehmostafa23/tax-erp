@@ -4115,8 +4115,31 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                                 st.rerun()
 
                 st.markdown("---")
+                with st.expander("🖊️ وقّع ملف JSON على جهاز الكارت (من غير أي أوامر)",expanded=False):
+                    st.caption("لو انت على جهاز فيه الكارت: ارفع هنا الفاتورة غير الموقعة (نزّلتها من السحابة)، واضغط توقيع، ثم نزّل الناتج وارفعه في القسم اللي بعده مباشرة ليُرحَّل:")
+                    _sg_up=st.file_uploader("ارفع ملف JSON غير موقّع",type=["json"],key="rent_sign_local_up")
+                    _sg_out=None; _sg_err=""
+                    if _sg_up is not None:
+                        try:
+                            _sg_doc=json.loads(_sg_up.getvalue().decode("utf-8"))
+                        except Exception as _e:
+                            _sg_err=str(_e)[:150]
+                        if not _sg_err:
+                            if st.button("✍️ وقّع الملف بالكارت",key="rent_sign_local_btn",type="primary",use_container_width=True):
+                                _sg_res=eta_sign_json_document(_sg_doc,st.session_state.get("rent_pfx_bytes"),"")
+                                if isinstance(_sg_res,dict) and _sg_res.get("error"):
+                                    _sg_err=str(_sg_res["error"])[:200]
+                                elif not (_sg_res or {}).get("signature"):
+                                    _sg_err=str((_sg_res or {}).get("reason") or "لم يتم التوقيع — الكارت مش متصل بالجهاز ده")
+                    if _sg_err:
+                        st.warning("تعذر التوقيع: "+_sg_err)
+                    if _sg_out is not None and (_sg_out or {}).get("signatures"):
+                        _sg_name=str(_sg_out.get("internalID") or "invoice")+".signed.json"
+                        st.success("✅ تم التوقيع بنجاح — نزّل الناتج وارفعه في قسم (📤 ترحيل مُوقّعة) اللي بعد كده")
+                        st.download_button("⬇️ نزّل الفاتورة المُوقّعة (.signed.json)",data=json.dumps(_sg_out,ensure_ascii=False,indent=2).encode("utf-8"),file_name=_sg_name,mime="application/json",key="rent_sign_local_dl")
+                st.markdown("---")
                 st.markdown("#### 📤 ترحيل فاتورة مُوقّعة جاهزة (للسحابة أو أي جهاز من غير كارت)")
-                st.caption("لو النسخة دي من غير كارت توقيع (زي السحابة): نزّل الفاتورة غير الموقعة من زر (⬇️ نزّل الفاتورة) اللي هيظهر بعد ضغطة رحّل، وقّعها على **جهاز الكارت** بالأمر المذكور، ثم ارفع الملف الناتج هنا ليُرحَّل مباشرة.")
+                st.caption("لو النسخة دي من غير كارت توقيع (زي السحابة): نزّل الفاتورة غير الموقعة من زر (⬇️ نزّل الفاتورة) اللي هيظهر بعد ضغطة رحّل، وقّعها على **جهاز الكارت** من قسم (🖊️ وقّع ملف JSON) اللي فوق، ثم ارفع الملف الناتج هنا ليُرحَّل مباشرة.")
                 signed_up=st.file_uploader("ارفع ملف JSON المُوقّع (ينتهي بـ .signed.json)",type=["json"],key="rent_signed_up")
                 if signed_up is not None:
                     try:
