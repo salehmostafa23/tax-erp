@@ -3964,6 +3964,31 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                         else:
                             st.session_state.pop("rent_pfx_bytes",None)
 
+                if not st.session_state.get("eta_token"):
+                    st.markdown("### 🔐 الاتصال بالبورتال")
+                    st.caption("البورتال يطلب توكن تفويض (Client ID + Client Secret من إعدادات حساب البورتال) — اربط مرة واحدة بالحقول دي قبل الضغط على الترحيل:")
+                    e1,e2=st.columns(2)
+                    with e1:
+                        eta_cid_input=st.text_input("Client ID",value=st.session_state.get("eta_client_id",""),key="rent_eta_cid",placeholder="أدخل Client ID")
+                    with e2:
+                        eta_csec_input=st.text_input("Client Secret",value=st.session_state.get("eta_client_secret",""),type="password",key="rent_eta_csec",placeholder="أدخل Client Secret")
+                    if st.button("🔐 الاتصال بالبورتال",key="rent_eta_connect",type="primary",use_container_width=True):
+                        eta_cid_cur=st.session_state.get("rent_eta_cid","").strip()
+                        eta_csec_cur=st.session_state.get("rent_eta_csec","").strip()
+                        if not eta_cid_cur or not eta_csec_cur:
+                            st.error("أدخل Client ID و Client Secret أولاً")
+                        else:
+                            with st.spinner("جاري الاتصال بالبورتال..."):
+                                ntoken,nerr=eta_login(eta_cid_cur,eta_csec_cur)
+                            if nerr:
+                                st.error(f"❌ فشل الاتصال: {nerr}")
+                            else:
+                                st.session_state["eta_token"]=ntoken
+                                st.session_state["eta_client_id"]=eta_cid_cur
+                                st.session_state["eta_client_secret"]=eta_csec_cur
+                                st.success("✅ تم الاتصال بالبورتال — الآن اضغط زر (🚀 رحّل) لإكمال الترحيل")
+                                st.rerun()
+
                 if st.button("🚀 رحّل Direct للبورتال",key="rent_submit",type="primary",use_container_width=True):
                     tax_no=tax_in.strip()
                     civ_val=civ_in.strip()
@@ -3977,7 +4002,7 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                         if not token:
                             token=_eta_refresh_token()
                         if not token:
-                            st.error("غير متصل بالبورتال - اربط أولاً من تاب الربط في صفحة Portal")
+                            st.error("غير متصل بالبورتال — اربط أولاً من قسم (🔐 الاتصال بالبورتال) بالشاشة ثم أعد الضغط على (🚀 رحّل)")
                         else:
                             invoice_lines=[]
                             for li in lines_info:
@@ -4042,6 +4067,11 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                                     st.stop()
                                 document=sres["document"]
                             status,resp=eta_submit_invoice(token,document)
+                            if status==401:
+                                ntoken=_eta_refresh_token()
+                                if ntoken and ntoken!=token:
+                                    token=ntoken
+                                    status,resp=eta_submit_invoice(token,document)
                             if status in (200,201,202):
                                 st.success(f"✅ البورتال استلم الفاتورة للمعالجة (HTTP {status}) - جاري التحقق من وصولها فعلاً في البورتال...")
                                 verdict_label="معالجة"
