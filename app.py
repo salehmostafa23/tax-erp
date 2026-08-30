@@ -46,7 +46,7 @@ DATA_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # ====================== USERS ======================
 USERS_FILE=os.path.join(DATA_DIR,"users.json")
-ALL_PAGES=["🏠 الرئيسية","📋 نموذج 41","💰 القيمة المضافة","🛒 فواتير الماركت","📄 Portal الفواتير الإلكترونية","🔍 الاستعلام عن ممول","🏷️ الاستعلام عن الأكواد","📑 اقرار 10 قيمة مضافة"]
+ALL_PAGES=["🏠 الرئيسية","📋 نموذج 41","💰 القيمة المضافة","🛒 فواتير الماركت","📄 Portal الفواتير الإلكترونية","🔍 الاستعلام عن ممول","🏷️ الاستعلام عن الأكواد","📑 اقرار 10 قيمة مضافة","📦 فواتير مبيعات الجملة والإيجارات"]
 ADMIN_PAGE="👥 إدارة المستخدمين"
 
 def _hash_pw(pw,salt="tax_erp_salt_2024"):
@@ -251,6 +251,20 @@ def _eta_refresh_token():
         st.session_state["eta_token"]=token
         return token
     return None
+
+def eta_submit_invoice(token, document):
+    url=f"{ETA_API_BASE}/api/v1.0/documentsubmissions"
+    headers={"Authorization":f"Bearer {token}","Content-Type":"application/json; charset=utf-8"}
+    payload={"documents":[document]}
+    try:
+        r=http_requests.post(url,headers=headers,json=payload,timeout=90,verify=False)
+    except Exception as e:
+        return None, str(e)
+    try:
+        data=r.json()
+    except Exception:
+        data={"raw":r.text[:600]}
+    return r.status_code,data
 
 def _extract_barcode_from_line(line):
     import re
@@ -3533,3 +3547,271 @@ elif page=="📑 اقرار 10 قيمة مضافة":
                         st.success("تم الحذف");st.rerun()
         else:
             st.info("لا توجد اقرارات محفوظة" + ("" if filter_decl_month=="الكل" and filter_decl_year=="الكل" else " في الفترة المحددة"))
+
+# ====================== WHOLESALE / RENT INVOICES ======================
+elif page=="📦 فواتير مبيعات الجملة والإيجارات":
+    if not user_has_permission(page): st.error("لا تملك صلاحية الوصول");st.stop()
+
+    st.markdown(f"""<div class="erp-topbar"><div><h2>{page}</h2><p>إنشاء وترحيل فواتير مبيعات الجملة والإيجارات للبورتال</p></div>
+<div class="erp-topbar-right">{_portal_led()}</div></div>""", unsafe_allow_html=True)
+
+    _tab_ws,_tab_rent=st.tabs(["📦 مبيعات الجملة","🏢 الإيجارات"])
+
+    with _tab_ws:
+        st.info("تاب مبيعات الجملة قيد التطوير - جارٍ التحضير")
+
+    with _tab_rent:
+        import re as _rent_re
+        RENT_META={
+            "G127409":{"name":"إيجار","barcode":"6224003512283","js":"ايجار"},
+            "G127411":{"name":"كهرباء","barcode":"6224003512290","js":"كهرباء"},
+            "G134260":{"name":"مياه","barcode":"6224003512306","js":"مياه"},
+        }
+        _ORG_NAME="جهاز الخدمات العامة للقوات المسلحة"
+
+        def _rent_clean_html(raw):
+            text=""
+            for enc in ("utf-8","cp1256","windows-1256"):
+                try:
+                    text=raw.decode(enc);break
+                except Exception: continue
+            if not text:
+                text=raw.decode("utf-8",errors="replace")
+            return text
+
+        _ALLCODES=('G127409','G127411','G134260')
+
+        def _rent_collapse(html):
+            txt=_rent_re.sub(r'</(td|th|tr|p|div|li|span|br|strong|b|h\d)>','\n',html,flags=_rent_re.I)
+            txt=_rent_re.sub(r'<br\s*/?>','\n',txt,flags=_rent_re.I)
+            txt=_rent_re.sub(r'<[^>]+>',' ',txt)
+            txt=_rent_re.sub(r'&nbsp;',' ',txt)
+            ls=[_rent_re.sub(r'[ \t]+',' ',l).strip() for l in txt.split('\n')]
+            return '\n'.join(l for l in ls if l)
+
+        def _rent_num_after(lines,label,limit=160):
+            i=lines.find(label)
+            if i<0: return ''
+            m=_rent_re.search(r'([0-9]{9,15})',lines[i+len(label):i+len(label)+limit])
+            return m.group(1) if m else ''
+
+        def _rent_tok_after(lines,label):
+            i=lines.find(label)
+            if i<0: return ''
+            tail=lines[i+len(label):i+len(label)+50]
+            m=_rent_re.search(r'[A-Za-z0-9]+(?:[-_/][A-Za-z0-9]+)+',tail)
+            if m: return m.group(0)
+            m=_rent_re.search(r'([A-Za-z0-9_]+)',tail)
+            return m.group(1) if m else ''
+
+        def _rent_digit_ok(nm):
+            if nm.startswith(('0','6224')): return False
+            if nm.isdigit():
+                for c in _ALLCODES:
+                    if int(nm)==int(c[1:]) or (1900<=int(nm)<=2100): return False
+            try: f=float(nm.replace(',',''))
+            except Exception: return False
+            return 1<=f<10**9
+
+        def _rent_line_nums(line):
+            out=[]
+            for nm in _rent_re.findall(r'(\d[\d,]*(?:\.\d+)?)',line):
+                if _rent_digit_ok(nm): out.append(float(nm.replace(',','')))
+            return out
+
+        def _rent_val_near(lines,code):
+            ls=lines.split('\n')
+            for m in _rent_re.finditer(_rent_re.escape(code),lines):
+                i=lines.count('\n',0,m.start())
+                own=_rent_line_nums(ls[i])
+                if own: return f"{max(own):g}"
+                for k in range(1,5):
+                    if i+k<len(ls):
+                        cand=_rent_line_nums(ls[i+k])
+                        if cand: return f"{max(cand):g}"
+                for k in range(1,3):
+                    if i-k>=0:
+                        cand=_rent_line_nums(ls[i-k])
+                        if cand: return f"{max(cand):g}"
+            return ''
+
+        def _rent_parse(html_bytes):
+            html=_rent_clean_html(html_bytes)
+            lines=_rent_collapse(html)
+            info={'rent':'','elec':'','water':'','tax_num':'','civ':'','so_ref':''}
+            info['rent']=_rent_val_near(lines,'G127409')
+            info['elec']=_rent_val_near(lines,'G127411')
+            info['water']=_rent_val_near(lines,'G134260')
+            info['tax_num']=_rent_num_after(lines,'الرقم الضريبي') or _rent_num_after(lines,'الرقم الضريبى')
+            civ=_rent_re.search(r'(CIV[-0-9A-Za-z_]+)',lines)
+            if civ: info['civ']=civ.group(1)
+            info['so_ref']=_rent_tok_after(lines,'رقم أمر المبيعات') or _rent_tok_after(lines,'أمر المبيعات')
+            return info
+
+        c_rent_m,c_rent_y=st.columns(2)
+        with c_rent_m:
+            _rent_sel_m=st.selectbox("الفاتورة شهر ايه؟",range(1,13),index=datetime.now().month-1,format_func=lambda x:f"{x}-{MONTHS[x]}",key="rent_sel_m")
+        with c_rent_y:
+            _rent_sel_y=st.selectbox("السنة",range(2020,2031),index=list(range(2020,2031)).index(datetime.now().year) if datetime.now().year in range(2020,2031) else 6,key="rent_sel_y")
+        _month_ar=MONTHS[_rent_sel_m]
+
+        rent_html=st.file_uploader("ارفع ملف HTML لأمر المبيعات",type=["html","htm"],key="rent_html_upload")
+        parsed=None
+        if rent_html:
+            parsed=_rent_parse(rent_html.getvalue())
+            st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot" style="background:#a29bfe;"></div><h3>📥 نتائج قراءة الملف</h3></div>',unsafe_allow_html=True)
+            cA,cB,cC=st.columns(3)
+            with cA:
+                st.markdown("**رقم التسجيل الضريبي**")
+                tax_in=st.text_input("",value=parsed.get('tax_num',''),key="rent_tax_num",placeholder="الرقم الضريبي")
+            with cB:
+                st.markdown("**الرقم الداخلي (CIV)**")
+                civ_in=st.text_input("",value=parsed.get('civ',''),key="rent_civ",placeholder="CIV...")
+            with cC:
+                st.markdown("**رقم أمر المبيعات**")
+                so_in=st.text_input("",value=parsed.get('so_ref',''),key="rent_so_ref",placeholder="مرجع طلب المبيعات")
+            st.markdown("**المبالغ المكتشفة (قابلة للتعديل):**")
+            c1,c2,c3=st.columns(3)
+            with c1:
+                st.markdown("**🏢 إيجار (G127409)**")
+                rent_gross_in=st.text_input("",value=parsed.get('rent',''),key="rent_amt",placeholder="المبلغ")
+            with c2:
+                st.markdown("**⚡ كهرباء (G127411)**")
+                elec_gross_in=st.text_input("",value=parsed.get('elec',''),key="elec_amt",placeholder="المبلغ")
+            with c3:
+                st.markdown("**💧 مياه (G134260)**")
+                water_gross_in=st.text_input("",value=parsed.get('water',''),key="water_amt",placeholder="المبلغ")
+
+            def _fval(s):
+                try:
+                    v=float(str(s).replace(',','').strip())
+                    return v if v>0 else 0.0
+                except Exception: return 0.0
+
+            rent_gross=_fval(rent_gross_in)
+            elec_gross=_fval(elec_gross_in)
+            water_gross=_fval(water_gross_in)
+
+            rent_type=None
+            if rent_gross>0:
+                st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot" style="background:#00cec9;"></div><h3>🏢 خيارات ضريبة الإيجار</h3></div>',unsafe_allow_html=True)
+                rent_type=st.radio("اختر نوع الفاتورة",["💼 إيجار عادي - ضريبة جدول 1% (T3)","🤝 إيجار مشاركة - ضريبة 14% (T1/V010)"],key="rent_type_opt")
+
+            lines_info=[]
+            if rent_gross>0:
+                if rent_type and rent_type.startswith("💼"):
+                    rate=1.0; at="T3"; sub="T3"; rt="T3"
+                else:
+                    rate=14.0; at="T1"; sub="V010"; rt="T1"
+                net=round(rent_gross/(1.0+rate/100.0),5)
+                tax=round(rent_gross-net,5)
+                lines_info.append({"name":"إيجار","desc":f"ايجار {_month_ar} {_rent_sel_y}","barcode":RENT_META["G127409"]["barcode"],"gross":rent_gross,"net":net,"tax":tax,"rate":rate,"at":at,"sub":sub,"rt":rt})
+            if elec_gross>0:
+                lines_info.append({"name":"كهرباء","desc":f"كهرباء {_month_ar} {_rent_sel_y}","barcode":RENT_META["G127411"]["barcode"],"gross":elec_gross,"net":elec_gross,"tax":0.0,"rate":0.0,"at":"","sub":"","rt":""})
+            if water_gross>0:
+                lines_info.append({"name":"مياه","desc":f"مياه {_month_ar} {_rent_sel_y}","barcode":RENT_META["G134260"]["barcode"],"gross":water_gross,"net":water_gross,"tax":0.0,"rate":0.0,"at":"","sub":"","rt":""})
+
+            if lines_info:
+                preview_rows=[]
+                for li in lines_info:
+                    preview_rows.append({"الصنف":li["name"],"الباركود":li["barcode"],"الوصف":li["desc"],"المبلغ قبل الضريبة":li["net"],"نوع الضريبة":li["at"]+"/"+li["sub"] if li["at"] else "بدون", "قيمة الضريبة":li["tax"],"الإجمالي":li["gross"]})
+                st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot" style="background:#55efc4;"></div><h3>🧮 معاينة الفاتورة</h3></div>',unsafe_allow_html=True)
+                st.dataframe(pd.DataFrame(preview_rows),use_container_width=True)
+                t_net=round(sum(li["net"] for li in lines_info),5)
+                t_tax=round(sum(li["tax"] for li in lines_info),5)
+                t_gross=round(sum(li["gross"] for li in lines_info),2)
+                s1,s2,s3=st.columns(3)
+                with s1: st.markdown(f'<div class="erp-stat s-blue"><div class="erp-stat-label">إجمالي قبل الضريبة</div><div class="erp-stat-value">{fmt(t_net)}</div></div>',unsafe_allow_html=True)
+                with s2: st.markdown(f'<div class="erp-stat s-orange"><div class="erp-stat-label">إجمالي الضرائب</div><div class="erp-stat-value">{fmt(t_tax)}</div></div>',unsafe_allow_html=True)
+                with s3: st.markdown(f'<div class="erp-stat s-green"><div class="erp-stat-label">الإجمالي</div><div class="erp-stat-value">{fmt(t_gross)}</div></div>',unsafe_allow_html=True)
+
+                if st.button("🚀 رحّل Direct للبورتال",key="rent_submit",type="primary",use_container_width=True):
+                    tax_no=tax_in.strip()
+                    civ_val=civ_in.strip()
+                    so_ref=so_in.strip()
+                    if not tax_no or len(tax_no)<9:
+                        st.error("رقم التسجيل الضريبي مفقود أو غير مكتمل")
+                    elif not civ_val:
+                        st.error("الرقم الداخلي CIV مفقود")
+                    else:
+                        token=st.session_state.get("eta_token","")
+                        if not token:
+                            token=_eta_refresh_token()
+                        if not token:
+                            st.error("غير متصل بالبورتال - اربط أولاً من تاب الربط في صفحة Portal")
+                        else:
+                            invoice_lines=[]
+                            for li in lines_info:
+                                taxes=[]
+                                if li["at"]:
+                                    taxes.append({"amountType":li["at"],"amount":li["tax"],"rate":li["rate"],"subType":li["sub"],"rateType":li["rt"],"internalCode":li["rt"]})
+                                invoice_lines.append({
+                                    "description":li["desc"],
+                                    "itemType":"GS1",
+                                    "itemCode":{"id":li["barcode"],"type":"B"},
+                                    "unitType":"EA",
+                                    "quantity":1,
+                                    "internalCode":"T0",
+                                    "saleType":"SY",
+                                    "totalItemsDiscount":0,
+                                    "valueDifference":0,
+                                    "totalTaxableFees":0,
+                                    "netTotal":li["net"],
+                                    "itemsDiscount":0,
+                                    "unitValue":{"currencySold":"EGP","amountSold":li["net"],"currencyExchangeRate":0,"currencyEquivalent":0},
+                                    "price":{"amountSold":li["net"],"name":"P","currencyExchangeRate":0,"currencyEquivalent":0,"amountEGP":li["net"]},
+                                    "discount":{"amountSold":0,"rate":0,"amountEGP":0},
+                                    "taxes":taxes
+                                })
+                            document={
+                                "documentType":"I",
+                                "documentTypeVersion":"1.1",
+                                "dateTimeIssued":datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ'),
+                                "taxpayerActivityCode":"4610",
+                                "internalID":civ_val,
+                                "invoiceCounterNumber":1,
+                                "invoiceNumber":1,
+                                "supplier":{"type":"B","id":tax_no,"name":_ORG_NAME},
+                                "receiver":{"type":"B","id":tax_no,"name":_ORG_NAME},
+                                "purchaseOrderReference":None,
+                                "salesOrderReference":so_ref or None,
+                                "proformaInvoiceNumber":None,
+                                "payment":{"bankName":"","bankAddress":"","bankAccountNo":"","bankAccountIBAN":"","swiftCode":"","terms":None},
+                                "delivery":{"approach":"","packaging":"","dateValidity":"","exportPort":"","countryOfOrigin":"EG","grossWeight":0,"netWeight":0,"terms":None},
+                                "invoiceLines":invoice_lines,
+                                "totalDiscount":0,
+                                "totalSales":t_net,
+                                "netAmount":t_net,
+                                "totalAmount":t_gross,
+                                "totalItemsDiscount":0,
+                                "valueDifference":0,
+                                "totalTaxableFees":0,
+                                "currency":"EGP",
+                                "extraDiscountAmount":0,
+                                "totalItemsDiscountAmount":0,
+                                "totalAmountVat":t_tax,
+                                "exemptedAmount":0,
+                                "amountWithVat":t_gross,
+                                "tables":{}
+                            }
+                            status,resp=eta_submit_invoice(token,document)
+                            if status==200:
+                                subs=resp.get("submissions",[]) if isinstance(resp,dict) else []
+                                uuids=[s.get("documentUuid","") for s in subs if isinstance(s,dict)]
+                                st.success(f"تم ترحيل الفاتورة للبورتال بنجاح ✅{' - UUID: '+', '.join(uuids) if uuids else ''}")
+                            else:
+                                msg=[]
+                                msg.append(f"الرد: HTTP {status}")
+                                if isinstance(resp,dict):
+                                    msg.append(str(resp.get("message",resp.get("error",resp.get("raw","")))))
+                                    dets=resp.get("details",[])
+                                    if dets:
+                                        msg.append("التفاصيل:")
+                                        for dt in dets[:5]:
+                                            msg.append(" - "+str(dt.get("message",dt)))
+                                else:
+                                    msg.append(str(resp))
+                                st.error("\n".join(msg))
+                                st.markdown("""<div style="padding:.7rem 1rem;border-radius:10px;background:rgba(255,107,107,.07);border:1px solid rgba(255,107,107,.15);color:#ff6b6b;font-size:.8rem;">💡 الترحيب مباشر للبورتال يتطلب <strong>التوقيع الإلكتروني</strong> (شهادة الشركة CAdES) — لو البورتال رفض الفاتورة بسبب التوقيع، محتاجين نضيف التوقيع في الخطوة الجاية.</div>""",unsafe_allow_html=True)
+            else:
+                st.info("لم يتم العثور على أي من الأصناف (G127409 / G127411 / G134260) بالمبالغ - تحقق من أرقام الأصناف في الملف")
