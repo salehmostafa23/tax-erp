@@ -3873,23 +3873,39 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                                 "tables":{}
                             }
                             status,resp=eta_submit_invoice(token,document)
-                            if status==200:
-                                subs=resp.get("submissions",[]) if isinstance(resp,dict) else []
-                                uuids=[s.get("documentUuid","") for s in subs if isinstance(s,dict)]
-                                st.success(f"تم ترحيل الفاتورة للبورتال بنجاح ✅{' - UUID: '+', '.join(uuids) if uuids else ''}")
+                            if status in (200,201,202):
+                                uuids=[]
+                                if isinstance(resp,dict):
+                                    acc=resp.get("acceptedDocuments",[])
+                                    if acc:
+                                        for a in acc:
+                                            if isinstance(a,dict): uuids.append(a.get("uuid",a.get("documentUuid","")))
+                                    else:
+                                        for k in ("documentUuid","uuid","submissionUuid"):
+                                            v=resp.get(k,"")
+                                            if v: uuids.append(v)
+                                ok=uuids[0] if uuids else ""
+                                st.success(fr"✅ تم ترحيل الفاتورة للبورتال بنجاح - تمت الموافقة (HTTP {status})")
+                                if ok:
+                                    st.markdown(f'<div style="padding:.5rem 1rem;border-radius:10px;background:rgba(0,206,201,.06);border:1px solid rgba(0,206,201,.15);color:#00cec9;font-size:.82rem;">🆔 UUID: <strong>{ok}</strong></div>',unsafe_allow_html=True)
+                                st.balloons()
                             else:
                                 msg=[]
                                 msg.append(f"الرد: HTTP {status}")
                                 if isinstance(resp,dict):
                                     msg.append(str(resp.get("message",resp.get("error",resp.get("raw","")))))
                                     dets=resp.get("details",[])
+                                    if not dets:
+                                        dets=resp.get("rejectedDocuments",[]) if isinstance(resp.get("rejectedDocuments"),list) else []
                                     if dets:
                                         msg.append("التفاصيل:")
                                         for dt in dets[:5]:
-                                            msg.append(" - "+str(dt.get("message",dt)))
+                                            if isinstance(dt,dict):
+                                                msg.append(" - "+str(dt.get("message",dt.get("error",{}) if isinstance(dt.get("error"),dict) else dt)))
+                                            else:
+                                                msg.append(" - "+str(dt))
                                 else:
                                     msg.append(str(resp))
                                 st.error("\n".join(msg))
-                                st.markdown("""<div style="padding:.7rem 1rem;border-radius:10px;background:rgba(255,107,107,.07);border:1px solid rgba(255,107,107,.15);color:#ff6b6b;font-size:.8rem;">💡 الترحيب مباشر للبورتال يتطلب <strong>التوقيع الإلكتروني</strong> (شهادة الشركة CAdES) — لو البورتال رفض الفاتورة بسبب التوقيع، محتاجين نضيف التوقيع في الخطوة الجاية.</div>""",unsafe_allow_html=True)
             else:
                 st.info("لم يتم العثور على أي من الأصناف (G127409 / G127411 / G134260) بالمبالغ - تحقق من أرقام الأصناف في الملف")
