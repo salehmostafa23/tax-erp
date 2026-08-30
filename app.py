@@ -347,18 +347,10 @@ def eta_canonical(doc):
         return _scalar(obj)
     return _walk(doc)
 
-def _eta_cades_sign(data_bytes,pfx_bytes,password=""):
-    pw=None
-    if password:
-        try:
-            pw=password if isinstance(password,bytes) else password.encode("utf-8")
-        except Exception: pw=None
-    key,cert,extra=pkcs12.load_key_and_certificates(pfx_bytes,pw)
-    if cert is None:
-        raise ValueError("الملف لا يحتوي على شهادة/مفتاح (تأكد من كلمة السر وأن الملف exportable)")
-    cert_der=cert.public_bytes(Encoding.DER)
-    issuer_der=cert.issuer.public_bytes()
-    serial_der=_eta_int_der(cert.serial_number)
+_ETA_SMART_SCRIPT=os.path.join(os.path.dirname(os.path.abspath(__file__)),"smartcard_sign.ps1")
+
+def _eta_build_cades(data_bytes,cert_der,issuer_der,serial_num,get_sig):
+    serial_der=_eta_int_der(serial_num)
     canon_hash=hashlib.sha256(data_bytes).digest()
     cert_hash=hashlib.sha256(cert_der).digest()
     utctime=_eta_tlv(0x17,datetime.now().strftime("%y%m%d%H%M%SZ").encode("ascii"))
@@ -371,7 +363,9 @@ def _eta_cades_sign(data_bytes,pfx_bytes,password=""):
            +_attr(_ETA_ATTR_SIGNING_TIME,utctime)
            +_attr(_ETA_ATTR_SIGNING_CERT_V2,signing_cv2))
     signed_attrs=_eta_tlv(0xA0,attrs)
-    signature=key.sign(signed_attrs,padding.PKCS1v15(),hashes.SHA256())
+    signature=get_sig(signed_attrs)
+    if not signature:
+        raise ValueError("فشل الحصول على التوقيع من المفتاح")
     sid=_eta_tlv(0x30,issuer_der+serial_der)
     signer_info=_eta_tlv(0x30,
         b"\x02\x01\x01"
@@ -393,6 +387,71 @@ def _eta_cades_sign(data_bytes,pfx_bytes,password=""):
     content_info=_eta_tlv(0x30,_ETA_SIGNED_DATA_OID+_eta_tlv(0xA0,signed_data))
     return base64.b64encode(content_info).decode("ascii")
 
+def _eta_smartcard_cert():
+    if os.name!="nt" or not os.path.exists(_ETA_SMART_SCRIPT):
+        return None
+    try:
+        import subprocess
+        r=subprocess.run(["powershell","-NoProfile","-ExecutionPolicy","Bypass","-File",_ETA_SMART_SCRIPT],
+                         capture_output=True,text=True,timeout=60,cwd=os.path.dirname(_ETA_SMART_SCRIPT))
+    except Exception:
+        return None
+    out=(r.stdout or "").strip()
+    if r.returncode!=0 or not out:
+        return None
+    try:
+        d=json.loads(out)
+    except Exception:
+        return None
+    if not d.get("cert") or not d.get("issuer") or not d.get("serial"):
+        return None
+    return d
+
+def _eta_smartcard_sign(data_bytes):
+    if os.name!="nt" or not os.path.exists(_ETA_SMART_SCRIPT):
+        return None
+    try:
+        import subprocess
+        r=subprocess.run(["powershell","-NoProfile","-ExecutionPolicy","Bypass","-File",_ETA_SMART_SCRIPT,"-DataB64",base64.b64encode(data_bytes).decode("ascii")],
+                         capture_output=True,text=True,timeout=120,cwd=os.path.dirname(_ETA_SMART_SCRIPT))
+    except Exception:
+        return None
+    out=(r.stdout or "").strip()
+    if r.returncode!=0 or not out:
+        return None
+    try:
+        d=json.loads(out)
+    except Exception:
+        return None
+    return d.get("signature") or None
+
+def _eta_cades_sign(data_bytes,pfx_bytes,password=""):
+    if pfx_bytes:
+        pw=None
+        if password:
+            try:
+                pw=password if isinstance(password,bytes) else password.encode("utf-8")
+            except Exception: pw=None
+        key,cert,extra=pkcs12.load_key_and_certificates(pfx_bytes,pw)
+        if cert is None:
+            raise ValueError("الملف لا يحتوي على شهادة/مفتاح (تأكد من كلمة السر وأن الملف exportable)")
+        cert_der=cert.public_bytes(Encoding.DER)
+        issuer_der=cert.issuer.public_bytes()
+        serial_num=cert.serial_number
+        def _with_key(sa):
+            return key.sign(sa,padding.PKCS1v15(),hashes.SHA256())
+    else:
+        info=_eta_smartcard_cert()
+        if not info:
+            return None
+        cert_der=base64.b64decode(info["cert"])
+        issuer_der=base64.b64decode(info["issuer"])
+        serial_num=int(info["serial"],16)
+        def _with_key(sa):
+            res=_eta_smartcard_sign(sa)
+            return base64.b64decode(res) if res else None
+    return _eta_build_cades(data_bytes,cert_der,issuer_der,serial_num,_with_key)
+
 def eta_sign_json_document(document,pfx_bytes,password=""):
     try:
         to_sign={k:v for k,v in document.items() if k!="signatures"}
@@ -401,6 +460,8 @@ def eta_sign_json_document(document,pfx_bytes,password=""):
         lit=json.loads(text,parse_float=str,parse_int=str)
         canonical=eta_canonical(lit)
         sig=_eta_cades_sign(canonical.encode("utf-8"),pfx_bytes,password)
+        if not sig:
+            return {"document":None,"signature":None}
         out=dict(clean)
         out["signatures"]=[{"signatureType":"CAdES","value":sig}]
         return {"document":out,"signature":sig}
@@ -3945,7 +4006,7 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                 with s3: st.markdown(f'<div class="erp-stat s-green"><div class="erp-stat-label">الإجمالي</div><div class="erp-stat-value">{fmt(t_gross)}</div></div>',unsafe_allow_html=True)
 
                 with st.expander("🔏 شهادة التوقيع الإلكتروني (مطلوبة للموافقة في البورتال)"):
-                    st.caption("البورتال يطلب الفاتورة **مُوقّعة إلكترونيًا** (CAdES-BES) بشهادة الشركة. ارفع ملف الشهادة **exportable** بصيغة PFX بس (استخرجها بكلمة سر) — بدونها البورتال سيرفض الفاتورة.")
+                    st.caption("إذا كان التطبيق شغالًا على **جهاز فيه شهادة الكارت (eSeal Egypt Trust)** فهيوقّع تلقائيًا ولا داعي لملف. غير ذلك ارفع شهادة PFX exportable + كلمة السر — وبدون أي توقيع البورتال سيرفض الفاتورة.")
                     c_pfx=st.file_uploader("",type=["pfx","p12"],key="rent_pfx",accept_multiple_files=False)
                     c_pw=st.text_input("كلمة سر الشهادة PFX",type="password",key="rent_pfx_pw")
                     if c_pfx is not None:
@@ -4060,11 +4121,11 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                                 "signatures":[]
                             }
                             rent_pfx_bytes=st.session_state.get("rent_pfx_bytes")
-                            if rent_pfx_bytes:
-                                sres=eta_sign_json_document(document,rent_pfx_bytes,st.session_state.get("rent_pfx_pw",""))
-                                if sres.get("error"):
-                                    st.error(f"❌ فشل توقيع الفاتورة؛ لن يتم الإرسال: {sres['error']}")
-                                    st.stop()
+                            sres=eta_sign_json_document(document,rent_pfx_bytes,st.session_state.get("rent_pfx_pw",""))
+                            if sres.get("error"):
+                                st.error(f"❌ فشل توقيع الفاتورة؛ لن يتم الإرسال: {sres['error']}")
+                                st.stop()
+                            if sres.get("signature"):
                                 document=sres["document"]
                             status,resp=eta_submit_invoice(token,document)
                             if status==401:
