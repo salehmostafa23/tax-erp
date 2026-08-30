@@ -592,5 +592,14 @@
     "upload_date": "2026-08-30T08:40:25.926499",
     "items_count": 2,
     "matched": 1
+  },
+  {
+    "receipt_number": "201011-02181544",
+    "receipt_date": "2026-08-30",
+    "receiver_name": "الكتيبة 69 طرق",
+    "file_name": "201011-02181544_2026-08-30_الكتيبة 69 طرق.xlsx",
+    "upload_date": "2026-08-30T09:24:41.700340",
+    "items_count": 13,
+    "matched": 11
   }
 ]
