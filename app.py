@@ -3979,6 +3979,14 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
             info['so_ref']=_rent_tok_after(lines,'رقم أمر المبيعات') or _rent_tok_after(lines,'أمر المبيعات')
             return info
 
+        _rent_env_cd=_eta_smartcard_diag()
+        if os.name!="nt":
+            st.markdown('<div style="padding:.8rem 1rem;border-radius:12px;background:rgba(250,177,160,.08);border:1px solid rgba(250,177,160,.3);color:#fab1a0;font-size:.85rem;"><strong>☁️ أنت الآن على نسخة سحابية من غير كارت التوقيع.</strong> مفتاح التوقيع محبوس في كارت موصل بجهازك فقط — الترحيل الناجح بزر واحد بيتم من التطبيق المحلي: <a href="http://localhost:8501" target="_blank" style="color:#00cec9;font-weight:700;">افتح التطبيق المحلي دوس رحّل ←</a></div>',unsafe_allow_html=True)
+        elif "مقروءة ✓" in _rent_env_cd:
+            st.markdown('<div style="padding:.8rem 1rem;border-radius:12px;background:rgba(0,206,201,.07);border:1px solid rgba(0,206,201,.25);color:#00cec9;font-size:.85rem;"><strong>🪪 كارت التوقيع متصل ومقروء ✓</strong> — دوس (🚀 رحّل) وهتفتح نافذة PIN مباشرة، اكتبها والفاتورة ترحل.</div>',unsafe_allow_html=True)
+        else:
+            st.markdown(f'<div style="padding:.8rem 1rem;border-radius:12px;background:rgba(255,234,167,.07);border:1px solid rgba(255,234,167,.25);color:#ffeaa7;font-size:.85rem;"><strong>🖥️ جهاز ويندوز لكن الكارت غير مقروء الآن</strong> — تأكد إن شهادة الكارت متوصلة وإلا {_rent_env_cd}</div>',unsafe_allow_html=True)
+
         c_rent_m,c_rent_y=st.columns(2)
         with c_rent_m:
             _rent_sel_m=st.selectbox("الفاتورة شهر ايه؟",range(1,13),index=datetime.now().month-1,format_func=lambda x:f"{x}-{MONTHS[x]}",key="rent_sel_m")
