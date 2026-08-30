@@ -2454,6 +2454,41 @@ elif page=="🛒 فواتير الماركت":
                         st.rerun()
             else:
                 st.info(f"لا توجد أكواد مطابقة لـ: {bc_search.strip()}")
+            st.markdown('<div class="erp-section" style="margin-top:1.2rem"><div class="erp-section-dot" style="background:#fd79a8;"></div><h3>🖋️ تعديل بالجملة</h3></div>',unsafe_allow_html=True)
+            bulk_file=st.file_uploader("ارفع شيت Excel - العمود A: الكود الداخلي | العمود B: الباركود الجديد",type=["xlsx","xls"],key="bc_bulk_upload")
+            if bulk_file:
+                try:
+                    bdf=pd.read_excel(bulk_file,header=None,dtype=str)
+                except Exception:
+                    st.error("تعذر قراءة الملف - تأكد من صيغته")
+                else:
+                    pairs=[]
+                    for _,bulk_row in bdf.iterrows():
+                        va=bulk_row[0];vb=bulk_row[1]
+                        if pd.isna(va) and pd.isna(vb): continue
+                        ca=str(va).strip() if not pd.isna(va) else ''
+                        cb=str(vb).strip() if not pd.isna(vb) else ''
+                        if not ca or not cb: continue
+                        if ca.endswith('.0') and ca[:-2].isdigit(): ca=ca[:-2]
+                        if cb.endswith('.0') and cb[:-2].isdigit(): cb=cb[:-2]
+                        pairs.append((ca,cb))
+                    if not pairs:
+                        st.warning("الملف فاضي من البيانات")
+                    else:
+                        existing_ids={str(x.get('internal_code','')).strip() for x in barcodes_db}
+                        match=[p for p in pairs if p[0] in existing_ids]
+                        notfound=[p for p in pairs if p[0] not in existing_ids]
+                        preview=pd.DataFrame([{'الكود الداخلي':p[0],'الباركود الجديد':p[1],'الحالة':'✅ سيتم التعديل' if p[0] in existing_ids else '⚠️ غير موجود بالقاعدة'} for p in pairs])
+                        st.dataframe(preview,use_container_width=True,height=250)
+                        st.markdown(f'<div style="padding:.5rem 1rem;border-radius:10px;background:rgba(253,121,168,.06);border:1px solid rgba(253,121,168,.15);color:#fd79a8;font-size:.82rem;">📊 سيتم تعديل <strong>{len(match)}</strong> كود - غير موجود بالقاعدة <strong>{len(notfound)}</strong> (سيتم تجاهلهم)</div>',unsafe_allow_html=True)
+                        if st.button(f"💾 حفظ التعديل بالجملة ({len(match)})",key="bc_bulk_save",type="primary"):
+                            for id_val,bc_val in match:
+                                for rec in barcodes_db:
+                                    if str(rec.get('internal_code','')).strip()==id_val:
+                                        rec['barcode']=bc_val;break
+                            save_barcodes(barcodes_db)
+                            st.success(f"تم تعديل {len(match)} كود بنجاح!")
+                            st.rerun()
 
 # ====================== PORTAL ELECTRONIC INVOICES ======================
 elif page=="📄 Portal الفواتير الإلكترونية":
