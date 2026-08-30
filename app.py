@@ -387,23 +387,31 @@ def _eta_build_cades(data_bytes,cert_der,issuer_der,serial_num,get_sig):
     content_info=_eta_tlv(0x30,_ETA_SIGNED_DATA_OID+_eta_tlv(0xA0,signed_data))
     return base64.b64encode(content_info).decode("ascii")
 
+_ETA_CARD_ERR=""
 def _eta_smartcard_cert():
+    global _ETA_CARD_ERR
+    _ETA_CARD_ERR=""
     if os.name!="nt" or not os.path.exists(_ETA_SMART_SCRIPT):
+        _ETA_CARD_ERR="سكريبت smartcard_sign.ps1 غير موجود"
         return None
     try:
         import subprocess
         r=subprocess.run(["powershell","-NoProfile","-ExecutionPolicy","Bypass","-File",_ETA_SMART_SCRIPT],
                          capture_output=True,text=True,timeout=60,cwd=os.path.dirname(_ETA_SMART_SCRIPT))
-    except Exception:
+    except Exception as e:
+        _ETA_CARD_ERR="تعذر تشغيل PowerShell: "+str(e)[:120]
         return None
     out=(r.stdout or "").strip()
     if r.returncode!=0 or not out or "NO_CERT" in out:
+        _ETA_CARD_ERR=("رمز "+str(r.returncode)+" - ")+((r.stderr or out)[:150])
         return None
     try:
         d=json.loads(out)
     except Exception:
+        _ETA_CARD_ERR="استجابة غير قابلة للقراءة: "+out[:150]
         return None
     if not d.get("cert") or not d.get("issuer") or not d.get("serial"):
+        _ETA_CARD_ERR="بيانات الشهادة ناقصة"
         return None
     return d
 
@@ -436,22 +444,36 @@ def _eta_smartcard_diag():
     return "شهادة الكارت مقروءة ✓ - "+cn
 
 def _eta_smartcard_sign(data_bytes):
+    global _ETA_CARD_ERR
+    _ETA_CARD_ERR=""
     if os.name!="nt" or not os.path.exists(_ETA_SMART_SCRIPT):
+        _ETA_CARD_ERR="سكريبت smartcard_sign.ps1 غير موجود"
         return None
-    try:
-        import subprocess
-        r=subprocess.run(["powershell","-NoProfile","-ExecutionPolicy","Bypass","-File",_ETA_SMART_SCRIPT,"-DataB64",base64.b64encode(data_bytes).decode("ascii")],
-                         capture_output=True,text=True,timeout=120,cwd=os.path.dirname(_ETA_SMART_SCRIPT))
-    except Exception:
-        return None
-    out=(r.stdout or "").strip()
-    if r.returncode!=0 or not out:
-        return None
-    try:
-        d=json.loads(out)
-    except Exception:
-        return None
-    return d.get("signature") or None
+    import subprocess
+    flags=subprocess.CREATE_NEW_CONSOLE if hasattr(subprocess,"CREATE_NEW_CONSOLE") else 0
+    for attempt in range(2):
+        try:
+            r=subprocess.run(["powershell","-NoProfile","-ExecutionPolicy","Bypass","-File",_ETA_SMART_SCRIPT,"-DataB64",base64.b64encode(data_bytes).decode("ascii")],
+                             capture_output=True,text=True,timeout=240,creationflags=flags,cwd=os.path.dirname(_ETA_SMART_SCRIPT))
+        except Exception as e:
+            _ETA_CARD_ERR="تعذر تشغيل PowerShell للتوقيع: "+str(e)[:120]
+            import time; time.sleep(1)
+            continue
+        out=(r.stdout or "").strip()
+        if r.returncode==0 and out:
+            try:
+                d=json.loads(out)
+            except Exception:
+                _ETA_CARD_ERR="استجابة توقيع غير قابلة للقراءة: "+out[:120]
+                import time; time.sleep(1)
+                continue
+            if d.get("signature"):
+                return d["signature"]
+            _ETA_CARD_ERR=d.get("error") or ("استجابة بدون توقيع: "+out[:150])
+        else:
+            _ETA_CARD_ERR=("رمز "+str(r.returncode)+" - ")+((r.stderr or out)[:150])
+        import time; time.sleep(1)
+    return None
 
 def _eta_cades_sign(data_bytes,pfx_bytes,password=""):
     if pfx_bytes:
@@ -489,7 +511,8 @@ def eta_sign_json_document(document,pfx_bytes,password=""):
         canonical=eta_canonical(lit)
         sig=_eta_cades_sign(canonical.encode("utf-8"),pfx_bytes,password)
         if not sig:
-            return {"document":None,"signature":None}
+            reason=_ETA_CARD_ERR or "لا توجد وسيلة توقيع (أرفع PFX exportable أو تأكد من توصيل كارت الشهادة)"
+            return {"document":None,"signature":None,"reason":reason}
         out=dict(clean)
         out["signatures"]=[{"signatureType":"CAdES","value":sig}]
         return {"document":out,"signature":sig}
@@ -4162,7 +4185,9 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                                 document=sres["document"]
                                 st.info("✍️ الفاتورة أُرسلت مُوقّعة إلكترونيًا (CAdES-BES)")
                             else:
-                                st.warning("⚠️ الفاتورة أُرسلت **من غير توقيع إلكتروني** — البورتال غالبًا سيرفضها لهذا السبب")
+                                _why=sres.get("reason","لا توجد وسيلة توقيع")
+                                st.warning(f"⚠️ تعذر التوقيع: {_why}. ستُرسل الفاتورة **من غير توقيع إلكتروني** وقد يرفضها البورتال.")
+                                st.caption("ستفتح نافذة PowerShell ظاهرة مع نافذة PIN للكارت - لو مادخلتهاش انتظر ثم أعد الضغط على رحّل. بديل: ارفع PFX exportable بالكود والشيفرة في تب شهادة التوقيع.")
                             status,resp=eta_submit_invoice(token,document)
                             if status==401:
                                 ntoken=_eta_refresh_token()
