@@ -574,5 +574,14 @@
     "upload_date": "2026-08-29T10:53:40.688995",
     "items_count": 17,
     "matched": 16
+  },
+  {
+    "receipt_number": "301011-02187678",
+    "receipt_date": "2026-08-27",
+    "receiver_name": "ميكائيل جعفر فوعاني",
+    "file_name": "301011-02187678_2026-08-27_ميكائيل جعفر فوعاني.xlsx",
+    "upload_date": "2026-08-30T05:30:31.771323",
+    "items_count": 2,
+    "matched": 1
   }
 ]
