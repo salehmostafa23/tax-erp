@@ -262,7 +262,7 @@ def eta_submit_invoice(token, document):
     headers={"Authorization":f"Bearer {token}","Content-Type":"application/json; charset=utf-8"}
     payload={"documents":[document]}
     try:
-        r=http_requests.post(url,headers=headers,json=payload,timeout=90,verify=False)
+        r=http_requests.post(url,headers=headers,json=payload,timeout=150,verify=False)
     except Exception as e:
         return None, str(e)
     try:
@@ -289,7 +289,7 @@ def eta_reconcile_document(token, internal_id):
     url=f"{ETA_API_BASE}/api/v1.0/documents/reconcile"
     headers={"Authorization":f"Bearer {token}"}
     try:
-        r=http_requests.get(url,headers=headers,params={"internalId":internal_id},timeout=30,verify=False)
+        r=http_requests.get(url,headers=headers,params={"internalId":internal_id},timeout=60,verify=False)
     except Exception as e:
         return None, {"error":str(e)}
     try:
@@ -397,7 +397,7 @@ def _eta_smartcard_cert():
     except Exception:
         return None
     out=(r.stdout or "").strip()
-    if r.returncode!=0 or not out:
+    if r.returncode!=0 or not out or "NO_CERT" in out:
         return None
     try:
         d=json.loads(out)
@@ -406,6 +406,34 @@ def _eta_smartcard_cert():
     if not d.get("cert") or not d.get("issuer") or not d.get("serial"):
         return None
     return d
+
+def _eta_smartcard_diag():
+    if os.name!="nt":
+        return "بيئة غير ويندوز - لن يعمل التوقيع بالكارت"
+    if not os.path.exists(_ETA_SMART_SCRIPT):
+        return "ملف السكريبت smartcard_sign.ps1 مفقود"
+    try:
+        import subprocess
+        r=subprocess.run(["powershell","-NoProfile","-ExecutionPolicy","Bypass","-File",_ETA_SMART_SCRIPT],
+                         capture_output=True,text=True,timeout=60,cwd=os.path.dirname(_ETA_SMART_SCRIPT))
+    except Exception as e:
+        return "تعذر تشغيل PowerShell: "+str(e)[:150]
+    out=(r.stdout or "").strip()
+    if r.returncode!=0:
+        return "خطأ PowerShell (رمز "+str(r.returncode)+"): "+((r.stderr or out)[:200])
+    if "NO_CERT" in out:
+        return "لا توجد شهادة eSeal (Egypt Trust) بمفتاح خاص على هذا الجهاز"
+    try:
+        d=json.loads(out)
+    except Exception:
+        return "استجابة غير متوقعة: "+out[:200]
+    try:
+        from cryptography import x509 as _etax
+        c=_etax.load_der_x509_certificate(base64.b64decode(d["cert"]))
+        cn=c.subject.rfc4514_string()
+    except Exception:
+        cn="رقم تسلسلي "+str(d.get("serial"))[:20]
+    return "شهادة الكارت مقروءة ✓ - "+cn
 
 def _eta_smartcard_sign(data_bytes):
     if os.name!="nt" or not os.path.exists(_ETA_SMART_SCRIPT):
@@ -4007,6 +4035,11 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
 
                 with st.expander("🔏 شهادة التوقيع الإلكتروني (مطلوبة للموافقة في البورتال)"):
                     st.caption("إذا كان التطبيق شغالًا على **جهاز فيه شهادة الكارت (eSeal Egypt Trust)** فهيوقّع تلقائيًا ولا داعي لملف. غير ذلك ارفع شهادة PFX exportable + كلمة السر — وبدون أي توقيع البورتال سيرفض الفاتورة.")
+                    _cd=_eta_smartcard_diag()
+                    if "مقروءة ✓" in _cd:
+                        st.success(_cd)
+                    else:
+                        st.warning(_cd+" — الفاتورة ستُرسل بدون توقيع وقد يرفضها البورتال")
                     c_pfx=st.file_uploader("",type=["pfx","p12"],key="rent_pfx",accept_multiple_files=False)
                     c_pw=st.text_input("كلمة سر الشهادة PFX",type="password",key="rent_pfx_pw")
                     if c_pfx is not None:
@@ -4127,6 +4160,9 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                                 st.stop()
                             if sres.get("signature"):
                                 document=sres["document"]
+                                st.info("✍️ الفاتورة أُرسلت مُوقّعة إلكترونيًا (CAdES-BES)")
+                            else:
+                                st.warning("⚠️ الفاتورة أُرسلت **من غير توقيع إلكتروني** — البورتال غالبًا سيرفضها لهذا السبب")
                             status,resp=eta_submit_invoice(token,document)
                             if status==401:
                                 ntoken=_eta_refresh_token()
