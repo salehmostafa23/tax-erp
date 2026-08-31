@@ -4208,57 +4208,53 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                         else:
                             invoice_lines=[]
                             for li in lines_info:
-                                taxes=[]
-                                if li["at"]:
-                                    taxes.append({"amountType":li["at"],"amount":li["tax"],"rate":li["rate"],"subType":li["sub"],"rateType":li["rt"],"internalCode":li["rt"]})
+                                _taxable=[]
+                                if li["at"] and li["tax"]>0:
+                                    _taxable=[{"taxType":li["at"],"amount":round(li["tax"],5),"subType":li["sub"],"rate":li["rate"]}]
                                 invoice_lines.append({
                                     "description":li["desc"],
-                                    "itemType":"GS1",
-                                    "itemCode":{"id":li["barcode"],"type":"B"},
+                                    "itemType":"GPC",
+                                    "itemCode":li["barcode"],
                                     "unitType":"EA",
                                     "quantity":1,
-                                    "internalCode":"T0",
-                                    "saleType":"SY",
-                                    "totalItemsDiscount":0,
+                                    "internalCode":"IC0",
+                                    "salesTotal":round(li["gross"],5),
+                                    "total":round(li["gross"],5),
                                     "valueDifference":0,
-                                    "totalTaxableFees":0,
-                                    "netTotal":li["net"],
+                                    "totalTaxableFees":round(li["tax"],5),
+                                    "netTotal":round(li["net"],5),
                                     "itemsDiscount":0,
-                                    "unitValue":{"currencySold":"EGP","amountSold":li["net"],"currencyExchangeRate":0,"currencyEquivalent":0},
-                                    "price":{"amountSold":li["net"],"name":"P","currencyExchangeRate":0,"currencyEquivalent":0,"amountEGP":li["net"]},
-                                    "discount":{"amountSold":0,"rate":0,"amountEGP":0},
-                                    "taxes":taxes
+                                    "unitValue":{"currencySold":"EGP","amountEGP":round(li["net"],5),"amountSold":round(li["net"],5),"currencyExchangeRate":0},
+                                    "discount":{"rate":0,"amount":0},
+                                    "taxableItems":_taxable
                                 })
+                            _tax_totals=[]
+                            _rent_at=[li["at"] for li in lines_info if li["at"]]
+                            if _rent_at:
+                                _tax_totals=[{"taxType":_rent_at[0],"amount":round(t_tax,5)}]
                             document={
+                                "issuer":{"type":"B","id":tax_no,"address":{"branchID":"","country":"EG","governate":"","regionCity":"","street":"","buildingNumber":"","postalCode":"","floor":"","room":"","landmark":"","additionalInformation":""},"name":_ORG_NAME},
+                                "receiver":{"type":"B","id":tax_no,"address":{"branchID":"","country":"EG","governate":"","regionCity":"","street":"","buildingNumber":"","postalCode":"","floor":"","room":"","landmark":"","additionalInformation":""},"name":_ORG_NAME},
                                 "documentType":"I",
                                 "documentTypeVersion":"1.0",
                                 "dateTimeIssued":datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ'),
                                 "taxpayerActivityCode":"4610",
                                 "internalID":civ_val,
-                                "invoiceCounterNumber":1,
-                                "invoiceNumber":1,
-                                "supplier":{"type":"B","id":tax_no,"idType":"INN","name":_ORG_NAME},
-                                "receiver":{"type":"B","id":tax_no,"idType":"INN","name":_ORG_NAME},
                                 "purchaseOrderReference":None,
+                                "purchaseOrderDescription":None,
                                 "salesOrderReference":so_ref or None,
+                                "salesOrderDescription":None,
                                 "proformaInvoiceNumber":None,
                                 "payment":{"bankName":"","bankAddress":"","bankAccountNo":"","bankAccountIBAN":"","swiftCode":"","terms":None},
                                 "delivery":{"approach":"","packaging":"","dateValidity":"","exportPort":"","countryOfOrigin":"EG","grossWeight":0,"netWeight":0,"terms":None},
                                 "invoiceLines":invoice_lines,
-                                "totalDiscount":0,
-                                "totalSales":t_net,
-                                "netAmount":t_net,
-                                "totalAmount":t_gross,
-                                "totalItemsDiscount":0,
-                                "valueDifference":0,
-                                "totalTaxableFees":0,
-                                "currency":"EGP",
-                                "extraDiscountAmount":0,
-                                "totalItemsDiscountAmount":0,
-                                "totalAmountVat":t_tax,
-                                "exemptedAmount":0,
-                                "amountWithVat":t_gross,
-                                "tables":{},
+                                "totalDiscountAmount":0.0,
+                                "totalSalesAmount":round(t_net,5),
+                                "netAmount":round(t_net,5),
+                                "taxTotals":_tax_totals,
+                                "totalAmount":round(t_gross,2),
+                                "extraDiscountAmount":0.0,
+                                "totalItemsDiscountAmount":0.0,
                                 "signatures":[]
                             }
                             rent_pfx_bytes=st.session_state.get("rent_pfx_bytes")
