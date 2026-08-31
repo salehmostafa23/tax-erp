@@ -517,7 +517,7 @@ def eta_sign_json_document(document,pfx_bytes,password=""):
             reason=_ETA_CARD_ERR or "لا توجد وسيلة توقيع (أرفع PFX exportable أو تأكد من توصيل كارت الشهادة)"
             return {"document":None,"signature":None,"reason":reason}
         out=dict(clean)
-        out["signatures"]=[{"signatureType":"CAdES","value":sig}]
+        out["signatures"]=[{"signatureType":"I","value":sig}]
         return {"document":out,"signature":sig}
     except Exception as e:
         return {"error":str(e)}
@@ -3825,6 +3825,7 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
             "G134260":{"name":"مياه","barcode":"6224003512306","js":"مياه"},
         }
         _ORG_NAME="جهاز الخدمات العامة للقوات المسلحة"
+        _GOV="Cairo"; _CITY="Nasr City"; _STREET="Al Nasr Road"; _BLDG="12"
 
         def _rent_clean_html(raw):
             text=""
@@ -4233,8 +4234,8 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                             if _rent_at:
                                 _tax_totals=[{"taxType":_rent_at[0],"amount":round(t_tax,5)}]
                             document={
-                                "issuer":{"type":"B","id":tax_no,"address":{"branchID":"","country":"EG","governate":"","regionCity":"","street":"","buildingNumber":"","postalCode":"","floor":"","room":"","landmark":"","additionalInformation":""},"name":_ORG_NAME},
-                                "receiver":{"type":"B","id":tax_no,"address":{"branchID":"","country":"EG","governate":"","regionCity":"","street":"","buildingNumber":"","postalCode":"","floor":"","room":"","landmark":"","additionalInformation":""},"name":_ORG_NAME},
+                                "issuer":{"type":"B","id":tax_no,"address":{"branchID":"","country":"EG","governate":_GOV,"regionCity":_CITY,"street":_STREET,"buildingNumber":_BLDG,"postalCode":"","floor":"","room":"","landmark":"","additionalInformation":""},"name":_ORG_NAME},
+                                "receiver":{"type":"B","id":tax_no,"address":{"branchID":"","country":"EG","governate":_GOV,"regionCity":_CITY,"street":_STREET,"buildingNumber":_BLDG,"postalCode":"","floor":"","room":"","landmark":"","additionalInformation":""},"name":_ORG_NAME},
                                 "documentType":"I",
                                 "documentTypeVersion":"1.0",
                                 "dateTimeIssued":datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ'),
