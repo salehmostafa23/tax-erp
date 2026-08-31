@@ -4231,7 +4231,7 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                                 })
                             document={
                                 "documentType":"I",
-                                "documentTypeVersion":"1.1",
+                                "documentTypeVersion":"1.0",
                                 "dateTimeIssued":datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ'),
                                 "taxpayerActivityCode":"4610",
                                 "internalID":civ_val,
