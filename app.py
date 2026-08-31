@@ -354,7 +354,7 @@ def _eta_build_cades(data_bytes,cert_der,issuer_der,serial_num,get_sig):
     canon_hash=hashlib.sha256(data_bytes).digest()
     cert_hash=hashlib.sha256(cert_der).digest()
     utctime=_eta_tlv(0x17,datetime.now().strftime("%y%m%d%H%M%SZ").encode("ascii"))
-    issuer_general=_eta_tlv(0xA4,issuer_der)
+    issuer_general=_eta_tlv(0xA0,issuer_der)
     general_names=_eta_tlv(0x30,issuer_general)
     issuer_serial=_eta_tlv(0x30,general_names+serial_der)
     esccert=_eta_tlv(0x30,_eta_tlv(0x04,cert_hash)+issuer_serial)
@@ -4215,7 +4215,7 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                                     _taxable=[{"taxType":li["at"],"amount":round(li["tax"],5),"subType":li["sub"],"rate":li["rate"]}]
                                 invoice_lines.append({
                                     "description":li["desc"],
-                                    "itemType":"GPC",
+                                    "itemType":"GS1",
                                     "itemCode":li["barcode"],
                                     "unitType":"EA",
                                     "quantity":1,
@@ -4235,12 +4235,12 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                             if _rent_at:
                                 _tax_totals=[{"taxType":_rent_at[0],"amount":round(t_tax,5)}]
                             document={
-                                "issuer":{"type":"B","id":_ISS_ID,"address":{"branchID":"1","country":"EG","governate":_GOV,"regionCity":_CITY,"street":_STREET,"buildingNumber":_BLDG,"postalCode":"","floor":"","room":"","landmark":_LAND,"additionalInformation":""},"name":_ORG_NAME},
+                                "issuer":{"type":"B","id":_ISS_ID,"address":{"branchID":"0","country":"EG","governate":_GOV,"regionCity":_CITY,"street":_STREET,"buildingNumber":_BLDG,"postalCode":"","floor":"","room":"","landmark":_LAND,"additionalInformation":""},"name":_ORG_NAME},
                                 "receiver":{"type":"B","id":tax_no,"address":{"branchID":"1","country":"EG","governate":"Cairo","regionCity":"Cairo","street":"Main Street","buildingNumber":"1","postalCode":"","floor":"","room":"","landmark":"","additionalInformation":""},"name":"المستأجر"},
                                 "documentType":"I",
                                 "documentTypeVersion":"1.0",
                                 "dateTimeIssued":(datetime.now(timezone.utc)-timedelta(minutes=2)).strftime('%Y-%m-%dT%H:%M:%SZ'),
-                                "taxpayerActivityCode":"4610",
+                                "taxpayerActivityCode":"8422",
                                 "internalID":civ_val,
                                 "purchaseOrderReference":None,
                                 "purchaseOrderDescription":None,
