@@ -311,7 +311,7 @@ _ETA_SIGNED_DATA_OID=b"\x06\x09\x2a\x86\x48\x86\xf7\x0d\x01\x07\x02"
 _ETA_ATTR_CONTENT_TYPE=b"\x06\x09\x2a\x86\x48\x86\xf7\x0d\x01\x09\x03"
 _ETA_ATTR_MESSAGE_DIGEST=b"\x06\x09\x2a\x86\x48\x86\xf7\x0d\x01\x09\x04"
 _ETA_ATTR_SIGNING_TIME=b"\x06\x09\x2a\x86\x48\x86\xf7\x0d\x01\x09\x05"
-_ETA_ATTR_SIGNING_CERT_V2=b"\x06\x0a\x2a\x86\x48\x86\xf7\x0d\x01\x10\x02\x2f"
+_ETA_ATTR_SIGNING_CERT_V2=b"\x06\x0b\x2a\x86\x48\x86\xf7\x0d\x01\x09\x10\x02\x2f"
 
 def _eta_tlv(tag,content):
     l=len(content)
@@ -354,7 +354,10 @@ def _eta_build_cades(data_bytes,cert_der,issuer_der,serial_num,get_sig):
     canon_hash=hashlib.sha256(data_bytes).digest()
     cert_hash=hashlib.sha256(cert_der).digest()
     utctime=_eta_tlv(0x17,datetime.now().strftime("%y%m%d%H%M%SZ").encode("ascii"))
-    esccert=_eta_tlv(0x30,_eta_tlv(0x04,cert_hash))
+    issuer_general=_eta_tlv(0xA4,issuer_der)
+    general_names=_eta_tlv(0x30,issuer_general)
+    issuer_serial=_eta_tlv(0x30,general_names+serial_der)
+    esccert=_eta_tlv(0x30,_eta_tlv(0x04,cert_hash)+issuer_serial)
     signing_cv2=_eta_tlv(0x30,esccert)
     def _attr(oid,value_der):
         return _eta_tlv(0x30,oid+_eta_tlv(0x31,value_der))
@@ -374,7 +377,7 @@ def _eta_build_cades(data_bytes,cert_der,issuer_der,serial_num,get_sig):
         +signed_attrs
         +_eta_tlv(0x30,_ETA_RSASHA256_OID)
         +_eta_tlv(0x04,signature))
-    digest_algs=_eta_tlv(0x31,_ETA_SHA256_OID)
+    digest_algs=_eta_tlv(0x31,_eta_tlv(0x30,_ETA_SHA256_OID))
     encap=_eta_tlv(0x30,_ETA_DIGEST_DATA_OID)
     certs=_eta_tlv(0xA0,cert_der)
     signer_infos=_eta_tlv(0x31,signer_info)
