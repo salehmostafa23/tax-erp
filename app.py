@@ -7,7 +7,7 @@ import shutil
 import math
 import hashlib
 import requests as http_requests
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from io import BytesIO
 import base64
 import time
@@ -3825,7 +3825,8 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
             "G134260":{"name":"مياه","barcode":"6224003512306","js":"مياه"},
         }
         _ORG_NAME="جهاز الخدمات العامة للقوات المسلحة"
-        _GOV="Cairo"; _CITY="Nasr City"; _STREET="Al Nasr Road"; _BLDG="12"
+        _GOV="Cairo"; _CITY="Bab El Sharia"; _STREET="برج مصر للسياحة"; _BLDG="23"; _LAND="ميدان العباسية"
+        _ISS_ID="100027024"
 
         def _rent_clean_html(raw):
             text=""
@@ -4225,7 +4226,7 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                                     "totalTaxableFees":round(li["tax"],5),
                                     "netTotal":round(li["net"],5),
                                     "itemsDiscount":0,
-                                    "unitValue":{"currencySold":"EGP","amountEGP":round(li["net"],5),"amountSold":round(li["net"],5),"currencyExchangeRate":0},
+                                    "unitValue":{"currencySold":"EGP","amountEGP":round(li["net"],5),"currencyExchangeRate":0},
                                     "discount":{"rate":0,"amount":0},
                                     "taxableItems":_taxable
                                 })
@@ -4234,11 +4235,11 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                             if _rent_at:
                                 _tax_totals=[{"taxType":_rent_at[0],"amount":round(t_tax,5)}]
                             document={
-                                "issuer":{"type":"B","id":tax_no,"address":{"branchID":"","country":"EG","governate":_GOV,"regionCity":_CITY,"street":_STREET,"buildingNumber":_BLDG,"postalCode":"","floor":"","room":"","landmark":"","additionalInformation":""},"name":_ORG_NAME},
-                                "receiver":{"type":"B","id":tax_no,"address":{"branchID":"","country":"EG","governate":_GOV,"regionCity":_CITY,"street":_STREET,"buildingNumber":_BLDG,"postalCode":"","floor":"","room":"","landmark":"","additionalInformation":""},"name":_ORG_NAME},
+                                "issuer":{"type":"B","id":_ISS_ID,"address":{"branchID":"1","country":"EG","governate":_GOV,"regionCity":_CITY,"street":_STREET,"buildingNumber":_BLDG,"postalCode":"","floor":"","room":"","landmark":_LAND,"additionalInformation":""},"name":_ORG_NAME},
+                                "receiver":{"type":"B","id":tax_no,"address":{"branchID":"1","country":"EG","governate":"Cairo","regionCity":"Cairo","street":"Main Street","buildingNumber":"1","postalCode":"","floor":"","room":"","landmark":"","additionalInformation":""},"name":"المستأجر"},
                                 "documentType":"I",
                                 "documentTypeVersion":"1.0",
-                                "dateTimeIssued":datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ'),
+                                "dateTimeIssued":(datetime.now(timezone.utc)-timedelta(minutes=2)).strftime('%Y-%m-%dT%H:%M:%SZ'),
                                 "taxpayerActivityCode":"4610",
                                 "internalID":civ_val,
                                 "purchaseOrderReference":None,
