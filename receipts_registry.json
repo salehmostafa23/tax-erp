@@ -619,5 +619,14 @@
     "upload_date": "2026-08-31T06:53:38.582999",
     "items_count": 3,
     "matched": 2
+  },
+  {
+    "receipt_number": "302011-01158079",
+    "receipt_date": "2026-08-31",
+    "receiver_name": "السرية 20 محطات مياه مقلة",
+    "file_name": "302011-01158079_2026-08-31_السرية 20 محطات مياه مقلة.xlsx",
+    "upload_date": "2026-08-31T09:18:50.864949",
+    "items_count": 6,
+    "matched": 5
   }
 ]
