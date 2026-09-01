@@ -655,5 +655,14 @@
     "upload_date": "2026-09-01T08:24:52.284390",
     "items_count": 7,
     "matched": 6
+  },
+  {
+    "receipt_number": "201011-03160437",
+    "receipt_date": "2026-09-01",
+    "receiver_name": "كتيبة المساحة",
+    "file_name": "201011-03160437_2026-09-01_كتيبة المساحة.xlsx",
+    "upload_date": "2026-09-01T08:30:13.673452",
+    "items_count": 5,
+    "matched": 4
   }
 ]
