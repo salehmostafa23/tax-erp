@@ -3941,7 +3941,7 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                 for c in reversed(cand):
                     if c.isdigit(): dig=c+dig
                     elif dig: break
-                if re.fullmatch(r'\d{9,15}',dig): return dig
+                if _rent_re.fullmatch(r'\d{9,15}',dig): return dig
             return ''
 
         def _rent_tok_before(lines,label,back=200):
