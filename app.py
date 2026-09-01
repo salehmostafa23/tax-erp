@@ -4275,7 +4275,7 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                                 "invoiceLines":invoice_lines,
                                 "totalDiscountAmount":0.0,
                                 "totalSalesAmount":round(t_net,5),
-                                "netAmount":round(t_gross,5),
+                                "netAmount":round(t_net,5),
                                 "taxTotals":_tax_totals,
                                 "totalAmount":round(t_gross,2),
                                 "extraDiscountAmount":0.0,
