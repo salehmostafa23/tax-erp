@@ -358,7 +358,8 @@ def _eta_build_cades(data_bytes,cert_der,issuer_der,serial_num,get_sig):
     general_names=_eta_tlv(0x30,issuer_general)
     issuer_serial=_eta_tlv(0x30,general_names+serial_der)
     esccert=_eta_tlv(0x30,_eta_tlv(0x04,cert_hash)+issuer_serial)
-    signing_cv2=_eta_tlv(0x30,esccert)
+    certs=_eta_tlv(0x30,esccert)
+    signing_cv2=_eta_tlv(0x30,certs)
     def _attr(oid,value_der):
         return _eta_tlv(0x30,oid+_eta_tlv(0x31,value_der))
     attrs=(_attr(_ETA_ATTR_CONTENT_TYPE,_ETA_DIGEST_DATA_OID)
@@ -4211,7 +4212,7 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                             for li in lines_info:
                                 _taxable=[]
                                 if li["at"] and li["tax"]>0:
-                                    _taxable=[{"taxType":li["at"],"amount":round(li["tax"],5),"subType":li["sub"],"rate":li["rate"]}]
+                                    _taxable=[{"taxType":li["at"],"amount":round(li["tax"],5),"subType":li["sub"],"rate":0.0}]
                                 invoice_lines.append({
                                     "description":li["desc"],
                                     "itemType":"GS1",
@@ -4219,11 +4220,11 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                                     "unitType":"EA",
                                     "quantity":1,
                                     "internalCode":"IC0",
-                                    "salesTotal":round(li["gross"],5),
+                                    "salesTotal":round(li["net"],5),
                                     "total":round(li["gross"],5),
                                     "valueDifference":0,
-                                    "totalTaxableFees":round(li["tax"],5),
-                                    "netTotal":round(li["net"],5),
+                                    "totalTaxableFees":0.0,
+                                    "netTotal":round(li["gross"],5),
                                     "itemsDiscount":0,
                                     "unitValue":{"currencySold":"EGP","amountEGP":round(li["net"],5),"currencyExchangeRate":0},
                                     "discount":{"rate":0,"amount":0},
