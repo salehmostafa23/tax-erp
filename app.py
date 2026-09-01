@@ -2967,17 +2967,16 @@ elif page=="📄 Portal الفواتير الإلكترونية":
                 st.success("✅ تم الاتصال التلقائي بالبورتال!")
                 st.rerun()
 
-        if not eta_cid:
-            st.markdown("""<div style="padding:.8rem 1rem;border-radius:10px;background:rgba(253,203,110,.06);border:1px solid rgba(253,203,110,.15);margin-bottom:1rem;font-size:.78rem;color:#fdcb6e;">
-                💡 أدخل بيانات الاتصال يدوياً من البورتال
-            </div>""",unsafe_allow_html=True)
-            with st.form("eta_credentials_form"):
-                c1,c2=st.columns(2)
-                with c1:
-                    eta_client_id_input=st.text_input("Client ID",value=st.session_state.get("eta_client_id",""),placeholder="أدخل Client ID")
-                with c2:
-                    eta_client_secret_input=st.text_input("Client Secret",value=st.session_state.get("eta_client_secret",""),type="password",placeholder="أدخل Client Secret")
-                submitted=st.form_submit_button("🔐 الاتصال بالبورتال",type="primary")
+        st.markdown("""<div style="padding:.8rem 1rem;border-radius:10px;background:rgba(253,203,110,.06);border:1px solid rgba(253,203,110,.15);margin-top:.5rem;font-size:.78rem;color:#fdcb6e;">
+            💡 أدخل بيانات الاتصال يدوياً من البورتال (أو اتركها لتستخدم الإعدادات المحفوظة تلقائياً)
+        </div>""",unsafe_allow_html=True)
+        with st.form("eta_credentials_form"):
+            c1,c2=st.columns(2)
+            with c1:
+                eta_client_id_input=st.text_input("Client ID",value=st.session_state.get("eta_client_id",eta_cid),placeholder="أدخل Client ID")
+            with c2:
+                eta_client_secret_input=st.text_input("Client Secret",value=st.session_state.get("eta_client_secret",eta_csec),type="password",placeholder="أدخل Client Secret")
+            submitted=st.form_submit_button("🔐 الاتصال بالبورتال",type="primary")
             if submitted:
                 if not eta_client_id_input or not eta_client_secret_input:
                     st.error("أدخل Client ID و Client Secret")
