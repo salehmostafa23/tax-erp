@@ -4212,7 +4212,7 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                             for li in lines_info:
                                 _taxable=[]
                                 if li["at"] and li["tax"]>0:
-                                    _taxable=[{"taxType":li["at"],"amount":round(li["tax"],5),"subType":li["sub"],"rate":0.0}]
+                                    _taxable=[{"taxType":li["at"],"amount":round(li["tax"],5),"subType":li["sub"],"rate":round(li["rate"],2)}]
                                 invoice_lines.append({
                                     "description":li["desc"],
                                     "itemType":"GS1",
@@ -4221,10 +4221,10 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                                     "quantity":1,
                                     "internalCode":"IC0",
                                     "salesTotal":round(li["net"],5),
+                                    "netTotal":round(li["net"],5),
                                     "total":round(li["gross"],5),
                                     "valueDifference":0,
                                     "totalTaxableFees":0.0,
-                                    "netTotal":round(li["gross"],5),
                                     "itemsDiscount":0,
                                     "unitValue":{"currencySold":"EGP","amountEGP":round(li["net"],5),"currencyExchangeRate":0},
                                     "discount":{"rate":0,"amount":0},
@@ -4252,7 +4252,7 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                                 "invoiceLines":invoice_lines,
                                 "totalDiscountAmount":0.0,
                                 "totalSalesAmount":round(t_net,5),
-                                "netAmount":round(t_net,5),
+                                "netAmount":round(t_gross,5),
                                 "taxTotals":_tax_totals,
                                 "totalAmount":round(t_gross,2),
                                 "extraDiscountAmount":0.0,
