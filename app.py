@@ -3930,14 +3930,32 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
             m=_rent_re.search(r'([0-9]{9,15})',lines[i+len(label):i+len(label)+limit])
             return m.group(1) if m else ''
 
-        def _rent_tok_after(lines,label):
+        def _rent_num_before(lines,label,back=200):
+            if label not in lines: return ''
             i=lines.find(label)
-            if i<0: return ''
-            tail=lines[i+len(label):i+len(label)+50]
-            m=_rent_re.search(r'[A-Za-z0-9]+(?:[-_/][A-Za-z0-9]+)+',tail)
-            if m: return m.group(0)
-            m=_rent_re.search(r'([A-Za-z0-9_]+)',tail)
-            return m.group(1) if m else ''
+            ls=lines.split('\n')
+            idx=lines.count('\n',0,i)
+            for k in range(idx-1,max(-1,idx-back),-1):
+                cand=ls[k] if k<len(ls) else ''
+                dig=''
+                for c in reversed(cand):
+                    if c.isdigit(): dig=c+dig
+                    elif dig: break
+                if re.fullmatch(r'\d{9,15}',dig): return dig
+            return ''
+
+        def _rent_tok_before(lines,label,back=200):
+            if label not in lines: return ''
+            i=lines.find(label)
+            ls=lines.split('\n')
+            idx=lines.count('\n',0,i)
+            for k in range(idx-1,max(-1,idx-back),-1):
+                cand=(ls[k] if k<len(ls) else '').strip()
+                m=_rent_re.search(r'([A-Za-z0-9]+(?:[-_/][A-Za-z0-9]+)+)',cand)
+                if m: return m.group(1)
+                m=_rent_re.search(r'([A-Za-z0-9_]+\d+)',cand)
+                if m: return m.group(1)
+            return ''
 
         def _rent_digit_ok(nm):
             if nm.startswith(('0','6224')): return False
@@ -3978,10 +3996,10 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
             info['rent']=_rent_table_value(tables,'G127409') or _rent_val_near(lines,'G127409')
             info['elec']=_rent_table_value(tables,'G127411') or _rent_val_near(lines,'G127411')
             info['water']=_rent_table_value(tables,'G134260') or _rent_val_near(lines,'G134260')
-            info['tax_num']=_rent_num_after(lines,'الرقم الضريبي') or _rent_num_after(lines,'الرقم الضريبى')
+            info['tax_num']=_rent_num_before(lines,'الرقم الضريبي') or _rent_num_before(lines,'الرقم الضريبى') or _rent_num_after(lines,'الرقم الضريبي')
             civ=_rent_re.search(r'(CIV[-0-9A-Za-z_]+)',lines)
             if civ: info['civ']=civ.group(1)
-            info['so_ref']=_rent_tok_after(lines,'رقم أمر المبيعات') or _rent_tok_after(lines,'أمر المبيعات')
+            info['so_ref']=_rent_tok_before(lines,'أمر') or _rent_tok_before(lines,'المبيعات') or _rent_tok_after(lines,'رقم أمر المبيعات') or _rent_tok_after(lines,'أمر المبيعات')
             return info
 
         _rent_env_cd=_eta_smartcard_diag()
@@ -4014,6 +4032,9 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
             with cC:
                 st.markdown("**رقم أمر المبيعات**")
                 so_in=st.text_input("",value=parsed.get('so_ref',''),key="rent_so_ref",placeholder="مرجع طلب المبيعات")
+            st.markdown("**المستلم (To) — الاسم والعنوان:**")
+            rec_name_in=st.text_input("اسم المستلم (To / العميل)",value="المستأجر",key="rent_rec_name")
+            rec_addr_in=st.text_input("عنوان المستلم",value="Cairo, Egypt",key="rent_rec_addr")
             st.markdown("**المبالغ المكتشفة (قابلة للتعديل):**")
             c1,c2,c3=st.columns(3)
             with c1:
@@ -4197,6 +4218,8 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                     tax_no=tax_in.strip()
                     civ_val=civ_in.strip()
                     so_ref=so_in.strip()
+                    _rec_name=rec_name_in.strip() or "المستأجر"
+                    _rec_addr=rec_addr_in.strip() or "Cairo, Egypt"
                     if not tax_no or len(tax_no)<9:
                         st.error("رقم التسجيل الضريبي مفقود أو غير مكتمل")
                     elif not civ_val:
@@ -4236,7 +4259,7 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                                 _tax_totals=[{"taxType":_rent_at[0],"amount":round(t_tax,5)}]
                             document={
                                 "issuer":{"type":"B","id":_ISS_ID,"address":{"branchID":"0","country":"EG","governate":_GOV,"regionCity":_CITY,"street":_STREET,"buildingNumber":_BLDG,"postalCode":"","floor":"","room":"","landmark":_LAND,"additionalInformation":""},"name":_ORG_NAME},
-                                "receiver":{"type":"B","id":tax_no,"address":{"branchID":"1","country":"EG","governate":"Cairo","regionCity":"Cairo","street":"Main Street","buildingNumber":"1","postalCode":"","floor":"","room":"","landmark":"","additionalInformation":""},"name":"المستأجر"},
+                                "receiver":{"type":"B","id":tax_no,"address":{"branchID":"1","country":"EG","governate":"Cairo","regionCity":"Cairo","street":_rec_addr,"buildingNumber":"1","postalCode":"","floor":"","room":"","landmark":"","additionalInformation":""},"name":_rec_name},
                                 "documentType":"I",
                                 "documentTypeVersion":"1.0",
                                 "dateTimeIssued":(datetime.now(timezone.utc)-timedelta(minutes=2)).strftime('%Y-%m-%dT%H:%M:%SZ'),
