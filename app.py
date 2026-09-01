@@ -4044,9 +4044,9 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
             lines_info=[]
             if rent_gross>0:
                 if rent_type and rent_type.startswith("💼"):
-                    rate=1.0; at="T3"; sub="T3"; rt="T3"
+                    rate=1.0; at="T2"; sub="Tbl01"; rt="T12"
                 else:
-                    rate=14.0; at="T1"; sub="V010"; rt="T1"
+                    rate=14.0; at="T1"; sub="V010"; rt="T13"
                 net=round(rent_gross/(1.0+rate/100.0),5)
                 tax=round(rent_gross-net,5)
                 lines_info.append({"name":"إيجار","desc":f"ايجار {_month_ar} {_rent_sel_y}","barcode":RENT_META["G127409"]["barcode"],"gross":rent_gross,"net":net,"tax":tax,"rate":rate,"at":at,"sub":sub,"rt":rt})
