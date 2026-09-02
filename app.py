@@ -3831,7 +3831,7 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
     st.markdown(f"""<div class="erp-topbar"><div><h2>{page}</h2><p>إنشاء وترحيل فواتير مبيعات الجملة والإيجارات للبورتال</p></div>
 <div class="erp-topbar-right">{_portal_led()}</div></div>""", unsafe_allow_html=True)
 
-    _tab_ws,_tab_rent=st.tabs(["📦 مبيعات الجملة","🏢 الإيجارات"])
+    _tab_ws,_tab_rent,_tab_xl=st.tabs(["📦 مبيعات الجملة","✍️ التوقيع مباشر","📊 تحويل الفاتورة لأكسيل"])
 
     with _tab_ws:
         st.info("تاب مبيعات الجملة قيد التطوير - جارٍ التحضير")
@@ -4403,3 +4403,104 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                                 st.error("\n".join(msg))
             else:
                 st.info("لم يتم العثور على أي من الأصناف (G127409 / G127411 / G134260) بالمبالغ - تحقق من أرقام الأصناف في الملف")
+
+    with _tab_xl:
+        st.markdown('<div class="erp-section"><div class="erp-section-dot" style="background:#00b894;"></div><h3>📊 تحويل الفاتورة لأكسيل</h3></div>',unsafe_allow_html=True)
+        st.caption("نفس خطوات فاتورة الإيجار تمامًا — ارفع ملف HTML، اظبط البيانات، وسيُصدَّر شيت Excel جاهز باسم المستأجر وعنوانه بالرقم الداخلي ورقم أمر المبيعات.")
+
+        xl_m,xl_y=st.columns(2)
+        with xl_m:
+            xl_sel_m=st.selectbox("الفاتورة شهر ايه؟",range(1,13),index=datetime.now().month-1,format_func=lambda x:f"{x}-{MONTHS[x]}",key="xl_sel_m")
+        with xl_y:
+            xl_sel_y=st.selectbox("السنة",range(2020,2031),index=list(range(2020,2031)).index(datetime.now().year) if datetime.now().year in range(2020,2031) else 6,key="xl_sel_y")
+        xl_month_ar=MONTHS[xl_sel_m]
+
+        xl_html=st.file_uploader("ارفع ملف HTML لأمر المبيعات",type=["html","htm"],key="xl_html_upload")
+        if xl_html:
+            xl_parsed=_rent_parse(xl_html.getvalue())
+            st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot" style="background:#a29bfe;"></div><h3>📥 نتائج قراءة الملف</h3></div>',unsafe_allow_html=True)
+            xcA,xcB,xcC=st.columns(3)
+            with xcA:
+                st.markdown("**رقم التسجيل الضريبي**")
+                xl_tax=st.text_input("",value=xl_parsed.get('tax_num',''),key="xl_tax_num",placeholder="الرقم الضريبي")
+            with xcB:
+                st.markdown("**الرقم الداخلي (CIV)**")
+                xl_civ=st.text_input("",value=xl_parsed.get('civ',''),key="xl_civ",placeholder="CIV...")
+            with xcC:
+                st.markdown("**رقم أمر المبيعات**")
+                xl_so=st.text_input("",value=xl_parsed.get('so_ref',''),key="xl_so_ref",placeholder="مرجع طلب المبيعات")
+            st.markdown("**المستلم (To) — الاسم:**")
+            xl_rec=st.text_input("اسم المستلم (المستأجر)",value="المستأجر",key="xl_rec_name")
+            st.markdown("**المبالغ المكتشفة (قابلة للتعديل):**")
+            xl_c1,xl_c2,xl_c3=st.columns(3)
+            with xl_c1:
+                st.markdown("**🏢 إيجار (G127409)**")
+                xl_rent_in=st.text_input("",value=xl_parsed.get('rent',''),key="xl_rent_amt",placeholder="المبلغ")
+            with xl_c2:
+                st.markdown("**⚡ كهرباء (G127411)**")
+                xl_elec_in=st.text_input("",value=xl_parsed.get('elec',''),key="xl_elec_amt",placeholder="المبلغ")
+            with xl_c3:
+                st.markdown("**💧 مياه (G134260)**")
+                xl_water_in=st.text_input("",value=xl_parsed.get('water',''),key="xl_water_amt",placeholder="المبلغ")
+
+            def _xl_fval(s):
+                try:
+                    v=float(str(s).replace(',','').strip())
+                    return v if v>0 else 0.0
+                except Exception: return 0.0
+
+            xl_rent=_xl_fval(xl_rent_in)
+            xl_elec=_xl_fval(xl_elec_in)
+            xl_water=_xl_fval(xl_water_in)
+
+            xl_lines=[]
+            if xl_rent>0:
+                xl_type=st.radio("اختر نوع الفاتورة",["💼 إيجار عادي - ضريبة جدول 1% (T3)","🤝 إيجار مشاركة - ضريبة 14% (T1/V010)"],key="xl_rent_type")
+                if xl_type.startswith("💼"):
+                    xl_rate=1.0; xl_at="T2"; xl_sub="Tbl01"
+                else:
+                    xl_rate=14.0; xl_at="T1"; xl_sub="V010"
+                xl_net=round(xl_rent/(1.0+xl_rate/100.0),5)
+                xl_tax=round(xl_rent-xl_net,5)
+                xl_lines.append({"name":"إيجار","desc":f"ايجار {xl_month_ar} {xl_sel_y}","barcode":RENT_META["G127409"]["barcode"],"gross":xl_rent,"net":xl_net,"tax":xl_tax,"rate":xl_rate,"at":xl_at,"sub":xl_sub})
+            if xl_elec>0:
+                xl_lines.append({"name":"كهرباء","desc":f"كهرباء {xl_month_ar} {xl_sel_y}","barcode":RENT_META["G127411"]["barcode"],"gross":xl_elec,"net":xl_elec,"tax":0.0,"rate":0.0,"at":"","sub":""})
+            if xl_water>0:
+                xl_lines.append({"name":"مياه","desc":f"مياه {xl_month_ar} {xl_sel_y}","barcode":RENT_META["G134260"]["barcode"],"gross":xl_water,"net":xl_water,"tax":0.0,"rate":0.0,"at":"","sub":""})
+
+            if xl_lines:
+                xl_prev=[]
+                for li in xl_lines:
+                    xl_prev.append({"الصنف":li["name"],"الباركود":li["barcode"],"الوصف":li["desc"],"المبلغ قبل الضريبة":li["net"],"نوع الضريبة":li["at"]+"/"+li["sub"] if li["at"] else "بدون","قيمة الضريبة":li["tax"],"الإجمالي":li["gross"]})
+                st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot" style="background:#55efc4;"></div><h3>🧮 معاينة الفاتورة</h3></div>',unsafe_allow_html=True)
+                st.dataframe(pd.DataFrame(xl_prev),use_container_width=True)
+
+                if st.button("📥 تصدير شيت Excel",key="xl_export",type="primary",use_container_width=True):
+                    try:
+                        xl_tpl=os.path.join(os.path.dirname(os.path.abspath(__file__)),"rent_excel_template.xlsx")
+                        xl_wb=openpyxl.load_workbook(xl_tpl,data_only=False)
+                        xl_ws=xl_wb["بنود الفاتورة"]
+                        xl_r=2
+                        for li in xl_lines:
+                            xl_ws.cell(row=xl_r,column=1,value=str(li["barcode"]))
+                            xl_ws.cell(row=xl_r,column=2,value="IC0")
+                            xl_ws.cell(row=xl_r,column=3,value=li["desc"])
+                            xl_ws.cell(row=xl_r,column=4,value="EA")
+                            xl_ws.cell(row=xl_r,column=5,value=round(li["net"],5))
+                            xl_ws.cell(row=xl_r,column=6,value=1)
+                            xl_ws.cell(row=xl_r,column=7,value=0)
+                            xl_ws.cell(row=xl_r,column=8,value=0)
+                            if li.get("tax",0)>0:
+                                xl_ws.cell(row=xl_r,column=9,value=li["sub"])
+                                xl_ws.cell(row=xl_r,column=10,value=round(li["rate"],2))
+                            xl_r+=1
+                        xl_buf=BytesIO()
+                        xl_wb.save(xl_buf)
+                        xl_buf.seek(0)
+                        xl_safe=str(xl_rec or "المستأجر").strip().replace(':','').replace('/','').replace('\\','').replace('<','').replace('>','').replace('"','').replace('*','').replace('?','').replace('|','').strip()
+                        xl_safe=xl_safe or "المستأجر"
+                        xl_fname=f"{xl_safe} - {str(xl_civ).strip() or 'no-civ'} - {str(xl_so).strip() or 'no-so'}.xlsx"
+                        st.success("✅ تم تجهيز الشيت")
+                        st.download_button("⬇️ نزّل شيت Excel",data=xl_buf.getvalue(),file_name=xl_fname,mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",key="xl_dl")
+                    except Exception as xl_e:
+                        st.error("خطأ أثناء تصدير Excel: "+str(xl_e)[:200])
