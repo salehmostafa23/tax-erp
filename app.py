@@ -262,7 +262,8 @@ def eta_submit_invoice(token, document):
     headers={"Authorization":f"Bearer {token}","Content-Type":"application/json; charset=utf-8"}
     payload={"documents":[document]}
     try:
-        r=http_requests.post(url,headers=headers,json=payload,timeout=150,verify=False)
+        _body=json.dumps(payload,ensure_ascii=False).encode("utf-8")
+        r=http_requests.post(url,headers=headers,data=_body,timeout=150,verify=False)
     except Exception as e:
         return None, str(e)
     try:
@@ -367,7 +368,7 @@ def _eta_build_cades(data_bytes,cert_der,issuer_der,serial_num,get_sig):
            +_attr(_ETA_ATTR_SIGNING_TIME,utctime)
            +_attr(_ETA_ATTR_SIGNING_CERT_V2,signing_cv2))
     signed_attrs=_eta_tlv(0xA0,attrs)
-    signature=get_sig(attrs)
+    signature=get_sig(_eta_tlv(0x31,attrs))
     if not signature:
         raise ValueError("فشل الحصول على التوقيع من المفتاح")
     sid=_eta_tlv(0x30,issuer_der+serial_der)
@@ -520,6 +521,18 @@ def eta_sign_json_document(document,pfx_bytes,password=""):
         out=dict(clean)
         out["signatures"]=[{"signatureType":"I","value":sig}]
         return {"document":out,"signature":sig}
+    except Exception as e:
+        return {"error":str(e)}
+
+def eta_digest_of(document):
+    try:
+        to_sign={k:v for k,v in document.items() if k!="signatures"}
+        clean=eta_strip_nulls(to_sign)
+        text=json.dumps(clean,ensure_ascii=False,separators=(",",":"))
+        lit=json.loads(text,parse_float=str,parse_int=str)
+        canonical=eta_canonical(lit)
+        digest=hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+        return {"canonical":canonical,"digest":digest}
     except Exception as e:
         return {"error":str(e)}
 
@@ -2196,7 +2209,8 @@ elif page == "📋 نموذج 41":
             if rm:
                 st.markdown(f'<div style="padding:.5rem 1rem;border-radius:8px;background:rgba(255,107,107,.08);border:1px solid rgba(255,107,107,.15);color:#ff6b6b;font-size:.8rem;margin:.5rem 0;">⚠ سيتم حذف {len(rm)} سطر — المتبقي: {len(df)-len(rm)}</div>', unsafe_allow_html=True)
                 if st.button("🗑️ تطبيق الحذف",key="f41_arm"):
-                    st.session_state['f41_df']=df.drop(rm).reset_index(drop=True);st.rerun()
+                    st.session_state['f41_df']=df.drop(rm).reset_index(drop=True)
+                    st.markdown('</div>',unsafe_allow_html=True);st.rerun()
             df=st.session_state['f41_df']
             st.dataframe(df,use_container_width=True,height=280)
             st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>ربط البيانات</h3></div>',unsafe_allow_html=True)
@@ -2359,7 +2373,8 @@ elif page == "💰 القيمة المضافة":
             if rm:
                 st.markdown(f'<div style="padding:.5rem 1rem;border-radius:8px;background:rgba(255,107,107,.08);border:1px solid rgba(255,107,107,.15);color:#ff6b6b;font-size:.8rem;margin:.5rem 0;">⚠ سيتم حذف {len(rm)} سطر — المتبقي: {len(df)-len(rm)}</div>',unsafe_allow_html=True)
                 if st.button("🗑️ تطبيق الحذف",key="vat_arm"):
-                    st.session_state['vat_df']=df.drop(rm).reset_index(drop=True);st.rerun()
+                    st.session_state['vat_df']=df.drop(rm).reset_index(drop=True)
+                    st.markdown('</div>',unsafe_allow_html=True);st.rerun()
             df=st.session_state['vat_df']
             st.dataframe(df,use_container_width=True,height=280)
             st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>ربط البيانات</h3></div>',unsafe_allow_html=True)
@@ -2523,7 +2538,8 @@ elif page=="🛒 فواتير الماركت":
                         st.session_state['detail_df']=ddf
                         st.dataframe(ddf,use_container_width=True,height=300)
                         if st.button("التالي ←",key="next1",type="primary"):
-                            st.session_state['mkt_step']=2;st.rerun()
+                            st.session_state['mkt_step']=2
+                            st.markdown('</div>',unsafe_allow_html=True);st.rerun()
                 except Exception as e: st.error(f"خطأ: {e}")
             st.markdown('</div>',unsafe_allow_html=True)
         elif cs==2:
@@ -2546,7 +2562,8 @@ elif page=="🛒 فواتير الماركت":
                         if st.button("💾 حفظ الأكواد في القاعدة",key="save_barcodes_db",type="primary"):
                             new_db=[{'internal_code':k,'barcode':v} for k,v in merged.items()]
                             save_barcodes(new_db)
-                            st.success(f"تم حفظ {len(new_db)} كود");st.rerun()
+                            st.success(f"تم حفظ {len(new_db)} كود")
+                            st.markdown('</div>',unsafe_allow_html=True);st.rerun()
                 except Exception as e: st.error(f"خطأ: {e}")
             if barcodes_db:
                 st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot" style="background:#00cec9;"></div><h3>الأكواد المحفوظة ({})</h3></div>'.format(len(barcodes_db)),unsafe_allow_html=True)
@@ -2563,19 +2580,22 @@ elif page=="🛒 فواتير الماركت":
                             if str(b.get('internal_code','')).strip()==edit_ic:
                                 b['barcode']=new_bc.strip();break
                         save_barcodes(barcodes_db)
-                        st.success("تم حفظ التعديل!");st.rerun()
+                        st.success("تم حفظ التعديل!")
+                        st.markdown('</div>',unsafe_allow_html=True);st.rerun()
                 st.session_state['barcode_map']=barcodes_map
             else:
                 st.session_state['barcode_map']={}
             c1,c2=st.columns(2)
             with c1:
                 if st.button("← السابق",key="prev2"):
-                    st.session_state['mkt_step']=1;st.rerun()
+                    st.session_state['mkt_step']=1
+                    st.markdown('</div>',unsafe_allow_html=True);st.rerun()
             with c2:
                 if st.button("التالي ←",key="next2",type="primary"):
                     if barcodes_map:
                         st.session_state['barcode_map']=barcodes_map
-                        st.session_state['mkt_step']=3;st.rerun()
+                        st.session_state['mkt_step']=3
+                        st.markdown('</div>',unsafe_allow_html=True);st.rerun()
                     else:
                         st.error("احفظ الأكواد أولاً قبل الانتقال للخطوة 3")
             st.markdown('</div>',unsafe_allow_html=True)
@@ -4213,6 +4233,9 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                                 else:
                                     _msg=str(_sr.get("message",_sr.get("error",""))) if isinstance(_sr,dict) else str(_sr)
                                     st.error(f"الرد: HTTP {_st} - {_msg or 'خطأ غير معروف'}")
+                                    _dg=eta_digest_of(_sd)
+                                    if _dg.get("digest"):
+                                        st.info(f"هذا هو الـ SHA256 اللي التوقيع مدمج فيه: `{_dg['digest']}`")
 
                 if st.button("🚀 رحّل Direct للبورتال",key="rent_submit",type="primary",use_container_width=True):
                     tax_no=tax_in.strip()
@@ -4355,6 +4378,9 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                                 with st.expander("🔎 رد البورتال التفصيلي"):
                                     st.markdown("**رد الإرسال (Submission):**")
                                     st.json(resp if isinstance(resp,dict) else {"raw":str(resp)})
+                                    _dg=eta_digest_of(document)
+                                    if _dg.get("digest"):
+                                        st.info(f"هذا هو الـ SHA256 اللي التوقيع مدمج فيه: `{_dg['digest']}`")
                                     st.markdown("**رد الاستعلام (Reconcile):**")
                                     st.json(rc_res if isinstance(rc_res,dict) else {"raw":rc_res})
                             else:
