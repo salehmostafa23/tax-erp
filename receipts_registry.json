@@ -754,5 +754,14 @@
     "upload_date": "2026-09-05T10:12:08.191106",
     "items_count": 8,
     "matched": 7
+  },
+  {
+    "receipt_number": "مجمع",
+    "receipt_date": "2026-09-05",
+    "receiver_name": "ادارة المساحة العسكرية",
+    "file_name": "مجمع_2026-09-05_ادارة المساحة العسكرية.xlsx",
+    "upload_date": "2026-09-05T11:26:05.120277",
+    "items_count": 76,
+    "matched": 75
   }
 ]
