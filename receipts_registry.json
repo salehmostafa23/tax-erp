@@ -763,5 +763,14 @@
     "upload_date": "2026-09-05T11:26:05.120277",
     "items_count": 76,
     "matched": 75
+  },
+  {
+    "receipt_number": "501033-02175267",
+    "receipt_date": "2026-09-07",
+    "receiver_name": "منطقة تجنيد وتعبئة أسيوط",
+    "file_name": "501033-02175267_2026-09-07_منطقة تجنيد وتعبئة أسيوط.xlsx",
+    "upload_date": "2026-09-07T07:44:23.598757",
+    "items_count": 6,
+    "matched": 5
   }
 ]
