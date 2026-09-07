@@ -200,7 +200,7 @@ def eta_get_document_pdf(token, uuid_val):
     return None, f"HTTP {r.status_code}"
 
 CODES_DB_FILE=os.path.join(DATA_DIR,"codes_database.json")
-@st.cache_data(ttl=300, show_spinner=False)
+@st.cache_data(ttl=3600, show_spinner=False)
 def load_codes_db():
     gh=gh_read("codes_database.json")
     if gh is not None and isinstance(gh,list) and len(gh)>0:
@@ -623,7 +623,7 @@ GPC_DATA_FILE=os.path.join(DATA_DIR,"gpc_database.json")
 GS1_DATA_FILE=os.path.join(DATA_DIR,"gs1_products.json")
 SUPPLIER_CODES_FILE=os.path.join(DATA_DIR,"supplier_codes.json")
 
-@st.cache_data(ttl=600, show_spinner=False)
+@st.cache_data(ttl=3600, show_spinner=False)
 def _gpc_load_cache():
     data=gh_read("gpc_database.json")
     if data: return data
@@ -763,7 +763,7 @@ def _gs1_get_products(auth):
         except: break
     return all_products
 
-@st.cache_data(ttl=600, show_spinner=False)
+@st.cache_data(ttl=3600, show_spinner=False)
 def _load_gs1_db():
     data=gh_read("gs1_products.json")
     if data: return data
@@ -778,7 +778,7 @@ def _save_gs1_db(products):
     with open(GS1_DATA_FILE,'w',encoding='utf-8') as f: json.dump(products,f,ensure_ascii=False,indent=2,default=str)
     _load_gs1_db.clear()
 
-@st.cache_data(ttl=600, show_spinner=False)
+@st.cache_data(ttl=3600, show_spinner=False)
 def _load_supplier_codes():
     data=gh_read("supplier_codes.json")
     if data: return data
@@ -792,6 +792,19 @@ def _save_supplier_codes(data):
     gh_write("supplier_codes.json",data)
     with open(SUPPLIER_CODES_FILE,'w',encoding='utf-8') as f: json.dump(data,f,ensure_ascii=False,indent=2,default=str)
     _load_supplier_codes.clear()
+    _supplier_codes_df.clear()
+    _supplier_codes_xlsx.clear()
+
+@st.cache_data(ttl=900, show_spinner=False)
+def _supplier_codes_df(rows):
+    return pd.DataFrame([{'الكود':p.get('code',''),'الاسم':p.get('name',''),'الوصف':p.get('description',''),'الرقم الضريبي':p.get('tax_number',''),'المورد':p.get('supplier_name','')} for p in rows])
+
+@st.cache_data(ttl=900, show_spinner=False)
+def _supplier_codes_xlsx(rows):
+    buf=BytesIO()
+    _supplier_codes_df(rows).to_excel(buf,index=False,engine='xlsxwriter')
+    buf.seek(0)
+    return buf.getvalue()
 
 def _standalone_portal_tab():
     codes_db=load_codes_db()
@@ -1173,13 +1186,16 @@ def _standalone_supplier_codes_tab():
             sq=sup_search.strip().lower()
             filtered=[p for p in sup_db if sq in str(p.get('code','')).lower() or sq in str(p.get('name','')).lower() or sq in str(p.get('description','')).lower() or sq in str(p.get('tax_number','')).lower() or sq in str(p.get('supplier_name','')).lower()]
         if filtered:
-            sup_rows=[{'الكود':p.get('code',''),'الاسم':p.get('name',''),'الوصف':p.get('description',''),'الرقم الضريبي':p.get('tax_number',''),'المورد':p.get('supplier_name','')} for p in filtered]
-            sup_df=pd.DataFrame(sup_rows)
-            st.dataframe(sup_df,use_container_width=True,height=400)
-            excel_buf=BytesIO()
-            sup_df.to_excel(excel_buf,index=False,engine='xlsxwriter')
-            excel_buf.seek(0)
-            st.download_button("📊 تحميل القائمة",data=excel_buf.getvalue(),file_name="supplier_codes.xlsx",mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",key="dl_sup")
+            sup_df=_supplier_codes_df(filtered)
+            if len(sup_db)>1000:
+                _view_lim=st.radio("عرض الصفوف",["الكل","أوّل 500","أوّل 200"],horizontal=True,index=0,key="sup_view_lim")
+            else:
+                _view_lim="الكل"
+            _view_df=sup_df.iloc[:200] if _view_lim=="أوّل 200" else (sup_df.iloc[:500] if _view_lim=="أوّل 500" else sup_df)
+            st.dataframe(_view_df,use_container_width=True,height=400)
+            st.download_button("📊 تحميل القائمة",data=_supplier_codes_xlsx(filtered),file_name="supplier_codes.xlsx",mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",key="dl_sup")
+            if is_admin and st.button("🔄 إعادة تحميل البيانات من GitHub",key="sup_refetch"):
+                _load_supplier_codes.clear();_supplier_codes_df.clear();_supplier_codes_xlsx.clear();st.rerun()
             if is_admin and st.button("🗑️ مسح القاعدة",key="sup_clear_db"):
                 _save_supplier_codes([])
                 st.rerun()
