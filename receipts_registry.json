@@ -799,5 +799,14 @@
     "upload_date": "2026-09-08T08:02:00.976554",
     "items_count": 32,
     "matched": 30
+  },
+  {
+    "receipt_number": "201011-02184981",
+    "receipt_date": "2026-09-09",
+    "receiver_name": "إدارة المساحة العسكرية",
+    "file_name": "201011-02184981_2026-09-09_إدارة المساحة العسكرية.xlsx",
+    "upload_date": "2026-09-09T10:58:23.057801",
+    "items_count": 27,
+    "matched": 26
   }
 ]
