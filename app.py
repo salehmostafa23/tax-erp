@@ -2036,7 +2036,7 @@ def batch_card_html(rec, btype):
         <div><div class="erp-batch-title">{rec.get('file_name','')}</div><div class="erp-batch-sub">{label}</div></div>
     </div>
     <div class="erp-batch-grid">
-        <div><div class="erp-batch-k">الفترة</div><div class="erp-batch-v">{rec['model_month']}/{rec['model_year']}</div></div>
+        <div><div class="erp-batch-k">الفترة</div><div class="erp-batch-v">{rec.get('model_month','')}/{rec.get('model_year','')}</div></div>
         <div><div class="erp-batch-k">رقم المدفوعة</div><div class="erp-batch-v">{rec.get('payment_number','-')}</div></div>
         <div><div class="erp-batch-k">تاريخ المدفوعة</div><div class="erp-batch-v">{_fmt_date_dmy(rec.get('payment_date','-'))}</div></div>
         <div><div class="erp-batch-k">تاريخ الرفع</div><div class="erp-batch-v">{_fmt_date_dmy(rec.get('upload_date',''))}</div></div>
@@ -2058,6 +2058,22 @@ def _sf(v):
     except: return 0.0
 def meta_html(label, value, color="var(--accent2)"):
     return f"""<div class="erp-meta-item"><div class="erp-meta-k">{label}</div><div class="erp-meta-v" style="color:{color}">{value}</div></div>"""
+
+def _meta_html_safe_get(rec,key,default=''):
+    try: return rec.get(key,default)
+    except: return default
+
+def _home_data(f):
+    try: return load_data(f)
+    except: return []
+
+def _home_n_records(data):
+    try: return sum(len(r.get('records',[])) if isinstance(r,dict) else 0 for r in data)
+    except: return 0
+
+def _home_n_portal(data):
+    try: return sum((r.get('records_count',len(r.get('records',[]))) if isinstance(r,dict) else 0) for r in data)
+    except: return 0
 
 # ====================== ADMIN ======================
 if page == ADMIN_PAGE:
@@ -2236,12 +2252,12 @@ if page == "🏠 الرئيسية":
         st.stop()
 
     # Dashboard
-    f41 = load_data(FORM41_FILE); vat = load_data(VAT_FILE)
-    f41_n = sum(len(r.get('records',[])) for r in f41)
-    vat_n = sum(len(r.get('records',[])) for r in vat)
-    portal_out = load_data(PORTAL_OUT_FILE); portal_in = load_data(PORTAL_IN_FILE)
-    portal_out_n = sum(r.get('records_count',len(r.get('records',[]))) for r in portal_out)
-    portal_in_n = sum(r.get('records_count',len(r.get('records',[]))) for r in portal_in)
+    f41=_home_data(FORM41_FILE); vat=_home_data(VAT_FILE)
+    f41_n=_home_n_records(f41)
+    vat_n=_home_n_records(vat)
+    portal_out=_home_data(PORTAL_OUT_FILE); portal_in=_home_data(PORTAL_IN_FILE)
+    portal_out_n=_home_n_portal(portal_out)
+    portal_in_n=_home_n_portal(portal_in)
 
     st.markdown(f"""<div class="erp-topbar"><div><h2>{page}</h2><p>مرحباً بك في لوحة التحكم</p></div>
 <div class="erp-topbar-right"><span class="erp-badge">📊 Dashboard</span><a href="https://invoicing.eta.gov.eg/" target="_blank" style="background:rgba(0,206,201,.12);border:1px solid rgba(0,206,201,.3);border-radius:10px;padding:.35rem .9rem;color:#00cec9;font-size:.72rem;font-weight:600;text-decoration:none;cursor:pointer;transition:all .3s;">portal الفواتير الإلكترونية</a></div></div>""", unsafe_allow_html=True)
