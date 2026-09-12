@@ -834,7 +834,24 @@ def _ro_headers(ws, hr):
         if s: cols.setdefault(s,[]).append(c)
     return cols
 
+def _col_letter(n):
+    s=''
+    while n>0:
+        n,r=divmod(n-1,26)
+        s=chr(65+r)+s
+    return s
+
+def _col_idx(letter):
+    n=0
+    for ch in (letter or ''):
+        n=n*26+(ord(ch)-64)
+    return n
+
 def _reconcile_invoices_io(base_bytes, src_bytes):
+    import zipfile as _zipfile
+    import re as _re
+    from xml.sax.saxutils import escape as _xmlesc
+    from datetime import date as _xdate
     try:
         base_wb=openpyxl.load_workbook(BytesIO(base_bytes),read_only=True,data_only=True)
         bws,bhdr=_ro_invoices_sheet(base_wb)
@@ -872,51 +889,194 @@ def _reconcile_invoices_io(base_bytes, src_bytes):
 
         hrow=list(next(iter(bws.iter_rows(min_row=bhdr,max_row=bhdr,values_only=True)),()))
         W=max([len(hrow),key_col,ser_col or 0]+list(upd_map.keys())+list(add_map.keys()))
+        keyL=_col_letter(key_col); serL=_col_letter(ser_col) if ser_col else None
+        upd_map_l=[(_col_letter(tc),sc) for tc,sc in upd_map.items()]
+        add_map_l=[(_col_letter(tc),sc) for tc,sc in add_map.items()]
 
-        out_wb=openpyxl.Workbook(write_only=True)
-        out_ws=out_wb.create_sheet(bws.title if bws.title else 'جميع الفواتير')
+        z=_zipfile.ZipFile(BytesIO(base_bytes))
+        try:
+            ss_xml=z.read('xl/sharedStrings.xml')
+            import xml.etree.ElementTree as _ET
+            _root=_ET.fromstring(ss_xml)
+            ss=[]
+            for _si in _root.iter('{http://schemas.openxmlformats.org/spreadsheetml/2006/main}si'):
+                ss.append(''.join((_t.text or '') for _t in _si.iter('{http://schemas.openxmlformats.org/spreadsheetml/2006/main}t')))
+        except Exception:
+            ss=[]
+        wbx=z.read('xl/workbook.xml').decode('utf-8','replace')
+        rels=z.read('xl/_rels/workbook.xml.rels').decode('utf-8','replace')
+        _m=_re.search(r'<sheet[^>]*name="[^"]*"[^>]*r:id="(rId\d+)"',wbx)
+        if not _m: return {'error':'مش قادر أحدد شيت العمليات في ملف الأساس'}
+        _mt=_re.search(r'Id="%s"[^>]*Target="([^"]+)"'%_m.group(1),rels)
+        sfile=_mt.group(1) if _mt else 'worksheets/sheet1.xml'
+        if not sfile.startswith('xl/'): sfile='xl/'+sfile
+        sheet=z.read(sfile)
 
+        def _style_of(cellb):
+            _m2=_re.search(rb'\bs="(\d+)"',cellb)
+            return _m2.group(1).decode() if _m2 else None
+
+        def _cell_val(cellb):
+            _m3=_re.search(rb'\bt="([A-Za-z]+)"',cellb)
+            tt=_m3.group(1).decode() if _m3 else ''
+            if tt=='s':
+                _m4=_re.search(rb'<v>(.*?)</v>',cellb,_re.S)
+                if not _m4: return ''
+                try: return ss[int(_m4.group(1))]
+                except: return ''
+            if tt=='inlineStr':
+                return ''.join(x.decode('utf-8','replace') for x in _re.findall(rb'<t[^>]*>(.*?)</t>',cellb,_re.S))
+            _m5=_re.search(rb'<v>(.*?)</v>',cellb,_re.S)
+            return _m5.group(1).decode('utf-8','replace') if _m5 else ''
+
+        def _cells_of(inner):
+            out=[]; i=0
+            while True:
+                st=inner.find(b'<c ',i)
+                if st==-1: break
+                oe=inner.find(b'>',st)
+                if oe==-1: break
+                if inner[oe-1]==47:
+                    en=oe+1
+                else:
+                    cl=inner.find(b'</c>',oe+1)
+                    en=cl+4 if cl!=-1 else oe+1
+                _m6=_re.search(rb'\br="([A-Z]+)[0-9]+"',inner[st:oe])
+                col=_m6.group(1).decode() if _m6 else None
+                out.append((col,inner[st:en]))
+                i=en
+            return out
+
+        def _xcell(col,rn,stl,val):
+            r=_col_letter(col)+str(rn)
+            sattr=(' s="%s"'%stl) if stl else ''
+            if val is None: return ('<c r="%s"%s/>'%(r,sattr)).encode('utf-8')
+            if isinstance(val,bool): return ('<c r="%s"%s t="b"><v>%d</v></c>'%(r,sattr,1 if val else 0)).encode('utf-8')
+            if isinstance(val,(datetime,_xdate)):
+                ep=datetime(1899,12,30)
+                try: sd=(val-ep).total_seconds()/86400.0
+                except: sd=0.0
+                return ('<c r="%s"%s><v>%s</v></c>'%(r,sattr,repr(sd))).encode('utf-8')
+            if isinstance(val,(int,float)):
+                if isinstance(val,int): vs=str(val)
+                else:
+                    if abs(val)<1e15 and val==int(val): vs=str(int(val))
+                    else:
+                        vs=repr(val)
+                        if 'e' in vs.lower(): vs=('%.15f'%val).rstrip('0').rstrip('.')
+                return ('<c r="%s"%s><v>%s</v></c>'%(r,sattr,vs)).encode('utf-8')
+            s=str(val)
+            s=_xmlesc(s)
+            return ('<c r="%s"%s t="inlineStr"><is><t xml:space="preserve">%s</t></is></c>'%(r,sattr,s)).encode('utf-8')
+
+        head=sheet.find(b'<row ')
+        if head==-1: return {'error':'مش لقيت صفوف في شيت الأساس'}
+        last_end=sheet.rfind(b'</row>')
+        tail=sheet[last_end+6:] if last_end!=-1 else b''
+        _ed=tail.find(b'</sheetData>')
+        tail_suffix=tail[_ed:] if _ed!=-1 else tail
+        out=bytearray()
+        out+=sheet[:head]
+        pos=head
         base_keys=set(); base_rows=0; next_ser=1; updated=0; added=0
-        for i,row in enumerate(bws.iter_rows(min_row=1,values_only=True),1):
-            if i<bhdr:
-                out_ws.append(row if len(row)>=W else (row+(None,)*(W-len(row))))
+        ref_styles={}; last_rn=bhdr
+        while True:
+            st=sheet.find(b'<row ',pos)
+            if st==-1: break
+            en=sheet.find(b'</row>',st)
+            if en==-1: break
+            rb=sheet[st:en+6]
+            rootag=rb[:rb.find(b'>')]
+            _m7=_re.search(rb'\br="(\d+)"',rootag)
+            rn=int(_m7.group(1)) if _m7 else 0
+            last_rn=rn
+            if rootag.endswith(b'/>'):
+                out+=rb
+                pos=en+6
                 continue
-            if i==bhdr:
-                out_ws.append(row if len(row)>=W else (row+(None,)*(W-len(row))))
-                continue
-            if len(row)>=W: rl=row
-            else: rl=row+(None,)*(W-len(row))
-            k=_nkey(rl[key_col-1])
-            if k:
-                base_keys.add(k); base_rows+=1
+            if rn<=bhdr:
+                out+=rb; pos=en+6; continue
+            oe=rb.find(b'>')
+            inner=rb[oe+1:]
+            spans=_cells_of(inner)
+            key=''
+            for col,cb in spans:
+                if col==keyL:
+                    key=_cell_val(cb); break
+            k=_nkey(key)
+            if not k:
+                out+=rb; pos=en+6; continue
+            base_rows+=1; base_keys.add(k)
             sr=src_rows.get(k)
+            mod={}
             if sr is not None:
-                rl=list(rl)
-                for tc,sc in upd_map.items():
-                    if len(sr)>=sc and len(rl)>=tc:
-                        v=sr[sc-1]
+                for tcl,scl in upd_map_l:
+                    if len(sr)>=scl:
+                        v=sr[scl-1]
                         if v is not None and not (isinstance(v,str) and not v.strip()):
-                            rl[tc-1]=v
+                            stl=ref_styles.get(tcl)
+                            for col,cb in spans:
+                                if col==tcl: stl=_style_of(cb); break
+                            mod[tcl]=_xcell(_col_idx(tcl),rn,stl,v)
                 updated+=1
-            if ser_col is not None and len(rl)>=ser_col:
-                sv=rl[ser_col-1]
-                try: next_ser=max(next_ser,int(float(sv))+1)
-                except: pass
-            out_ws.append(rl)
+            if serL:
+                for col,cb in spans:
+                    if col==serL:
+                        try: next_ser=max(next_ser,int(float(_cell_val(cb)))+1)
+                        except: pass
+                        break
+            for col,cb in spans:
+                ref_styles[col]=_style_of(cb)
+            if mod:
+                items=[]
+                have=set()
+                for col,cb in spans:
+                    have.add(col)
+                    if col in mod: items.append((_col_idx(col) if col else 999999,mod[col]))
+                    else: items.append((_col_idx(col) if col else 999999,cb))
+                for col,nb in mod.items():
+                    if col not in have: items.append((_col_idx(col),nb))
+                items.sort(key=lambda x:x[0])
+                rb=rb[:oe+1]+b''.join(b for _,b in items)+b'</row>'
+            out+=rb
+            pos=en+6
+        app_rows=bytearray()
         for k,sr in src_rows.items():
             if k in base_keys: continue
-            outrow=[None]*W
-            for tc,sc in add_map.items():
-                if len(sr)>=sc:
-                    v=sr[sc-1]
-                    if v is not None: outrow[tc-1]=v
-            if ser_col is not None:
-                outrow[ser_col-1]=next_ser
-                next_ser+=1
-            out_ws.append(outrow)
+            last_rn+=1
             added+=1
+            cells=[]
+            for tcl,scl in add_map_l:
+                if len(sr)>=scl:
+                    v=sr[scl-1]
+                    if v is not None:
+                        cells.append((_col_idx(tcl),_xcell(_col_idx(tcl),last_rn,ref_styles.get(tcl),v)))
+            if serL is not None:
+                cells.append((_col_idx(serL),_xcell(_col_idx(serL),last_rn,ref_styles.get(serL),next_ser)))
+                next_ser+=1
+            cells.sort(key=lambda x:x[0])
+            app_rows+=('<row r="%d" spans="1:%d">'%(last_rn,W)).encode('utf-8')
+            app_rows+=b''.join(b for _,b in cells)
+            app_rows+=b'</row>'
+        out+=app_rows
+        last_rn=max(last_rn,bhdr)
+        _out=bytes(out)
+        _dm=_re.search(rb'<dimension ref="([^"]+)"',_out)
+        if _dm:
+            _d0=_dm.group(1).decode().split(':')
+            _c0=_d0[0]
+            _c1=_re.sub(r'\d+$','',_d0[-1])
+            ncols=max(_col_idx(_c1),W)
+            _newref='%s:%s%d'%(_c0,_col_letter(ncols),last_rn)
+            _out=_out[:_dm.start(1)]+_newref.encode()+_out[_dm.end(1):]
+        out=_out
+        out+=tail_suffix
         buf=BytesIO()
-        out_wb.save(buf)
+        with _zipfile.ZipFile(buf,'w',_zipfile.ZIP_DEFLATED) as zo:
+            for item in z.infolist():
+                data=z.read(item.filename)
+                if item.filename==sfile: data=bytes(out)
+                zo.writestr(item,data)
         mapped_names=[str(hrow[tc-1] if len(hrow)>=tc else '').strip() for tc in upd_map]
         return {'updated_rows':updated,'added':added,'unmatched':unmatched,'base_rows':base_rows,'mapped':mapped_names,'out':buf.getvalue()}
     except Exception as e:
