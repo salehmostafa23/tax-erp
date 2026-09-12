@@ -808,86 +808,119 @@ def _sup_search_result(sig, query):
     buf.seek(0)
     return df, buf.getvalue()
 
-def _xls_header_row(ws):
-    for r in range(1,min(ws.max_row,6)+1):
-        for c in range(1,min(ws.max_column,6)+1):
-            if str(ws.cell(row=r,column=c).value or '').strip()=='مسلسل':
+def _nkey(v):
+    return str(v or '').strip()
+
+def _ro_xls_header_row(ws):
+    for r,row in enumerate(ws.iter_rows(min_row=1,max_row=6,values_only=True),start=1):
+        for c,v in enumerate((row or ())[:6],start=1):
+            if str(v or '').strip()=='مسلسل':
                 return r
     return None
 
-def _invoices_sheet(wb):
+def _ro_invoices_sheet(wb):
     for sn in wb.sheetnames:
         ws=wb[sn]
-        hr=_xls_header_row(ws)
+        hr=_ro_xls_header_row(ws)
         if hr is not None:
             return ws,hr
     return None,None
 
-def _nkey(v):
-    return str(v or '').strip()
+def _ro_headers(ws, hr):
+    cols={}
+    row=next(iter(ws.iter_rows(min_row=hr,max_row=hr,values_only=True)),())
+    for c,v in enumerate((row or ()),start=1):
+        s=str(v or '').strip()
+        if s: cols.setdefault(s,[]).append(c)
+    return cols
 
-def _reconcile_invoices(base_wb, src_wb):
-    bws,bhdr=_invoices_sheet(base_wb)
-    if bws is None: return {'error':'شيت الأساس لازم يكون فيه عمود «مسلسل»'}
-    base_cols={}
-    for c in range(1,bws.max_column+1):
-        v=str(bws.cell(row=bhdr,column=c).value or '').strip()
-        if v: base_cols.setdefault(v,[]).append(c)
-    key_col=base_cols.get('الرقم الإلكترونى',[None])[0]
-    if not key_col: return {'error':'مش لقيت عمود «الرقم الإلكترونى» في الأساس'}
-    ser_col=base_cols.get('مسلسل',[None])[0]
-    index={}; base_rows=0; next_ser=1
-    for r in range(bhdr+1,bws.max_row+1):
-        k=_nkey(bws.cell(row=r,column=key_col).value)
-        if not k: continue
-        base_rows+=1
-        index.setdefault(k,[]).append(r)
-        if ser_col is not None:
-            sv=bws.cell(row=r,column=ser_col).value
-            try: next_ser=max(next_ser,int(float(sv))+1)
-            except: pass
-    sws,shdr=_invoices_sheet(src_wb)
-    if sws is None: return {'error':'الملف الجديد مفيش فيه شيت فيه عمود «مسلسل»'}
-    src_cols={}
-    for c in range(1,sws.max_column+1):
-        v=str(sws.cell(row=shdr,column=c).value or '').strip()
-        if v: src_cols.setdefault(v,[]).append(c)
-    skey=src_cols.get('الرقم الإلكترونى',[None])[0]
-    if not skey: return {'error':'مش لقيت عمود «الرقم الإلكترونى» في الملف الجديد'}
-    upd_map={}
-    skip={'الرقم الإلكترونى','مسلسل'}
-    for name,src_idxs in src_cols.items():
-        if name in skip: continue
-        if name in base_cols: upd_map[base_cols[name][0]]=src_idxs[0]
-    add_map={}
-    for name,src_idxs in src_cols.items():
-        if name=='مسلسل': continue
-        if name in base_cols: add_map[base_cols[name][0]]=src_idxs[0]
-    updated=0; added=0; unmatched=0
-    for r in range(shdr+1,sws.max_row+1):
-        k=_nkey(sws.cell(row=r,column=skey).value)
-        if not k:
-            unmatched+=1
-            continue
-        rows=index.get(k)
-        if rows:
-            for tr in rows:
+def _reconcile_invoices_io(base_bytes, src_bytes):
+    try:
+        base_wb=openpyxl.load_workbook(BytesIO(base_bytes),read_only=True,data_only=True)
+        bws,bhdr=_ro_invoices_sheet(base_wb)
+        if bws is None: return {'error':'شيت الأساس لازم يكون فيه عمود «مسلسل»'}
+        base_cols=_ro_headers(bws,bhdr)
+        key_col=base_cols.get('الرقم الإلكترونى',[None])[0]
+        if not key_col: return {'error':'مش لقيت عمود «الرقم الإلكترونى» في الأساس'}
+        ser_col=base_cols.get('مسلسل',[None])[0]
+
+        src_wb=openpyxl.load_workbook(BytesIO(src_bytes),read_only=True,data_only=True)
+        sws,shdr=_ro_invoices_sheet(src_wb)
+        if sws is None: return {'error':'الملف الجديد مفيش فيه شيت فيه عمود «مسلسل»'}
+        src_cols=_ro_headers(sws,shdr)
+        skey=src_cols.get('الرقم الإلكترونى',[None])[0]
+        if not skey: return {'error':'مش لقيت عمود «الرقم الإلكترونى» في الملف الجديد'}
+
+        upd_map={}
+        skip={'الرقم الإلكترونى','مسلسل'}
+        for name,idxs in src_cols.items():
+            if name in skip: continue
+            if name in base_cols: upd_map[base_cols[name][0]]=idxs[0]
+        add_map={}
+        for name,idxs in src_cols.items():
+            if name=='مسلسل': continue
+            if name in base_cols: add_map[base_cols[name][0]]=idxs[0]
+
+        src_rows={}; unmatched=0
+        for row in sws.iter_rows(min_row=shdr+1,values_only=True):
+            rw=list(row) if row else []
+            k=_nkey(rw[skey-1] if len(rw)>=skey else None)
+            if not k:
+                unmatched+=1
+                continue
+            src_rows.setdefault(k,rw)
+
+        hrow=list(next(iter(bws.iter_rows(min_row=bhdr,max_row=bhdr,values_only=True)),()))
+        W=max([len(hrow),key_col,ser_col or 0]+list(upd_map.keys())+list(add_map.keys()))
+
+        out_wb=openpyxl.Workbook(write_only=True)
+        out_ws=out_wb.create_sheet(bws.title if bws.title else 'جميع الفواتير')
+
+        base_keys=set(); base_rows=0; next_ser=1; updated=0; added=0
+        for i,row in enumerate(bws.iter_rows(min_row=1,values_only=True),1):
+            if i<bhdr:
+                out_ws.append(row if len(row)>=W else (row+(None,)*(W-len(row))))
+                continue
+            if i==bhdr:
+                out_ws.append(row if len(row)>=W else (row+(None,)*(W-len(row))))
+                continue
+            if len(row)>=W: rl=row
+            else: rl=row+(None,)*(W-len(row))
+            k=_nkey(rl[key_col-1])
+            if k:
+                base_keys.add(k); base_rows+=1
+            sr=src_rows.get(k)
+            if sr is not None:
+                rl=list(rl)
                 for tc,sc in upd_map.items():
-                    v=sws.cell(row=r,column=sc).value
-                    if v is None or (isinstance(v,str) and not v.strip()): continue
-                    bws.cell(row=tr,column=tc).value=v
+                    if len(sr)>=sc and len(rl)>=tc:
+                        v=sr[sc-1]
+                        if v is not None and not (isinstance(v,str) and not v.strip()):
+                            rl[tc-1]=v
                 updated+=1
-            continue
-        nr=bws.max_row+1
-        if ser_col is not None:
-            bws.cell(row=nr,column=ser_col).value=next_ser
-            next_ser+=1
-        for tc,sc in add_map.items():
-            v=sws.cell(row=r,column=sc).value
-            if v is not None: bws.cell(row=nr,column=tc).value=v
-        added+=1
-    mapped_names=[str(bws.cell(row=bhdr,column=tc).value) for tc in upd_map]
-    return {'updated_rows':updated,'added':added,'unmatched':unmatched,'base_rows':base_rows,'mapped':mapped_names}
+            if ser_col is not None and len(rl)>=ser_col:
+                sv=rl[ser_col-1]
+                try: next_ser=max(next_ser,int(float(sv))+1)
+                except: pass
+            out_ws.append(rl)
+        for k,sr in src_rows.items():
+            if k in base_keys: continue
+            outrow=[None]*W
+            for tc,sc in add_map.items():
+                if len(sr)>=sc:
+                    v=sr[sc-1]
+                    if v is not None: outrow[tc-1]=v
+            if ser_col is not None:
+                outrow[ser_col-1]=next_ser
+                next_ser+=1
+            out_ws.append(outrow)
+            added+=1
+        buf=BytesIO()
+        out_wb.save(buf)
+        mapped_names=[str(hrow[tc-1] if len(hrow)>=tc else '').strip() for tc in upd_map]
+        return {'updated_rows':updated,'added':added,'unmatched':unmatched,'base_rows':base_rows,'mapped':mapped_names,'out':buf.getvalue()}
+    except Exception as e:
+        return {'error':str(e)}
 
 def _standalone_portal_tab():
     codes_db=load_codes_db()
@@ -3955,18 +3988,19 @@ elif page=="📤 تحديث الفواتير":
         if base_file:
             if st.session_state.get('upd_base_name')!=base_file.name:
                 try:
-                    wb=openpyxl.load_workbook(base_file,data_only=True)
-                    bw,bh=_invoices_sheet(wb)
+                    wb=openpyxl.load_workbook(BytesIO(base_file.getvalue()),read_only=True,data_only=True)
+                    bw,bh=_ro_invoices_sheet(wb)
                     if bw is None: raise ValueError("مش لقيت شيت فيه عمود «مسلسل»")
-                    st.session_state['upd_base_wb']=wb
-                    st.session_state['upd_base_info']="شيت «"+bw.title+"» ("+str(bw.max_row-1)+" صف)"
-                    st.session_state['upd_result']=None
+                    bc=_ro_headers(bw,bh)
+                    if 'الرقم الإلكترونى' not in bc: raise ValueError("الأساس لازم يكون فيه عمود «الرقم الإلكترونى»")
+                    n=max(0,(bw.max_row or bh)-bh)
+                    st.session_state['upd_base_info']="شيت «"+bw.title+"» (~"+str(n)+" صف)"
                     st.success("تم تحميل الأساس: "+st.session_state['upd_base_info'])
                 except Exception as e:
                     st.error("خطأ في قراءة الأساس: "+str(e))
+                st.session_state.pop('upd_result',None)
                 st.session_state['upd_base_name']=base_file.name
         else:
-            st.session_state.pop('upd_base_wb',None)
             st.session_state.pop('upd_base_info',None)
             st.session_state.pop('upd_result',None)
     with c2:
@@ -3974,45 +4008,41 @@ elif page=="📤 تحديث الفواتير":
         if src_file:
             if st.session_state.get('upd_src_name')!=src_file.name:
                 try:
-                    wb=openpyxl.load_workbook(src_file,data_only=True)
-                    sw,sh=_invoices_sheet(wb)
+                    wb=openpyxl.load_workbook(BytesIO(src_file.getvalue()),read_only=True,data_only=True)
+                    sw,sh=_ro_invoices_sheet(wb)
                     if sw is None: raise ValueError("مش لقيت شيت فيه عمود «مسلسل»")
-                    cols={str(sw.cell(row=sh,column=c).value or '').strip() for c in range(1,sw.max_column+1)}
-                    if 'الرقم الإلكترونى' not in cols: raise ValueError("الملف الجديد لازم يكون فيه عمود «الرقم الإلكترونى»")
-                    st.session_state['upd_src_wb']=wb
-                    st.session_state['upd_src_info']="شيت «"+sw.title+"» ("+str(sw.max_row-1)+" صف)"
-                    st.session_state['upd_result']=None
+                    sc=_ro_headers(sw,sh)
+                    if 'الرقم الإلكترونى' not in sc: raise ValueError("الملف الجديد لازم يكون فيه عمود «الرقم الإلكترونى»")
+                    st.session_state['upd_src_info']="شيت «"+sw.title+"» (~"+str(max(0,(sw.max_row or sh)-sh))+" صف)"
                     st.success("تم تحميل ملف التحديث: "+st.session_state['upd_src_info'])
                 except Exception as e:
                     st.error("خطأ في قراءة ملف التحديث: "+str(e))
+                st.session_state.pop('upd_result',None)
                 st.session_state['upd_src_name']=src_file.name
         else:
-            st.session_state.pop('upd_src_wb',None)
             st.session_state.pop('upd_src_info',None)
+            st.session_state.pop('upd_result',None)
 
-    has_b=st.session_state.get('upd_base_wb')
-    has_s=st.session_state.get('upd_src_wb')
+    has_b=base_file is not None
+    has_s=src_file is not None
     if has_b and has_s:
         if st.button("🔄 تنفيذ التحديث",type="primary",use_container_width=True,key="upd_go"):
             try:
-                st.session_state['upd_result']=_reconcile_invoices(has_b,has_s)
+                with st.spinner("جارٍ معالجة أكثر من 86 ألف فاتورة… قد يستغرق عدة دقائق."):
+                    st.session_state['upd_result']=_reconcile_invoices_io(base_file.getvalue(),src_file.getvalue())
             except Exception as e:
                 st.session_state['upd_result']={'error':str(e)}
     rep=st.session_state.get('upd_result')
     if isinstance(rep,dict) and rep.get('error'):
         st.error(rep['error'])
-    elif isinstance(rep,dict):
-        uk=''
+    elif isinstance(rep,dict) and rep.get('out'):
         st.markdown(f'<div style="padding:.8rem 1rem;border-radius:12px;background:rgba(108,92,231,.08);border:1px solid rgba(108,92,231,.22);margin-top:.6rem;">'
             f'✅ <b>تم تحديث {rep.get("updated_rows",0)}</b> فاتورة موجودة • <b>تمت إضافة {rep.get("added",0)}</b> فاتورة جديدة'
             +((' • <b>مُتخطّاة (بلا رقم إلكترونى):</b> '+str(rep.get("unmatched",0))) if rep.get("unmatched",0) else '')
             +f'<br>🧩 <b>الأعمدة المنقولة تلقائياً ({len(rep.get("mapped",[]))}):</b> '+', '.join(str(x) for x in rep.get("mapped",[]))+'</div>',unsafe_allow_html=True)
-        buf=BytesIO()
-        has_b.save(buf)
-        buf.seek(0)
-        st.download_button("📥 تحميل «جميع الفواتير» بعد التحديث",data=buf.getvalue(),file_name="جميع الفواتير.xlsx",mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",key="upd_dl",type="primary",use_container_width=True)
+        st.download_button("📥 تحميل «جميع الفواتير» بعد التحديث",data=rep['out'],file_name="جميع الفواتير.xlsx",mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",key="upd_dl",type="primary",use_container_width=True)
         if st.button("🔄 إعادة التحميل من جديد",key="upd_reset"):
-            for k in ['upd_base_wb','upd_base_info','upd_base_name','upd_src_wb','upd_src_info','upd_src_name','upd_result']:
+            for k in ['upd_base_info','upd_base_name','upd_src_info','upd_src_name','upd_result']:
                 st.session_state.pop(k,None)
             st.rerun()
     elif has_b and has_s:
