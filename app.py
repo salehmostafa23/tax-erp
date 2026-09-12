@@ -3217,16 +3217,22 @@ elif page=="📄 Portal الفواتير الإلكترونية":
                 inv_total=r.get('الإجمالي (بعد الضريبة)',r.get('الإجمالي',0))
                 inv_date=r.get('تاريخ الإصدار','')
                 uuid_val=r.get('UUID','—')
-                st.markdown(f"""<div style="background:rgba(30,30,56,.8);border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:.7rem 1rem;margin-bottom:.5rem;">
+                is_credit=('دائن' in str(inv_type))
+                row_bg="rgba(168,173,194,.12)" if is_credit else "rgba(30,30,56,.8)"
+                row_bd="rgba(198,202,220,.25)" if is_credit else "rgba(255,255,255,.06)"
+                name_col="#e3e6ef" if is_credit else "#fff"
+                mut_col="#aeb3c4" if is_credit else "var(--text2)"
+                tot_col="#c4c9d6" if is_credit else "#a29bfe"
+                st.markdown(f"""<div style="background:{row_bg};border:1px solid {row_bd};border-radius:10px;padding:.7rem 1rem;margin-bottom:.5rem;">
                 <div style="display:flex;justify-content:space-between;align-items:center;">
                     <div>
-                        <div style="color:#fff;font-weight:700;font-size:.88rem;">{supplier}</div>
+                        <div style="color:{name_col};font-weight:700;font-size:.88rem;">{supplier}</div>
                         <div style="display:flex;gap:.8rem;margin-top:.3rem;flex-wrap:wrap;">
-                            <span style="color:var(--text2);font-size:.72rem;">📋 {inv_type}</span>
-                            <span style="color:var(--text2);font-size:.72rem;">📅 {inv_date}</span>
-                            <span style="color:#a29bfe;font-size:.78rem;font-weight:600;">الإجمالي: {fmt(inv_total)}</span>
+                            <span style="color:{mut_col};font-size:.72rem;">📋 {inv_type}</span>
+                            <span style="color:{mut_col};font-size:.72rem;">📅 {inv_date}</span>
+                            <span style="color:{tot_col};font-size:.78rem;font-weight:600;">الإجمالي: {fmt(inv_total)}</span>
                         </div>
-                        <div style="color:var(--text2);font-size:.68rem;margin-top:.2rem;font-family:monospace;">UUID: {uuid_val}</div>
+                        <div style="color:{mut_col};font-size:.68rem;margin-top:.2rem;font-family:monospace;">UUID: {uuid_val}</div>
                     </div>
                     <div style="display:flex;align-items:center;gap:.4rem;">
                         <div style="width:10px;height:10px;border-radius:50%;background:{bulb_color};box-shadow:0 0 8px {bulb_color};"></div>
