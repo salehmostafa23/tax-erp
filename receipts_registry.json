@@ -844,5 +844,14 @@
     "upload_date": "2026-09-10T08:41:34.114637",
     "items_count": 27,
     "matched": 26
+  },
+  {
+    "receipt_number": "مجمع 4",
+    "receipt_date": "2026-09-08",
+    "receiver_name": "إدارة المساحة",
+    "file_name": "مجمع 4_2026-09-08_إدارة المساحة.xlsx",
+    "upload_date": "2026-09-12T07:28:22.421228",
+    "items_count": 93,
+    "matched": 90
   }
 ]
