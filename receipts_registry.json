@@ -925,5 +925,14 @@
     "upload_date": "2026-09-14T06:23:05.741981",
     "items_count": 2,
     "matched": 1
+  },
+  {
+    "receipt_number": "301033-01112217",
+    "receipt_date": "2026-09-14",
+    "receiver_name": "محمد عز الدين كامل علي",
+    "file_name": "301033-01112217_2026-09-14_محمد عز الدين كامل علي.xlsx",
+    "upload_date": "2026-09-14T06:39:07.515513",
+    "items_count": 2,
+    "matched": 1
   }
 ]
