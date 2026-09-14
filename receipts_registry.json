@@ -916,5 +916,14 @@
     "upload_date": "2026-09-13T10:28:33.222888",
     "items_count": 7,
     "matched": 6
+  },
+  {
+    "receipt_number": "301011-02194129",
+    "receipt_date": "2026-09-14",
+    "receiver_name": "عمرو محمد صالح مصطفى",
+    "file_name": "301011-02194129_2026-09-14_عمرو محمد صالح مصطفى.xlsx",
+    "upload_date": "2026-09-14T06:23:05.741981",
+    "items_count": 2,
+    "matched": 1
   }
 ]
