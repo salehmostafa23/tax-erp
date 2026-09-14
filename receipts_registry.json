@@ -943,5 +943,14 @@
     "upload_date": "2026-09-14T06:57:41.033926",
     "items_count": 3,
     "matched": 2
+  },
+  {
+    "receipt_number": "301033-01111486",
+    "receipt_date": "2026-09-14",
+    "receiver_name": "الكلية البحرية",
+    "file_name": "301033-01111486_2026-09-14_الكلية البحرية.xlsx",
+    "upload_date": "2026-09-14T07:07:50.048812",
+    "items_count": 7,
+    "matched": 6
   }
 ]
