@@ -1042,5 +1042,14 @@
     "upload_date": "2026-09-15T11:34:40.224325",
     "items_count": 3,
     "matched": 2
+  },
+  {
+    "receipt_number": "202055-02115244",
+    "receipt_date": "2026-09-17",
+    "receiver_name": "الفوج 57 تحلية مياه",
+    "file_name": "202055-02115244_2026-09-17_الفوج 57 تحلية مياه.xlsx",
+    "upload_date": "2026-09-17T08:05:07.384287",
+    "items_count": 19,
+    "matched": 18
   }
 ]
