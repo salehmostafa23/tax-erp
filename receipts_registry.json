@@ -1069,5 +1069,14 @@
     "upload_date": "2026-09-17T08:26:30.427085",
     "items_count": 15,
     "matched": 14
+  },
+  {
+    "receipt_number": "201099-01134448",
+    "receipt_date": "2026-09-19",
+    "receiver_name": "السرية 25 مياه ثابتة",
+    "file_name": "201099-01134448_2026-09-19_السرية 25 مياه ثابتة.xlsx",
+    "upload_date": "2026-09-19T06:33:40.834787",
+    "items_count": 24,
+    "matched": 22
   }
 ]
