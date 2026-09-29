@@ -3008,8 +3008,27 @@ elif page=="🛒 فواتير الماركت":
             </div>""",unsafe_allow_html=True)
 
     with _tab_mkt3:
-        st.markdown('<div class="erp-section"><div class="erp-section-dot" style="background:#a29bfe;"></div><h3>✏️ تعديل الأكواد</h3></div>',unsafe_allow_html=True)
         barcodes_db=load_barcodes()
+        st.markdown('<div class="erp-section"><div class="erp-section-dot" style="background:#00cec9;"></div><h3>➕ إضافة كود جديد</h3></div>',unsafe_allow_html=True)
+        ac1,ac2,ac3=st.columns([2,2,1])
+        with ac1:
+            add_ic_inp=st.text_input("الكود الداخلي",key="bc_add_ic",placeholder="اكتب الكود الداخلي...")
+        with ac2:
+            add_bc_inp=st.text_input("الباركود",key="bc_add_bc",placeholder="اكتب الباركود...")
+        with ac3:
+            st.write("")
+            if st.button("💾 إضافة الكود",key="bc_add_btn",type="primary",use_container_width=True):
+                add_ic=add_ic_inp.strip();add_bc=add_bc_inp.strip()
+                if not add_ic or not add_bc:
+                    st.error("اكتب الكود الداخلي والباركود مع بعض")
+                elif any(str(b.get('internal_code','')).strip()==add_ic for b in barcodes_db):
+                    st.error(f"الكود الداخلي {add_ic} موجود بالفعل!")
+                else:
+                    barcodes_db.append({'internal_code':add_ic,'barcode':add_bc})
+                    save_barcodes(barcodes_db)
+                    st.success("تم إضافة الكود بنجاح!")
+                    st.rerun()
+        st.markdown('<div class="erp-section" style="margin-top:.5rem"><div class="erp-section-dot" style="background:#a29bfe;"></div><h3>✏️ تعديل الأكواد</h3></div>',unsafe_allow_html=True)
         if not barcodes_db:
             st.markdown("""<div class="erp-empty" style="padding:2rem;margin-top:1rem;text-align:center;">
                 <div class="erp-empty-icon">✏️</div>
