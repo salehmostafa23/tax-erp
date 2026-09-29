@@ -1276,5 +1276,14 @@
     "upload_date": "2026-09-26T09:55:39.168637",
     "items_count": 28,
     "matched": 24
+  },
+  {
+    "receipt_number": "301033-01113376",
+    "receipt_date": "2026-09-29",
+    "receiver_name": "خالد حمدي حسن طه الليثي",
+    "file_name": "301033-01113376_2026-09-29_خالد حمدي حسن طه الليثي.xlsx",
+    "upload_date": "2026-09-29T06:05:29.210716",
+    "items_count": 2,
+    "matched": 1
   }
 ]
