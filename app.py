@@ -1937,7 +1937,7 @@ def gen_template(ddf,bmap):
         if d>0 and t>0: d/=1.14
         ws.cell(row=i,column=1,value=bc);ws.cell(row=i,column=2,value=ic);ws.cell(row=i,column=3,value=r['item_name'])
         ws.cell(row=i,column=4,value='EA');ws.cell(row=i,column=5,value=math.ceil(p*100000)/100000 if p>0 else 0);ws.cell(row=i,column=6,value=q)
-        ws.cell(row=i,column=7,value=math.ceil(d*100000)/100000 if d>0 else '');ws.cell(row=i,column=8,value='')
+        ws.cell(row=i,column=7,value=-math.ceil(d*100000)/100000 if d>0 else '');ws.cell(row=i,column=8,value='')
         ws.cell(row=i,column=9,value=tc);ws.cell(row=i,column=10,value=tr)
     out=BytesIO();wb.save(out);out.seek(0);wb.close()
     return out
