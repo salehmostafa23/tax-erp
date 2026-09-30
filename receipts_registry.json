@@ -1375,5 +1375,14 @@
     "upload_date": "2026-09-30T09:41:52.201202",
     "items_count": 7,
     "matched": 6
+  },
+  {
+    "receipt_number": "201011-03171333",
+    "receipt_date": "2026-09-29",
+    "receiver_name": "جامعة عين شمس الأهلية",
+    "file_name": "201011-03171333_2026-09-29_جامعة عين شمس الأهلية.xlsx",
+    "upload_date": "2026-09-30T11:21:49.518635",
+    "items_count": 32,
+    "matched": 31
   }
 ]
