@@ -4388,14 +4388,29 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                 j=seg.find(label)+len(label)
                 after=_rent_re.sub(r'^\s*[:：\-–—=]+\s*','',seg[j:])
                 t=' '.join(after.split())
-                if t and _rent_re.search(r'[\u0621-\u064A]',t) and t not in _RENT_SKIP_LABELS:
+                if t and _rent_re.search(r'[\u0621-\u064A]',t) and t not in _RENT_SKIP_LABELS and not t.startswith(':'):
                     return t
                 for k in range(line_idx+1,min(len(parts),line_idx+1+extra)):
                     t=' '.join(parts[k].split())
-                    if not t or t in _RENT_SKIP_LABELS: continue
-                    if _rent_re.search(r'[:：]',t) and not _rent_re.search(r'[\u0621-\u064A]',t): break
+                    if not t or t.startswith(':'): continue
+                    t2=t.lstrip(':-–—').strip()
+                    if t2 in _RENT_SKIP_LABELS: continue
+                    if ':' in t: break
+                    if _rent_re.fullmatch(r'[\d,\s.\-]+',t2): break
                     if _rent_re.search(r'[\u0621-\u064A]',t):
                         return t
+                return ''
+
+            def _rent_name_before(lines,label,back=4):
+                if label not in lines: return ''
+                parts=lines.split('\n')
+                line_idx=lines.count('\n',0,lines.find(label))
+                for k in range(line_idx-1,max(-1,line_idx-1-back),-1):
+                    cand=(parts[k] if k<len(parts) else '').strip()
+                    if not cand or cand.startswith(':'): continue
+                    if cand in _RENT_SKIP_LABELS or _rent_re.search(r'[:：]',cand): break
+                    if _rent_re.search(r'[\u0621-\u064A]',cand):
+                        return cand
                 return ''
 
             def _rent_tok_before(lines,label,back=200):
@@ -4462,7 +4477,10 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                 civ=_rent_re.search(r'(CIV[-0-9A-Za-z_]+)',lines)
                 if civ: info['civ']=civ.group(1)
                 info['so_ref']=_rent_tok_before(lines,'أمر') or _rent_tok_before(lines,'المبيعات') or _rent_tok_after(lines,'رقم أمر المبيعات') or _rent_tok_after(lines,'أمر المبيعات')
-                info['customer']=_rent_name_after(lines,'اسم العميل') or _rent_name_after(lines,'المشتري') or _rent_name_after(lines,'اسم المستأجر') or _rent_name_after(lines,'اسم المستلم')
+                info['customer']=(_rent_name_after(lines,'اسم العميل') or _rent_name_before(lines,'اسم العميل')
+                  or _rent_name_after(lines,'المشتري') or _rent_name_before(lines,'المشتري')
+                  or _rent_name_after(lines,'اسم المستأجر') or _rent_name_before(lines,'اسم المستأجر')
+                  or _rent_name_after(lines,'اسم المستلم') or _rent_name_before(lines,'اسم المستلم'))
                 return info
 
             _rent_env_cd=_eta_smartcard_diag()
