@@ -4377,6 +4377,27 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                     if _rent_re.fullmatch(r'\d{9,15}',dig): return dig
                 return ''
 
+            def _rent_name_after(lines,label,extra=4):
+                if label not in lines: return ''
+                parts=lines.split('\n')
+                line_idx=lines.count('\n',0,lines.find(label))
+                out=[]
+                if line_idx<len(parts):
+                    seg=parts[line_idx]
+                    j=seg.find(label)+len(label)
+                    after=_rent_re.sub(r'^\s*[:：\-–—=]+\s*','',seg[j:])
+                    t=' '.join(after.split())
+                    if t and _rent_re.search(r'[\u0621-\u064A]',t): out.append(t)
+                if not out:
+                    for k in range(line_idx+1,min(len(parts),line_idx+1+extra)):
+                        t=' '.join(parts[k].split())
+                        if not t: continue
+                        if _rent_re.search(r'[:：]',t) or not _rent_re.search(r'[\u0621-\u064A]',t): break
+                        out.append(t)
+                        break
+                if not out: return ''
+                return ' '.join(out).strip().rstrip(':-–—').strip()
+
             def _rent_tok_before(lines,label,back=200):
                 if label not in lines: return ''
                 i=lines.find(label)
@@ -4389,6 +4410,14 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                     m=_rent_re.search(r'([A-Za-z0-9_]+\d+)',cand)
                     if m: return m.group(1)
                 return ''
+
+            def _rent_tok_after(lines,label,limit=160):
+                i=lines.find(label)
+                if i<0: return ''
+                m=_rent_re.search(r'([A-Za-z0-9]+(?:[-_/][A-Za-z0-9]+)+)',lines[i+len(label):i+len(label)+limit])
+                if m: return m.group(1)
+                m=_rent_re.search(r'([A-Za-z0-9_]+\d+)',lines[i+len(label):i+len(label)+limit])
+                return m.group(1) if m else ''
 
             def _rent_digit_ok(nm):
                 if nm.startswith(('0','6224')): return False
@@ -4425,7 +4454,7 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                 html=_rent_clean_html(html_bytes)
                 lines=_rent_collapse(html)
                 tables=_rent_tables(html)
-                info={'rent':'','elec':'','water':'','tax_num':'','civ':'','so_ref':''}
+                info={'rent':'','elec':'','water':'','tax_num':'','civ':'','so_ref':'','customer':''}
                 info['rent']=_rent_table_value(tables,'G127409') or _rent_val_near(lines,'G127409')
                 info['elec']=_rent_table_value(tables,'G127411') or _rent_val_near(lines,'G127411')
                 info['water']=_rent_table_value(tables,'G134260') or _rent_val_near(lines,'G134260')
@@ -4433,6 +4462,7 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                 civ=_rent_re.search(r'(CIV[-0-9A-Za-z_]+)',lines)
                 if civ: info['civ']=civ.group(1)
                 info['so_ref']=_rent_tok_before(lines,'أمر') or _rent_tok_before(lines,'المبيعات') or _rent_tok_after(lines,'رقم أمر المبيعات') or _rent_tok_after(lines,'أمر المبيعات')
+                info['customer']=_rent_name_after(lines,'اسم العميل') or _rent_name_after(lines,'اسم المستأجر') or _rent_name_after(lines,'اسم المستلم')
                 return info
 
             _rent_env_cd=_eta_smartcard_diag()
@@ -4466,7 +4496,7 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                     st.markdown("**رقم أمر المبيعات**")
                     so_in=st.text_input("",value=parsed.get('so_ref',''),key="rent_so_ref",placeholder="مرجع طلب المبيعات")
                 st.markdown("**المستلم (To) — الاسم والعنوان:**")
-                rec_name_in=st.text_input("اسم المستلم (To / العميل)",value="المستأجر",key="rent_rec_name")
+                rec_name_in=st.text_input("اسم المستلم (To / العميل)",value=parsed.get('customer','') or "المستأجر",key="rent_rec_name")
                 rec_addr_in=st.text_input("عنوان المستلم",value="Cairo, Egypt",key="rent_rec_addr")
                 st.markdown("**المبالغ المكتشفة (قابلة للتعديل):**")
                 c1,c2,c3=st.columns(3)
@@ -4821,6 +4851,80 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
             st.markdown('<div class="erp-section"><div class="erp-section-dot" style="background:#00b894;"></div><h3>📊 تحويل الفاتورة لأكسيل</h3></div>',unsafe_allow_html=True)
             st.caption("نفس خطوات فاتورة الإيجار تمامًا — ارفع ملف HTML، اظبط البيانات، وسيُصدَّر شيت Excel جاهز باسم المستأجر وعنوانه بالرقم الداخلي ورقم أمر المبيعات.")
 
+            xl_mode=st.radio("طريقة الرفع",["📄 ملف واحد","📁 رفع بالجملة (عدة ملفات)"],horizontal=True,key="xl_mode")
+            if xl_mode.startswith("📁"):
+                st.markdown('<div class="erp-section" style="margin-top:.8rem"><div class="erp-section-dot" style="background:#00cec9;"></div><h3>📁 رفع بالجملة — عدة ملفات HTML</h3></div>',unsafe_allow_html=True)
+                st.caption("كل ملف يتحلل تلقائيًا بنفس منطق الملف الواحد: بياخد اسم العميل من الملف ويحطه في اسم المستأجر، ويتم اكتشاف الإيجار/الكهرباء/المياه، ويخرج كل ملف شيت Excel جاهز. الشهر والسنة ونوع الضريبة بيتطبقوا على كل الدفعة مرة واحدة.")
+                bx_m,bx_y=st.columns(2)
+                with bx_m:
+                    bx_sel_m=st.selectbox("الفاتورة شهر ايه؟",range(1,13),index=datetime.now().month-1,format_func=lambda x:f"{x}-{MONTHS[x]}",key="xl_bk_sel_m")
+                with bx_y:
+                    bx_sel_y=st.selectbox("السنة",range(2020,2031),index=list(range(2020,2031)).index(datetime.now().year) if datetime.now().year in range(2020,2031) else 6,key="xl_bk_sel_y")
+                bx_type=st.radio("اختر نوع الفاتورة",["💼 إيجار عادي - ضريبة جدول 1% (T3)","🤝 إيجار مشاركة - ضريبة 14% (T1/V010)"],horizontal=True,key="xl_bk_type")
+                bx_files=st.file_uploader("ارفع عدة ملفات HTML لأوامر المبيعات",type=["html","htm"],accept_multiple_files=True,key="xl_bulk_upload")
+                def _bk_fval(s):
+                    try:
+                        v=float(str(s).replace(',','').strip())
+                        return v if v>0 else 0.0
+                    except Exception: return 0.0
+                def _bk_build_xlsx(lines):
+                    _bk_tpl=os.path.join(os.path.dirname(os.path.abspath(__file__)),"rent_excel_template.xlsx")
+                    _wb=openpyxl.load_workbook(_bk_tpl,data_only=False)
+                    _ws=_wb["بنود الفاتورة"]; _rw=2
+                    for _li in lines:
+                        _ws.cell(row=_rw,column=1,value=str(_li["barcode"]))
+                        _ws.cell(row=_rw,column=2,value="IC0")
+                        _ws.cell(row=_rw,column=3,value=_li["desc"])
+                        _ws.cell(row=_rw,column=4,value="EA")
+                        _ws.cell(row=_rw,column=5,value=round(_li["net"],5))
+                        _ws.cell(row=_rw,column=6,value=1)
+                        _ws.cell(row=_rw,column=7,value=0)
+                        _ws.cell(row=_rw,column=8,value=0)
+                        if _li.get("tax",0)>0:
+                            _ws.cell(row=_rw,column=9,value=_li["sub"])
+                            _ws.cell(row=_rw,column=10,value=round(_li["rate"],2))
+                        _rw+=1
+                    _buf=BytesIO(); _wb.save(_buf); _buf.seek(0); _wb.close()
+                    return _buf
+                def _bk_safe_name(nm):
+                    _s=str(nm or "المستأجر").strip().replace(':','').replace('/','').replace('\\','').replace('<','').replace('>','').replace('"','').replace('*','').replace('?','').replace('|','').strip()
+                    return _s or "المستأجر"
+                if bx_files and st.button("📦 تجهيز كل الملفات (ZIP)",key="xl_bulk_export",type="primary",use_container_width=True):
+                    try:
+                        import zipfile
+                        _bz=BytesIO()
+                        _made=0; _bad=[]
+                        with zipfile.ZipFile(_bz,"w",zipfile.ZIP_DEFLATED) as _zf:
+                            for _up in bx_files:
+                                _p=_rent_parse(_up.getvalue())
+                                _rc=_p.get('customer','') or "المستأجر"
+                                _rent=_bk_fval(_p.get('rent','')); _elec=_bk_fval(_p.get('elec','')); _water=_bk_fval(_p.get('water',''))
+                                _lines=[]
+                                if _rent>0:
+                                    if bx_type.startswith("💼"): _rate=1.0; _at="T2"; _sub="Tbl01"
+                                    else: _rate=14.0; _at="T1"; _sub="V010"
+                                    _net=round(_rent/(1.0+_rate/100.0),5); _tax=round(_rent-_net,5)
+                                    _lines.append({"name":"إيجار","desc":f"ايجار {MONTHS[bx_sel_m]} {bx_sel_y}","barcode":RENT_META["G127409"]["barcode"],"gross":_rent,"net":_net,"tax":_tax,"rate":_rate,"at":_at,"sub":_sub})
+                                if _elec>0:
+                                    _lines.append({"name":"كهرباء","desc":f"كهرباء {MONTHS[bx_sel_m]} {bx_sel_y}","barcode":RENT_META["G127411"]["barcode"],"gross":_elec,"net":_elec,"tax":0.0,"rate":0.0,"at":"","sub":""})
+                                if _water>0:
+                                    _lines.append({"name":"مياه","desc":f"مياه {MONTHS[bx_sel_m]} {bx_sel_y}","barcode":RENT_META["G134260"]["barcode"],"gross":_water,"net":_water,"tax":0.0,"rate":0.0,"at":"","sub":""})
+                                if not _lines:
+                                    _bad.append(getattr(_up,"name","ملف؟")); continue
+                                _xbuf=_bk_build_xlsx(_lines)
+                                _fn=f"{_bk_safe_name(_rc)} - {str(_p.get('civ','')).strip() or 'no-civ'} - {str(_p.get('so_ref','')).strip() or 'no-so'}.xlsx"
+                                _zf.writestr(_fn,_xbuf.getvalue())
+                                _made+=1
+                        _bz.seek(0)
+                        _msg=f"✅ تم تجهيز {_made} شيت"
+                        if _bad: _msg+=f" — {len(_bad)} ملف من غير أصناف بالمبالغ يتم تجاوزها: "+", ".join(_bad[:5])
+                        st.success(_msg)
+                        if _made:
+                            st.download_button("⬇️ نزّل ZIP الفواتير",data=_bz.getvalue(),file_name=f"فواتير-مبيعات-{MONTHS[bx_sel_m]}-{bx_sel_y}.zip",mime="application/zip",key="xl_bulk_dl")
+                    except Exception as _be:
+                        st.error("خطأ أثناء تجهيز الدفعة: "+str(_be)[:200])
+                st.stop()
+
             xl_m,xl_y=st.columns(2)
             with xl_m:
                 xl_sel_m=st.selectbox("الفاتورة شهر ايه؟",range(1,13),index=datetime.now().month-1,format_func=lambda x:f"{x}-{MONTHS[x]}",key="xl_sel_m")
@@ -4843,7 +4947,7 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                     st.markdown("**رقم أمر المبيعات**")
                     xl_so=st.text_input("",value=xl_parsed.get('so_ref',''),key="xl_so_ref",placeholder="مرجع طلب المبيعات")
                 st.markdown("**المستلم (To) — الاسم:**")
-                xl_rec=st.text_input("اسم المستلم (المستأجر)",value="المستأجر",key="xl_rec_name")
+                xl_rec=st.text_input("اسم المستلم (المستأجر)",value=xl_parsed.get('customer','') or "المستأجر",key="xl_rec_name")
                 st.markdown("**المبالغ المكتشفة (قابلة للتعديل):**")
                 xl_c1,xl_c2,xl_c3=st.columns(3)
                 with xl_c1:
