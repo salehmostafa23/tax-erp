@@ -4377,26 +4377,26 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                     if _rent_re.fullmatch(r'\d{9,15}',dig): return dig
                 return ''
 
-            def _rent_name_after(lines,label,extra=4):
+            _RENT_SKIP_LABELS={'الاسم','اسم العميل','المشتري','اسم المستأجر','اسم المستلم','رقم التسجيل','رقم التعريف','رقم الضريبي','الرقم الضريبي','الرقم الضريبى','العنوان','التليفون','التلفون','المحافظة','الفرع','الحالة','البيان','القسم','خدمة العملاء','السلام الوطني','النشاط','المنتجات والخدمات','النطاق'}
+
+            def _rent_name_after(lines,label,extra=6):
                 if label not in lines: return ''
                 parts=lines.split('\n')
                 line_idx=lines.count('\n',0,lines.find(label))
-                out=[]
-                if line_idx<len(parts):
-                    seg=parts[line_idx]
-                    j=seg.find(label)+len(label)
-                    after=_rent_re.sub(r'^\s*[:：\-–—=]+\s*','',seg[j:])
-                    t=' '.join(after.split())
-                    if t and _rent_re.search(r'[\u0621-\u064A]',t): out.append(t)
-                if not out:
-                    for k in range(line_idx+1,min(len(parts),line_idx+1+extra)):
-                        t=' '.join(parts[k].split())
-                        if not t: continue
-                        if _rent_re.search(r'[:：]',t) or not _rent_re.search(r'[\u0621-\u064A]',t): break
-                        out.append(t)
-                        break
-                if not out: return ''
-                return ' '.join(out).strip().rstrip(':-–—').strip()
+                if line_idx>=len(parts): return ''
+                seg=' '.join(parts[line_idx].split())
+                j=seg.find(label)+len(label)
+                after=_rent_re.sub(r'^\s*[:：\-–—=]+\s*','',seg[j:])
+                t=' '.join(after.split())
+                if t and _rent_re.search(r'[\u0621-\u064A]',t) and t not in _RENT_SKIP_LABELS:
+                    return t
+                for k in range(line_idx+1,min(len(parts),line_idx+1+extra)):
+                    t=' '.join(parts[k].split())
+                    if not t or t in _RENT_SKIP_LABELS: continue
+                    if _rent_re.search(r'[:：]',t) and not _rent_re.search(r'[\u0621-\u064A]',t): break
+                    if _rent_re.search(r'[\u0621-\u064A]',t):
+                        return t
+                return ''
 
             def _rent_tok_before(lines,label,back=200):
                 if label not in lines: return ''
@@ -4462,7 +4462,7 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                 civ=_rent_re.search(r'(CIV[-0-9A-Za-z_]+)',lines)
                 if civ: info['civ']=civ.group(1)
                 info['so_ref']=_rent_tok_before(lines,'أمر') or _rent_tok_before(lines,'المبيعات') or _rent_tok_after(lines,'رقم أمر المبيعات') or _rent_tok_after(lines,'أمر المبيعات')
-                info['customer']=_rent_name_after(lines,'اسم العميل') or _rent_name_after(lines,'اسم المستأجر') or _rent_name_after(lines,'اسم المستلم')
+                info['customer']=_rent_name_after(lines,'اسم العميل') or _rent_name_after(lines,'المشتري') or _rent_name_after(lines,'اسم المستأجر') or _rent_name_after(lines,'اسم المستلم')
                 return info
 
             _rent_env_cd=_eta_smartcard_diag()
