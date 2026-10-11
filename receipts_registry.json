@@ -1699,5 +1699,14 @@
     "upload_date": "2026-10-10T07:21:20.323060",
     "items_count": 2,
     "matched": 1
+  },
+  {
+    "receipt_number": "201011-02192825",
+    "receipt_date": "2026-10-11",
+    "receiver_name": "السرية 15 شرطة عسكرية",
+    "file_name": "201011-02192825_2026-10-11_السرية 15 شرطة عسكرية.xlsx",
+    "upload_date": "2026-10-11T07:16:03.953789",
+    "items_count": 4,
+    "matched": 3
   }
 ]
