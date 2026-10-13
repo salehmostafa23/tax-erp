@@ -1735,5 +1735,14 @@
     "upload_date": "2026-10-12T09:43:28.499018",
     "items_count": 3,
     "matched": 1
+  },
+  {
+    "receipt_number": "202066-01173601",
+    "receipt_date": "2026-10-13",
+    "receiver_name": "الكتيبة 44 طرق",
+    "file_name": "202066-01173601_2026-10-13_الكتيبة 44 طرق.xlsx",
+    "upload_date": "2026-10-13T09:36:01.528606",
+    "items_count": 5,
+    "matched": 4
   }
 ]
