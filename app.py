@@ -1918,6 +1918,20 @@ def read_barcodes(f):
         if c and b: bm[c]=b
     wb.close()
     return bm
+def merge_g_items(df):
+    out=[];bykey={}
+    for _,r in df.iterrows():
+        ic=str(r['internal_code']).strip()
+        if ic.startswith('G') and ic in bykey:
+            t=bykey[ic]
+            t['quantity']=float(t['quantity'] or 0)+float(r['quantity'] or 0)
+            t['discount']=float(t['discount'] or 0)+float(r['discount'] or 0)
+            if float(r['tax'] or 0)>0: t['tax']=14
+            continue
+        row={'internal_code':ic,'item_name':r['item_name'],'price':r['price'],'quantity':r['quantity'],'discount':r['discount'],'tax':14 if float(r['tax'] or 0)>0 else 0}
+        if ic.startswith('G'): bykey[ic]=row
+        out.append(row)
+    return pd.DataFrame(out,columns=['internal_code','item_name','price','quantity','discount','tax'])
 def gen_template(ddf,bmap):
     tp=os.path.join(DATA_DIR,'Template_Portal.xlsx')
     if os.path.exists(tp): wb=openpyxl.load_workbook(tp)
@@ -2809,7 +2823,7 @@ elif page == "💰 القيمة المضافة":
 # ====================== MARKET ======================
 elif page=="🛒 فواتير الماركت":
     if not user_has_permission(page): st.error("لا تملك صلاحية الوصول");st.stop()
-    _tab_mkt1,_tab_mkt2,_tab_mkt3=st.tabs(["📝 إنشاء Template","📋 سجل الريسيتات","✏️ تعديل الأكواد"])
+    _tab_mkt1,_tab_mkt2,_tab_mkt3,_tab_mkt4=st.tabs(["📝 إنشاء Template","📋 سجل الريسيتات","✏️ تعديل الأكواد","🧩 Template مجمع"])
 
     with _tab_mkt1:
         st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>فواتير الماركت — إنشاء Template Portal</h3></div>',unsafe_allow_html=True)
@@ -3103,6 +3117,39 @@ elif page=="🛒 فواتير الماركت":
                             save_barcodes(barcodes_db)
                             st.success(f"تم تعديل {len(match)} كود بنجاح!")
                             st.rerun()
+
+    with _tab_mkt4:
+        st.markdown('<div class="erp-section"><div class="erp-section-dot" style="background:#fd79a8;"></div><h3>🧩 إنشاء Template مجمع</h3></div>',unsafe_allow_html=True)
+        st.caption("ارفع أكثر من شيت Detailed Receipt بنفس الصيغة المعتادة، واختار طريقة التصدير. الباركود بييجي تلقائياً من الأكواد المحفوظة.")
+        cm_bd=load_barcodes()
+        cm_bm={str(b.get('internal_code','')).strip():str(b.get('barcode','')).strip() for b in cm_bd if str(b.get('internal_code','')).strip()}
+        cm_files=st.file_uploader("ارفع عدة شيتات Detailed Receipt (ممكن كذا ملف مرة واحدة)",type=['xlsx','xls'],accept_multiple_files=True,key="comb_files")
+        if cm_files:
+            cm_mode=st.radio("اختر طريقة التصدير:",["📄 كل الأصناف كما هي (من غير تجميع)","🧮 تجميع الأصناف المتكررة اللي تبدأ بحرف G في سطر واحد"],horizontal=True,key="comb_mode")
+            st.markdown(f'<div style="padding:.5rem 1rem;border-radius:10px;background:rgba(162,155,254,.06);border:1px solid rgba(162,155,254,.15);color:#a29bfe;font-size:.82rem;">📂 عدد الملفات المرفوعة: <strong>{len(cm_files)}</strong> — الأكواد المحفوظة: <strong>{len(cm_bm)}</strong></div>',unsafe_allow_html=True)
+            if st.button("🚀 إنشاء Template مجمع",key="comb_gen",type="primary",use_container_width=True):
+                try:
+                    cm_ok=[d for d in (read_detailed_receipt(f) for f in cm_files) if not d.empty]
+                    if not cm_ok:
+                        st.error("كل الملفات فاضية من الأصناف!")
+                    else:
+                        cm_all=pd.concat(cm_ok,ignore_index=True)
+                        cm_merge=cm_mode.startswith("🧮")
+                        cm_out=merge_g_items(cm_all) if cm_merge else cm_all.copy()
+                        cm_buf=gen_template(cm_out,cm_bm)
+                        cm_miss=[str(c).strip() for c in cm_out['internal_code'] if str(cm_bm.get(str(c).strip(),'')).strip()=='']
+                        st.success(f"تم إنشاء Template بنجاح: {len(cm_all)} صنف أصلي" + (f" — بعد التجميع {len(cm_out)} صنف ({len(cm_all)-len(cm_out)} مدمج)" if cm_merge else ""))
+                        st.dataframe(cm_out,use_container_width=True,height=300)
+                        cm_buf.seek(0)
+                        st.dataframe(pd.read_excel(cm_buf,engine='openpyxl'),use_container_width=True,height=350)
+                        cm_buf.seek(0)
+                        if cm_miss:
+                            st.warning(f"⚠️ {len(cm_miss)} كود من غير باركود محفوظ (هيظهر الباركود فاضي) — أمثلة: {', '.join(cm_miss[:5])}")
+                        st.download_button("📥 تحميل Template مجمع",data=cm_buf,file_name=f"Template_مجمع_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",type="primary",key="comb_dl")
+                except Exception as ce:
+                    st.error("خطأ أثناء إنشاء Template المجمع: "+str(ce)[:200])
+        else:
+            st.info("ارفع ملف واحد أو أكثر بنفس صيغة Detailed Receipt المعتادة — من هنا تقدر تجمعهم في Template واحد.")
 
 # ====================== PORTAL ELECTRONIC INVOICES ======================
 elif page=="📄 Portal الفواتير الإلكترونية":
