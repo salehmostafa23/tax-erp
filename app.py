@@ -1922,14 +1922,15 @@ def merge_g_items(df):
     out=[];bykey={}
     for _,r in df.iterrows():
         ic=str(r['internal_code']).strip()
-        if ic.startswith('G') and ic in bykey:
+        if not ic.startswith('G'): continue
+        if ic in bykey:
             t=bykey[ic]
             t['quantity']=float(t['quantity'] or 0)+float(r['quantity'] or 0)
             t['discount']=float(t['discount'] or 0)+float(r['discount'] or 0)
             if float(r['tax'] or 0)>0: t['tax']=14
             continue
         row={'internal_code':ic,'item_name':r['item_name'],'price':r['price'],'quantity':r['quantity'],'discount':r['discount'],'tax':14 if float(r['tax'] or 0)>0 else 0}
-        if ic.startswith('G'): bykey[ic]=row
+        bykey[ic]=row
         out.append(row)
     return pd.DataFrame(out,columns=['internal_code','item_name','price','quantity','discount','tax'])
 def gen_template(ddf,bmap):
@@ -3125,7 +3126,7 @@ elif page=="🛒 فواتير الماركت":
         cm_bm={str(b.get('internal_code','')).strip():str(b.get('barcode','')).strip() for b in cm_bd if str(b.get('internal_code','')).strip()}
         cm_files=st.file_uploader("ارفع عدة شيتات Detailed Receipt (ممكن كذا ملف مرة واحدة)",type=['xlsx','xls'],accept_multiple_files=True,key="comb_files")
         if cm_files:
-            cm_mode=st.radio("اختر طريقة التصدير:",["📄 كل الأصناف كما هي (من غير تجميع)","🧮 تجميع الأصناف المتكررة اللي تبدأ بحرف G في سطر واحد"],horizontal=True,key="comb_mode")
+            cm_mode=st.radio("اختر طريقة التصدير:",["📄 كل الأصناف كما هي (من غير تجميع)","🧮 تجميع الأصناف المتكررة اللي تبدأ بحرف G في سطر واحد (الأصناف غير G مش هتتضمن)"],horizontal=True,key="comb_mode")
             st.markdown(f'<div style="padding:.5rem 1rem;border-radius:10px;background:rgba(162,155,254,.06);border:1px solid rgba(162,155,254,.15);color:#a29bfe;font-size:.82rem;">📂 عدد الملفات المرفوعة: <strong>{len(cm_files)}</strong> — الأكواد المحفوظة: <strong>{len(cm_bm)}</strong></div>',unsafe_allow_html=True)
             if st.button("🚀 إنشاء Template مجمع",key="comb_gen",type="primary",use_container_width=True):
                 try:
