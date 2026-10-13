@@ -3137,11 +3137,13 @@ elif page=="🛒 فواتير الماركت":
                         st.error("كل الملفات فاضية من الأصناف!")
                     else:
                         cm_all=pd.concat(cm_ok,ignore_index=True)
+                        cm_all=cm_all[~cm_all['internal_code'].astype(str).str.contains('product number',case=False,na=False)]
+                        cm_npn=len(cm_all)
                         cm_merge=cm_mode.startswith("🧮")
                         cm_out=merge_g_items(cm_all) if cm_merge else cm_all.copy()
                         cm_buf=gen_template(cm_out,cm_bm)
                         cm_miss=[str(c).strip() for c in cm_out['internal_code'] if str(cm_bm.get(str(c).strip(),'')).strip()=='']
-                        st.success(f"تم إنشاء Template بنجاح: {len(cm_all)} صنف أصلي" + (f" — بعد التجميع {len(cm_out)} صنف ({len(cm_all)-len(cm_out)} مدمج)" if cm_merge else ""))
+                        st.success(f"تم إنشاء Template بنجاح: {cm_npn} صنف أصلي" + (f" — بعد التجميع {len(cm_out)} صنف ({cm_npn-len(cm_out)} مدمج)" if cm_merge else ""))
                         st.dataframe(cm_out,use_container_width=True,height=300)
                         cm_buf.seek(0)
                         st.dataframe(pd.read_excel(cm_buf,engine='openpyxl'),use_container_width=True,height=350)
