@@ -3993,6 +3993,18 @@ elif page=="🔍 الاستعلام عن ممول":
         📊 قاعدة البيانات تحتوي على <strong>{len(suppliers_db)}</strong> ممول من جميع المصادر
     </div>""",unsafe_allow_html=True)
 
+    b1,b2=st.columns([2,1])
+    with b1:
+        show_all_tax=st.button("📋 عرض كل أرقام التسجيل",key="sl_all_tax",use_container_width=True)
+    with b2:
+        hide_all_tax=st.button("إخفاء",key="sl_hide_tax",use_container_width=True)
+    if show_all_tax: st.session_state['sl_show_tax']=True
+    if hide_all_tax: st.session_state['sl_show_tax']=False
+    if st.session_state.get('sl_show_tax',False) and suppliers_db:
+        nums=sorted({str(s['tax_number']) for s in suppliers_db})
+        st.markdown(f'<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(116,185,255,.08);border:1px solid rgba(116,185,255,.18);color:#74b9ff;font-size:.82rem;margin-bottom:.6rem;">📋 إجمالي أرقام التسجيل: <strong>{len(nums)}</strong></div>',unsafe_allow_html=True)
+        st.code("\n".join(nums),language="")
+
     search_mode=st.radio("search_mode",["🔍 بحث بالسجل الضريبي","📝 بحث بالاسم"],horizontal=True,label_visibility="collapsed")
 
     if search_mode=="🔍 بحث بالسجل الضريبي":
@@ -4072,6 +4084,50 @@ elif page=="🔍 الاستعلام عن ممول":
         sup_df.to_excel(excel_buf,index=False,engine='xlsxwriter')
         excel_buf.seek(0)
         st.download_button("📊 تحميل قائمة الممولين",data=excel_buf.getvalue(),file_name="suppliers.xlsx",mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",key="dl_sup")
+
+        def _norm_del(n):
+            return ''.join(ch for ch in str(n).strip() if ch.isdigit())
+        def _delete_supplier_by_number(tx):
+            removed=0
+            def _filter_recs(recs,keys):
+                nonlocal removed
+                kept=[]
+                for r in recs:
+                    vals=[str(r.get(k,'')).strip() for k in keys]
+                    if tx in vals or any(_norm_del(v)==_norm_del(tx) for v in vals if v):
+                        removed+=1;continue
+                    kept.append(r)
+                return kept
+            f41=load_data(FORM41_FILE)
+            f41=[{**rec,'records':_filter_recs(rec.get('records',[]),['رقم التسجيل الضريبي'])} for rec in f41]
+            save_data(FORM41_FILE,f41)
+            vat=load_data(VAT_FILE)
+            vat=[{**rec,'records':_filter_recs(rec.get('records',[]),['رقم التسجيل الضريبي'])} for rec in vat]
+            save_data(VAT_FILE,vat)
+            po=load_data(PORTAL_OUT_FILE)
+            po=[{**rec,'records':_filter_recs(rec.get('records',[]),['رقم التسجيل (المستلم)','رقم التسجيل (المصدر)','رقم التسجيل (الطرف الآخر)'])} for rec in po]
+            save_data(PORTAL_OUT_FILE,po)
+            pi=load_data(PORTAL_IN_FILE)
+            pi=[{**rec,'records':_filter_recs(rec.get('records',[]),['رقم التسجيل (المصدر)','رقم التسجيل (المستلم)','رقم التسجيل (الطرف الآخر)'])} for rec in pi]
+            save_data(PORTAL_IN_FILE,pi)
+            return removed
+        cu=get_current_user()
+        if cu and cu.get('role')=='admin':
+            del_opts=[f"{s['tax_number']} — {' • '.join(s['names'][:2])}" for s in suppliers_db]
+            st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot" style="background:#fd79a8;"></div><h3>🗑️ حذف ممول</h3></div>',unsafe_allow_html=True)
+            st.markdown('<div class="erp-card">',unsafe_allow_html=True)
+            del_sel=st.selectbox("اختر الممول (رقم التسجيل)",options=del_opts,key="del_sup_sel")
+            del_num=del_sel.split(" — ")[0].strip()
+            st.caption(f"الحذف بيشيل الممول من كل المصادر: نموذج 41 • القيمة المضافة • الفواتير الصادرة • الواردة")
+            del_confirm=st.text_input(f"اكتب رقم التسجيل لتأكيد الحذف: {del_num}",key="del_sup_confirm")
+            if st.button("🗑️ حذف الممول نهائياً",key="del_sup_btn",use_container_width=True):
+                if del_confirm.strip()!=del_num and _norm_del(del_confirm)!=_norm_del(del_num):
+                    st.error("اكتب رقم التسجيل صح لتأكيد الحذف")
+                else:
+                    removed=_delete_supplier_by_number(del_num)
+                    st.warning(f"تم حذف الممول {del_num} نهائياً — تم إزالة {removed} سجل من كل المصادر")
+                    st.rerun()
+            st.markdown('</div>',unsafe_allow_html=True)
 
 # ====================== VAT10 DECLARATION ======================
 elif page=="📑 اقرار 10 قيمة مضافة":
