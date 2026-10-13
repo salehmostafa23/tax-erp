@@ -1923,14 +1923,16 @@ def merge_g_items(df):
     for _,r in df.iterrows():
         ic=str(r['internal_code']).strip()
         if not ic.startswith('G'): continue
-        if ic in bykey:
-            t=bykey[ic]
+        pkey=float(r['price']) if r['price'] else 0
+        key=(ic,pkey)
+        if key in bykey:
+            t=bykey[key]
             t['quantity']=float(t['quantity'] or 0)+float(r['quantity'] or 0)
             t['discount']=float(t['discount'] or 0)+float(r['discount'] or 0)
             if float(r['tax'] or 0)>0: t['tax']=14
             continue
-        row={'internal_code':ic,'item_name':r['item_name'],'price':r['price'],'quantity':r['quantity'],'discount':r['discount'],'tax':14 if float(r['tax'] or 0)>0 else 0}
-        bykey[ic]=row
+        row={'internal_code':ic,'item_name':r['item_name'],'price':pkey,'quantity':r['quantity'],'discount':r['discount'],'tax':14 if float(r['tax'] or 0)>0 else 0}
+        bykey[key]=row
         out.append(row)
     return pd.DataFrame(out,columns=['internal_code','item_name','price','quantity','discount','tax'])
 def gen_template(ddf,bmap):
