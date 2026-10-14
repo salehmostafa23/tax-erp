@@ -1816,5 +1816,14 @@
     "upload_date": "2026-10-14T09:22:37.483953",
     "items_count": 2,
     "matched": 0
+  },
+  {
+    "receipt_number": "202066-01173581-1",
+    "receipt_date": "2026-10-13",
+    "receiver_name": "الفوج 27 مياه",
+    "file_name": "202066-01173581-1_2026-10-13_الفوج 27 مياه.xlsx",
+    "upload_date": "2026-10-14T09:38:52.402241",
+    "items_count": 2,
+    "matched": 1
   }
 ]
