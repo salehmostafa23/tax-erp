@@ -1906,5 +1906,14 @@
     "upload_date": "2026-10-17T10:15:25.504683",
     "items_count": 4,
     "matched": 3
+  },
+  {
+    "receipt_number": "501033-02182704",
+    "receipt_date": "2026-10-18",
+    "receiver_name": "كتيبة 590 مياه مختلط",
+    "file_name": "501033-02182704_2026-10-18_كتيبة 590 مياه مختلط.xlsx",
+    "upload_date": "2026-10-18T09:14:13.790821",
+    "items_count": 7,
+    "matched": 6
   }
 ]
