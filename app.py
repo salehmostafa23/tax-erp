@@ -286,6 +286,27 @@ def eta_submission_status(token, submission_uuid):
         data={"raw":r.text[:600]}
     return r.status_code,data
 
+def eta_lookup_tin(token, tin, direction):
+    url=f"{ETA_API_BASE}/api/v1.0/documents/search"
+    headers={"Authorization":f"Bearer {token}"}
+    params={"issueDateFrom":"2022-01-01T00:00:00","issueDateTo":datetime.now().strftime("%Y-%m-%dT23:59:59"),"direction":direction,"pageSize":5}
+    if direction=="Sent": params["receiverId"]=tin
+    else: params["issuerId"]=tin
+    try:
+        r=http_requests.get(url,headers=headers,params=params,timeout=30,verify=False)
+    except Exception as e:
+        return None,str(e)
+    if r.status_code!=200:
+        try:
+            err=r.json();return None,err.get("error_description",err.get("error",f"HTTP {r.status_code}"))
+        except: return None,f"HTTP {r.status_code}"
+    docs=r.json().get("result",[])
+    if not docs: return {"count":0,"name":""},None
+    key="receiverName" if direction=="Sent" else "issuerName"
+    names=[str(d.get(key,"")).strip() for d in docs]
+    names=[n for n in names if n]
+    return {"count":len(docs),"name":names[0] if names else ""},None
+
 def eta_reconcile_document(token, internal_id):
     url=f"{ETA_API_BASE}/api/v1.0/documents/reconcile"
     headers={"Authorization":f"Bearer {token}"}
@@ -4005,7 +4026,7 @@ elif page=="🔍 الاستعلام عن ممول":
         st.markdown(f'<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(116,185,255,.08);border:1px solid rgba(116,185,255,.18);color:#74b9ff;font-size:.82rem;margin-bottom:.6rem;">📋 إجمالي أرقام التسجيل: <strong>{len(nums)}</strong></div>',unsafe_allow_html=True)
         st.code("\n".join(nums),language="")
 
-    search_mode=st.radio("search_mode",["🔍 بحث بالسجل الضريبي","📝 بحث بالاسم"],horizontal=True,label_visibility="collapsed")
+    search_mode=st.radio("search_mode",["🔍 بحث بالسجل الضريبي","📝 بحث بالاسم","📁 رفع شيت أرقام تسجيل (استعلام من البورتال)"],horizontal=True,label_visibility="collapsed")
 
     if search_mode=="🔍 بحث بالسجل الضريبي":
         st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>بحث بالسجل الضريبي</h3></div>',unsafe_allow_html=True)
@@ -4039,7 +4060,7 @@ elif page=="🔍 الاستعلام عن ممول":
                     st.info(f"لم يتم العثور على ممول بالرقم: {query}")
         st.markdown('</div>',unsafe_allow_html=True)
 
-    else:
+    elif search_mode=="📝 بحث بالاسم":
         st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>بحث بالاسم</h3></div>',unsafe_allow_html=True)
         st.markdown('<div class="erp-card">',unsafe_allow_html=True)
         name_input=st.text_input("اكتب جزء من اسم الممول",key="sup_name_q",placeholder="مثال: شركة")
@@ -4074,6 +4095,89 @@ elif page=="🔍 الاستعلام عن ممول":
                         </div>""",unsafe_allow_html=True)
                 else:
                     st.info(f"لم يتم العثور على ممول بالاسم: {query}")
+        st.markdown('</div>',unsafe_allow_html=True)
+
+    else:
+        st.markdown('<div class="erp-section"><div class="erp-section-dot" style="background:#fdcb6e;"></div><h3>📁 استعلام أسماء الممولين من البورتال برقم التسجيل</h3></div>',unsafe_allow_html=True)
+        st.markdown('<div class="erp-card">',unsafe_allow_html=True)
+        st.markdown('<div style="padding:.5rem 1rem;border-radius:10px;background:rgba(253,203,110,.06);border:1px solid rgba(253,203,110,.15);color:#fdcb6e;font-size:.82rem;margin-bottom:.8rem;">ارفع شيت Excel فيه أرقام التسجيل (عمود واحد تحت بعضه) — النظام بيسأل البورتال عن اسم كل رقم اتعاملت معاه (فاتورة صادرة أو واردة) ويكتب الاسم جنبه عشان تطابق بسرعة</div>',unsafe_allow_html=True)
+        sl_file=st.file_uploader("ارفع شيت أرقام التسجيل",type=['xlsx','xls'],key="sup_lookup_file")
+        if sl_file:
+            sl_df=None
+            try:
+                sl_df=pd.read_excel(sl_file,header=None,engine='openpyxl',dtype=str)
+            except Exception:
+                st.error("تعذر قراءة الملف - تأكد من صيغته")
+            if sl_df is not None:
+                sl_nums=[]
+                for col in sl_df.columns:
+                    for v in sl_df[col].tolist():
+                        if v is None or (isinstance(v,float)): continue
+                        s=str(v).strip()
+                        if s.endswith('.0') and s[:-2].isdigit(): s=s[:-2]
+                        dch=''.join(ch for ch in s if ch.isdigit())
+                        if len(dch)>=9 and dch not in sl_nums:
+                            sl_nums.append(dch)
+                if not sl_nums:
+                    st.warning("مفيش أرقام تسجيل صالحة في الملف (الأرقام لازم 9 خانات على الأقل)")
+                else:
+                    st.markdown(f'<div style="padding:.5rem 1rem;border-radius:10px;background:rgba(0,206,201,.06);border:1px solid rgba(0,206,201,.15);color:#00cec9;font-size:.82rem;margin-bottom:.6rem;">✅ تم قراءت <strong>{len(sl_nums)}</strong> رقم تسجيل — كل رقم بياخد حوالي ثانيتين (حد فحص البورتال)</div>',unsafe_allow_html=True)
+                    _sl_token=st.session_state.get("eta_token","")
+                    if not _sl_token:
+                        st.info("اربط حساب البورتال الأول (من تبويب 🔗 الربط) أو ادخل الداتا هنا:")
+                        slc1,slc2=st.columns(2)
+                        with slc1:
+                            sl_cid=st.text_input("Client ID",value=st.session_state.get("eta_client_id",""),key="sup_lookup_cid")
+                        with slc2:
+                            sl_sec=st.text_input("Client Secret",value=st.session_state.get("eta_client_secret",""),type="password",key="sup_lookup_sec")
+                        if st.button("🔗 ربط الحساب",key="sup_lookup_login",type="primary"):
+                            if not sl_cid or not sl_sec:
+                                st.warning("اكتب Client ID و Client Secret")
+                            else:
+                                _tk,_err=eta_login(sl_cid,sl_sec)
+                                if _err:
+                                    st.error("فشل الربط: "+str(_err))
+                                else:
+                                    st.session_state["eta_token"]=_tk
+                                    st.session_state["eta_client_id"]=sl_cid
+                                    st.session_state["eta_client_secret"]=sl_sec
+                                    st.success("تم ربط الحساب بنجاح");st.rerun()
+                    else:
+                        if st.button("🔍 استعلام أسماء الممولين من البورتال",key="sup_lookup_go",type="primary",use_container_width=True):
+                            _prog=st.progress(0.0)
+                            _ph=st.empty()
+                            _res=[]
+                            for _i,_tin in enumerate(sl_nums):
+                                _ph.markdown(f"🔍 جاري استعلام الرقم <strong>{_i+1}/{len(sl_nums)}</strong>: {_tin}")
+                                _info,_err=eta_lookup_tin(_sl_token,_tin,"Sent")
+                                _found=bool(_info and _info.get("count",0)>0)
+                                _src="صادرة" if _found else ""
+                                if not _found:
+                                    time.sleep(2.2)
+                                    _info,_err=eta_lookup_tin(_sl_token,_tin,"Received")
+                                    _found=bool(_info and _info.get("count",0)>0)
+                                    _src="واردة" if _found else "غير موجود في فواتيرك"
+                                time.sleep(2.2)
+                                if _found:
+                                    _res.append({"رقم التسجيل":_tin,"الاسم على البورتال":_info.get("name","") or "—","مصدر الاسم":_src,"عدد الفواتير":_info.get("count",0)})
+                                else:
+                                    _res.append({"رقم التسجيل":_tin,"الاسم على البورتال":"","مصدر الاسم":"غير موجود في فواتيرك","عدد الفواتير":0})
+                                _prog.progress((_i+1)/len(sl_nums))
+                            _ph.empty()
+                            st.session_state['sup_lookup_results']=_res
+                            st.rerun()
+        _sl_res=st.session_state.get('sup_lookup_results',[])
+        if _sl_res:
+            _sl_nd=sum(1 for r in _sl_res if not r['الاسم على البورتال'])
+            st.markdown(f'<div style="padding:.5rem 1rem;border-radius:10px;background:rgba(108,92,231,.06);border:1px solid rgba(108,92,231,.15);color:#a29bfe;font-size:.82rem;margin-bottom:.6rem;">📋 النتيجة: <strong>{len(_sl_res)}</strong> رقم — لقيت اسم لـ <strong>{len(_sl_res)-_sl_nd}</strong> — مش لاقي اسم لـ <strong>{_sl_nd}</strong></div>',unsafe_allow_html=True)
+            st.dataframe(pd.DataFrame(_sl_res),use_container_width=True,height=400)
+            _sl_buf=BytesIO()
+            pd.DataFrame(_sl_res).to_excel(_sl_buf,index=False,engine='xlsxwriter')
+            _sl_buf.seek(0)
+            st.download_button("📊 تحميل النتيجة (Excel)",data=_sl_buf.getvalue(),file_name="استعلام_البورتال.xlsx",mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",key="sl_res_dl")
+            if st.button("🗑️ مسح النتائج",key="sl_res_clear"):
+                st.session_state.pop('sup_lookup_results',None)
+                st.rerun()
         st.markdown('</div>',unsafe_allow_html=True)
 
     if suppliers_db:
