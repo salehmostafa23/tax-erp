@@ -307,6 +307,31 @@ def eta_lookup_tin(token, tin, direction):
     names=[n for n in names if n]
     return {"count":len(docs),"name":names[0] if names else ""},None
 
+def eta_lookup_tin_name(token, tin):
+    # استعلام اسم الممول المسجل في البورتال (نفس استعلام نموذج الفاتورة الجديدة)
+    url=f"{ETA_API_BASE}/Api/v1/taxpayers/{tin}/light"
+    headers={"Authorization":f"Bearer {token}","Accept":"application/json","Accept-Language":"ar"}
+    try:
+        r=http_requests.get(url,headers=headers,timeout=30,verify=False)
+    except Exception as e:
+        return None,str(e)
+    if r.status_code==200:
+        try: d=r.json()
+        except: return None,"HTTP 200 بدون بيانات"
+        name=str(d.get("nameSecondaryLang") or "").strip() or str(d.get("namePrimaryLang") or "").strip()
+        return {"name":name,"registered":True,"active":bool(d.get("isActive")),"branches":len(d.get("taxpayerBranchs") or [])},None
+    if r.status_code==400:
+        try:
+            det=r.json().get("error",{}).get("details",[]) or []
+            if any(str(x.get("target",""))=="RinNotFound" for x in det):
+                return {"name":"","registered":False,"active":None,"branches":0},None
+        except: pass
+    try:
+        err=r.json()
+        msg=str(err.get("error_description") or err.get("error") or "")
+        return None,f"HTTP {r.status_code}"+(f": {msg}" if msg else "")
+    except: return None,f"HTTP {r.status_code}"
+
 def eta_reconcile_document(token, internal_id):
     url=f"{ETA_API_BASE}/api/v1.0/documents/reconcile"
     headers={"Authorization":f"Bearer {token}"}
@@ -4100,7 +4125,7 @@ elif page=="🔍 الاستعلام عن ممول":
     else:
         st.markdown('<div class="erp-section"><div class="erp-section-dot" style="background:#fdcb6e;"></div><h3>📁 استعلام أسماء الممولين من البورتال برقم التسجيل</h3></div>',unsafe_allow_html=True)
         st.markdown('<div class="erp-card">',unsafe_allow_html=True)
-        st.markdown('<div style="padding:.5rem 1rem;border-radius:10px;background:rgba(253,203,110,.06);border:1px solid rgba(253,203,110,.15);color:#fdcb6e;font-size:.82rem;margin-bottom:.8rem;">ارفع شيت Excel فيه أرقام التسجيل (عمود واحد تحت بعضه) — النظام بيسأل البورتال عن اسم كل رقم اتعاملت معاه (فاتورة صادرة أو واردة) ويكتب الاسم جنبه عشان تطابق بسرعة</div>',unsafe_allow_html=True)
+        st.markdown('<div style="padding:.5rem 1rem;border-radius:10px;background:rgba(253,203,110,.06);border:1px solid rgba(253,203,110,.15);color:#fdcb6e;font-size:.82rem;margin-bottom:.8rem;">ارفع شيت Excel فيه أرقام التسجيل (عمود واحد تحت بعضه) — النظام بيقرأ اسم الممول المسجل في البورتال لكل رقم (نفس استعلام نموذج الفاتورة الجديدة) ويكتبه جنبه عشان تطابق بسرعة</div>',unsafe_allow_html=True)
         sl_file=st.file_uploader("ارفع شيت أرقام التسجيل",type=['xlsx','xls'],key="sup_lookup_file")
         if sl_file:
             sl_df=None
@@ -4121,7 +4146,7 @@ elif page=="🔍 الاستعلام عن ممول":
                 if not sl_nums:
                     st.warning("مفيش أرقام تسجيل صالحة في الملف (الأرقام لازم 9 خانات على الأقل)")
                 else:
-                    st.markdown(f'<div style="padding:.5rem 1rem;border-radius:10px;background:rgba(0,206,201,.06);border:1px solid rgba(0,206,201,.15);color:#00cec9;font-size:.82rem;margin-bottom:.6rem;">✅ تم قراءت <strong>{len(sl_nums)}</strong> رقم تسجيل — كل رقم بياخد حوالي ثانيتين (حد فحص البورتال)</div>',unsafe_allow_html=True)
+                    st.markdown(f'<div style="padding:.5rem 1rem;border-radius:10px;background:rgba(0,206,201,.06);border:1px solid rgba(0,206,201,.15);color:#00cec9;font-size:.82rem;margin-bottom:.6rem;">✅ تم قراءت <strong>{len(sl_nums)}</strong> رقم تسجيل — استعلام مباشر عن الاسم المسجل (حد البورتال: ثانيتين لكل رقم)</div>',unsafe_allow_html=True)
                     _sl_token=st.session_state.get("eta_token","")
                     if not _sl_token:
                         st.info("اربط حساب البورتال الأول (من تبويب 🔗 الربط) أو ادخل الداتا هنا:")
@@ -4149,19 +4174,37 @@ elif page=="🔍 الاستعلام عن ممول":
                             _res=[]
                             for _i,_tin in enumerate(sl_nums):
                                 _ph.markdown(f"🔍 جاري استعلام الرقم <strong>{_i+1}/{len(sl_nums)}</strong>: {_tin}")
-                                _info,_err=eta_lookup_tin(_sl_token,_tin,"Sent")
-                                _found=bool(_info and _info.get("count",0)>0)
-                                _src="صادرة" if _found else ""
-                                if not _found:
-                                    time.sleep(2.2)
-                                    _info,_err=eta_lookup_tin(_sl_token,_tin,"Received")
-                                    _found=bool(_info and _info.get("count",0)>0)
-                                    _src="واردة" if _found else "غير موجود في فواتيرك"
-                                time.sleep(2.2)
-                                if _found:
-                                    _res.append({"رقم التسجيل":_tin,"الاسم على البورتال":_info.get("name","") or "—","مصدر الاسم":_src,"عدد الفواتير":_info.get("count",0)})
+                                _info,_err=eta_lookup_tin_name(_sl_token,_tin)
+                                if _err and "401" in str(_err) and st.session_state.get("eta_client_id"):
+                                    _tk2,_e2=eta_login(st.session_state.get("eta_client_id",""),st.session_state.get("eta_client_secret",""))
+                                    if _tk2:
+                                        st.session_state["eta_token"]=_tk2
+                                        _sl_token=_tk2
+                                        _info,_err=eta_lookup_tin_name(_sl_token,_tin)
+                                _name="";_status="";_src="البورتال"
+                                if _info and _info.get("registered"):
+                                    _name=_info.get("name","") or ""
+                                    _status="نشط" if _info.get("active") else "غير نشط"
+                                elif _info and not _info.get("registered"):
+                                    _status="غير مسجل"
+                                    _src="غير مسجل في البورتال"
                                 else:
-                                    _res.append({"رقم التسجيل":_tin,"الاسم على البورتال":"","مصدر الاسم":"غير موجود في فواتيرك","عدد الفواتير":0})
+                                    # احتياطي: بحث في فواتيرك لو الاستعلام المباشر فشل
+                                    time.sleep(2.2)
+                                    _info2,_err2=eta_lookup_tin(_sl_token,_tin,"Sent")
+                                    _found=bool(_info2 and _info2.get("count",0)>0)
+                                    _src="صادرة (احتياطي)"
+                                    if not _found:
+                                        time.sleep(2.2)
+                                        _info2,_err2=eta_lookup_tin(_sl_token,_tin,"Received")
+                                        _found=bool(_info2 and _info2.get("count",0)>0)
+                                        _src="واردة (احتياطي)" if _found else "غير موجود في فواتيرك"
+                                    if _found:
+                                        _name=_info2.get("name","") or ""
+                                    else:
+                                        _src="تعذر الاستعلام" if _err else "غير موجود في فواتيرك"
+                                time.sleep(2.2)
+                                _res.append({"رقم التسجيل":_tin,"الاسم على البورتال":_name,"الحالة":_status,"مصدر الاسم":_src})
                                 _prog.progress((_i+1)/len(sl_nums))
                             _ph.empty()
                             st.session_state['sup_lookup_results']=_res
