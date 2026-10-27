@@ -53,6 +53,18 @@ DATA_DIR = os.path.dirname(os.path.abspath(__file__))
 USERS_FILE=os.path.join(DATA_DIR,"users.json")
 ALL_PAGES=["🏠 الرئيسية","📋 نموذج 41","💰 القيمة المضافة","🛒 فواتير الماركت","📄 Portal الفواتير الإلكترونية","🔍 الاستعلام عن ممول","🏷️ الاستعلام عن الأكواد","📑 اقرار 10 قيمة مضافة","📦 فواتير مبيعات الجملة والإيجارات","📤 تحديث الفواتير"]
 ADMIN_PAGE="👥 إدارة المستخدمين"
+SUB_PAGES={
+ "📋 نموذج 41":["📤 رفع وربط البيانات","🔍 استعلام بالسجل الضريبي","📅 استعلام بالفترة"],
+ "💰 القيمة المضافة":["📤 رفع وربط البيانات","🔍 استعلام بالسجل الضريبي","📅 استعلام بالفترة"],
+ "🛒 فواتير الماركت":["📝 إنشاء Template","📋 سجل الريسيتات","✏️ تعديل الأكواد","🧩 Template مجمع"],
+ "📄 Portal الفواتير الإلكترونية":["🔗 الربط","📤 الصادرة","📥 الوارد","🏷️ أكواد","🔬 GPC Browser"],
+ "🔍 الاستعلام عن ممول":["🔍 بحث بالسجل الضريبي","📝 بحث بالاسم","📁 رفع شيت أرقام تسجيل (استعلام من البورتال)"],
+ "🏷️ الاستعلام عن الأكواد":["🔗 أكواد البورتال","🔬 GPC Browser","🏷️ أكواد GS1","🏷️ أكواد الموردين"],
+ "📑 اقرار 10 قيمة مضافة":["📝 تحضيرات الاقرار","📋 الاقرار"],
+ "📦 فواتير مبيعات الجملة والإيجارات":["📦 مبيعات الجملة","🏢 فواتير الإيجارات"],
+ ADMIN_PAGE:["➕ إضافة مستخدم","📋 قائمة المستخدمين","✏️ تعديل الصلاحيات"],
+}
+def _sub_key(p): return f"subsel|{p}"
 
 def _hash_pw(pw,salt="tax_erp_salt_2024"):
     return hashlib.sha256(f"{salt}{pw}".encode()).hexdigest()
@@ -1600,26 +1612,57 @@ if 'current_user' not in st.session_state:
 if not st.session_state['current_user']:
     st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Cairo:wght@300;400;500;600;700;800&display=swap');
-    :root{--bg:#0a0a15;--surface:rgba(22,22,40,0.7);--surface2:#1e1e38;--border:rgba(255,255,255,0.06);--text:#eaeaf2;--text2:#7878a0;--accent:#6c5ce7;--accent2:#a29bfe;}
-    html,body,[class*="css"]{font-family:'Inter','Cairo',sans-serif!important;}
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Cairo:wght@300;400;500;600;700;800;900&display=swap');
+    :root{--accent:#6c5ce7;--accent2:#a29bfe;--cyan:#00cec9;}
+    html,body,[class*="css"]{font-family:'Inter','Cairo',sans-serif!important;direction:rtl;}
 #MainMenu,footer,header,.stDeployButton{visibility:hidden!important;}
 div[data-testid="stDecoration"]{display:none!important;visibility:hidden!important;height:0!important;width:0!important;overflow:hidden!important;}
     div[data-testid="stToolbar"]{display:none!important;}
-    .stApp{background:linear-gradient(135deg,#08081a 0%,#0d0d22 50%,#0a0a18 100%)!important;}
-    .login-box{max-width:320px;margin:6rem auto 0;padding:1.5rem 1.5rem;border-radius:16px;background:rgba(22,22,40,0.7);border:1px solid rgba(255,255,255,0.06);backdrop-filter:blur(20px);box-shadow:0 20px 60px rgba(0,0,0,.5);position:relative;overflow:hidden;}
-    .login-box::before{content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;background:radial-gradient(circle at center,rgba(108,92,231,0.06),transparent 50%);pointer-events:none;}
-    .login-icon{width:50px;height:50px;margin:0 auto .8rem;border-radius:14px;background:linear-gradient(135deg,#6c5ce7 0%,#a29bfe 50%,#00cec9 100%);display:flex;align-items:center;justify-content:center;font-size:1.5rem;box-shadow:0 8px 30px rgba(108,92,231,0.45);}
-    .login-title{margin:0 0 .2rem;color:#fff;font-size:1.1rem;font-weight:800;text-align:center;letter-spacing:.5px;}
-    .login-sub{margin:0 0 1rem;color:rgba(255,255,255,.3);font-size:.65rem;text-align:center;letter-spacing:1px;}
-    .stTextInput>div>div>input{background:rgba(30,30,56,0.8)!important;border:1px solid rgba(255,255,255,0.08)!important;border-radius:12px!important;color:#fff!important;padding:.7rem 1rem!important;}
-    .stTextInput>div>div>input:focus{border-color:rgba(108,92,231,0.5)!important;box-shadow:0 0 0 3px rgba(108,92,231,0.1)!important;}
-    .stButton>button[kind="primary"]{background:linear-gradient(135deg,#6c5ce7 0%,#a29bfe 100%)!important;border:none!important;border-radius:12px!important;font-family:'Cairo',sans-serif!important;font-weight:700!important;color:#fff!important;padding:.6rem 0!important;width:100%!important;box-shadow:0 4px 20px rgba(108,92,231,0.4)!important;transition:all .3s!important;font-size:.95rem!important;}
-    .stButton>button[kind="primary"]:hover{transform:translateY(-2px)!important;box-shadow:0 8px 30px rgba(108,92,231,0.5)!important;}
-    .login-err{background:rgba(255,107,107,.1);border:1px solid rgba(255,107,107,.2);border-radius:10px;padding:.5rem 1rem;color:#ff6b6b;font-size:.8rem;text-align:center;margin-top:.5rem;}
+    .stApp{background:radial-gradient(120% 95% at 50% -10%,#0e0e26 0%,#07071a 48%,#030309 100%)!important;}
+    body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.5;mix-blend-mode:overlay;
+        background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/></filter><rect width="160" height="160" filter="url(%23n)" opacity="0.035"/></svg>');
+        background-size:160px 160px;}
+    .stApp::before{content:'';position:fixed;inset:-5%;z-index:0;pointer-events:none;background:
+        radial-gradient(55% 45% at 18% 22%,rgba(108,92,231,.22),transparent 60%),
+        radial-gradient(45% 40% at 82% 12%,rgba(0,206,201,.13),transparent 60%),
+        radial-gradient(50% 50% at 78% 88%,rgba(232,67,147,.11),transparent 60%),
+        radial-gradient(40% 40% at 12% 82%,rgba(108,92,231,.15),transparent 60%);
+        animation:bgDrift 22s ease-in-out infinite alternate;}
+    .stApp::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;background:
+        linear-gradient(115deg,transparent 14%,rgba(162,155,254,.05) 30%,transparent 42%),
+        linear-gradient(115deg,transparent 56%,rgba(0,206,201,.035) 72%,transparent 86%),
+        radial-gradient(62% 58% at 50% 44%,transparent 52%,rgba(0,0,0,.5) 100%);
+        animation:beamShift 26s ease-in-out infinite alternate;}
+    @keyframes bgDrift{0%{transform:translate(0,0) scale(1)}100%{transform:translate(-2.5%,-2%) scale(1.07)}}
+    @keyframes beamShift{0%{transform:translateX(-1.2%) translateY(0);opacity:.75}100%{transform:translateX(1.2%) translateY(-1%);opacity:1}}
+    @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
+    @keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+    @keyframes ringPulse{0%{opacity:.8;transform:scale(.94)}70%{opacity:0;transform:scale(1.18)}100%{opacity:0}}
+    @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+    @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+    .block-container{padding:0 1rem!important;max-width:100%!important;}
+    .login-hero{text-align:center;margin:6vh auto 1.1rem;animation:fadeUp .7s cubic-bezier(.2,.7,.3,1) both;position:relative;z-index:1;}
+    .login-icon{width:72px;height:72px;margin:0 auto .95rem;border-radius:20px;background:linear-gradient(135deg,#6c5ce7 0%,#a29bfe 55%,#00cec9 100%);display:flex;align-items:center;justify-content:center;font-size:2rem;box-shadow:0 14px 44px rgba(108,92,231,.5),inset 0 0 0 1px rgba(255,255,255,.12);position:relative;animation:floaty 5.5s ease-in-out infinite;}
+    .login-icon::after{content:'';position:absolute;inset:-7px;border-radius:26px;border:1px solid rgba(162,155,254,.35);animation:ringPulse 2.8s ease-out infinite;}
+    .login-title{margin:0;font-size:1.45rem;font-weight:900;letter-spacing:.4px;background:linear-gradient(90deg,#ffffff 10%,#a29bfe 55%,#00cec9 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+    .login-sub{margin:.4rem 0 0;color:rgba(255,255,255,.42);font-size:.74rem;letter-spacing:.4px;}
+    .login-badge{display:inline-flex;align-items:center;gap:.45rem;margin-top:.95rem;padding:.38rem 1rem;border-radius:99px;background:rgba(0,206,201,.06);border:1px solid rgba(0,206,201,.22);color:#7ef0e5;font-size:.67rem;font-weight:600;letter-spacing:.3px;}
+    .login-badge .dot{width:6px;height:6px;border-radius:50%;background:#00cec9;box-shadow:0 0 10px #00cec9;animation:blink 2.2s infinite;}
+    [data-testid="stForm"]{max-width:352px;margin:0 auto;background:rgba(17,17,34,.62);border:1px solid rgba(255,255,255,.08);border-radius:22px;padding:1.5rem 1.4rem 1.2rem;backdrop-filter:blur(26px);-webkit-backdrop-filter:blur(26px);box-shadow:0 32px 90px rgba(0,0,0,.55),0 0 0 1px rgba(108,92,231,.05);position:relative;overflow:hidden;animation:fadeUp .8s .12s cubic-bezier(.2,.7,.3,1) both;z-index:1;}
+    [data-testid="stForm"]::before{content:'';position:absolute;top:0;left:12%;right:12%;height:1px;background:linear-gradient(90deg,transparent,rgba(162,155,254,.65),transparent);}
+    [data-testid="stForm"]::after{content:'';position:absolute;top:-55%;left:-15%;width:130%;height:110%;background:radial-gradient(50% 50% at 50% 50%,rgba(108,92,231,.09),transparent 70%);pointer-events:none;}
+    [data-testid="stForm"] label p{color:rgba(255,255,255,.55)!important;font-size:.72rem!important;font-weight:600!important;letter-spacing:.3px;}
+    [data-testid="stForm"] .stTextInput>div>div>input{background:rgba(255,255,255,.04)!important;border:1px solid rgba(255,255,255,.09)!important;border-radius:12px!important;color:#fff!important;padding:.72rem .95rem!important;font-size:.9rem!important;transition:all .25s!important;}
+    [data-testid="stForm"] .stTextInput>div>div>input::placeholder{color:rgba(255,255,255,.22);}
+    [data-testid="stForm"] .stTextInput>div>div>input:focus{border-color:rgba(162,155,254,.6)!important;box-shadow:0 0 0 3px rgba(108,92,231,.16)!important;background:rgba(255,255,255,.06)!important;}
+    [data-testid="stForm"] button[kind="primary"],[data-testid="stForm"] button[kind="primaryFormSubmit"]{background:linear-gradient(135deg,#6c5ce7 0%,#8e7bff 55%,#a29bfe 100%)!important;border:none!important;border-radius:12px!important;font-family:'Cairo',sans-serif!important;font-weight:800!important;font-size:.92rem!important;color:#fff!important;padding:.72rem 0!important;width:100%!important;box-shadow:0 10px 32px rgba(108,92,231,.45)!important;transition:all .3s!important;}
+    [data-testid="stForm"] button[kind="primary"]:hover,[data-testid="stForm"] button[kind="primaryFormSubmit"]:hover{transform:translateY(-2px)!important;box-shadow:0 16px 44px rgba(108,92,231,.6)!important;filter:brightness(1.08)!important;}
+    [data-testid="stForm"] button[kind="primary"]:active,[data-testid="stForm"] button[kind="primaryFormSubmit"]:active{transform:translateY(0)!important;}
+    .login-err{background:rgba(255,90,90,.09);border:1px solid rgba(255,90,90,.26);border-radius:12px;padding:.62rem 1rem;color:#ff8787;font-size:.79rem;text-align:center;margin-top:.6rem;animation:shake .4s;}
+    .login-foot{text-align:center;color:rgba(255,255,255,.2);font-size:.62rem;margin-top:1.7rem;letter-spacing:.3px;animation:fadeUp .8s .26s both;position:relative;z-index:1;}
     </style>
     """, unsafe_allow_html=True)
-    st.markdown('<div class="login-box"><div class="login-icon">🏢</div><h2 class="login-title">Tax Management System</h2><p class="login-sub">نظام إدارة الضرائب المتكامل</p></div>', unsafe_allow_html=True)
+    st.markdown('<div class="login-hero"><div class="login-icon">🏢</div><h1 class="login-title">Tax Management System</h1><p class="login-sub">نظام إدارة الضرائب المتكامل</p><div class="login-badge"><span class="dot"></span> تسجيل دخول آمن ومحمي</div></div>', unsafe_allow_html=True)
     with st.form("login_form",clear_on_submit=False):
         u=st.text_input("اسم المستخدم",key="login_user",placeholder="Username")
         p=st.text_input("كلمة المرور",key="login_pass",type="password",placeholder="Password")
@@ -1634,7 +1677,7 @@ div[data-testid="stDecoration"]{display:none!important;visibility:hidden!importa
                     st.rerun()
                 else:
                     st.markdown('<div class="login-err">بيانات الدخول غير صحيحة</div>', unsafe_allow_html=True)
-    st.markdown('<p style="text-align:center;color:rgba(255,255,255,.2);font-size:.6rem;margin-top:2rem;font-family:Cairo,sans-serif;">جميع الحقوق محفوظة © تصميم محاسب / صالح مصطفى</p>', unsafe_allow_html=True)
+    st.markdown('<p class="login-foot">جميع الحقوق محفوظة © تصميم محاسب / صالح مصطفى</p>', unsafe_allow_html=True)
     st.stop()
 
 # ====================== CSS ======================
@@ -1656,9 +1699,22 @@ button[data-testid="stSidebarCollapseButton"],div[data-testid="stSidebarCollapse
 section[data-testid="stSidebar"]>div:first-child{padding-top:0!important;}
 section[data-testid="stSidebar"] [data-testid="stSidebarContent"]{overflow-y:auto!important;max-height:calc(100vh - 2rem)!important;}
 section[data-testid="stSidebar"] .stMarkdown p,section[data-testid="stSidebar"] .stMarkdown span,section[data-testid="stSidebar"] label{color:rgba(255,255,255,0.55)!important;font-size:.8rem!important;font-family:'Inter','Cairo',sans-serif!important;}
-section[data-testid="stSidebar"] button[kind="primary"]{background:linear-gradient(135deg,#6c5ce7,#a29bfe)!important;border:none!important;border-radius:8px!important;padding:.3rem .6rem!important;font-size:.75rem!important;font-weight:700!important;color:#fff!important;min-height:0!important;height:auto!important;margin:1px 4px!important;}
-section[data-testid="stSidebar"] button[kind="secondary"]{background:rgba(108,92,231,0.08)!important;border:1px solid rgba(108,92,231,0.15)!important;border-radius:8px!important;padding:.3rem .6rem!important;font-size:.75rem!important;color:rgba(255,255,255,0.6)!important;min-height:0!important;height:auto!important;margin:1px 4px!important;}
-section[data-testid="stSidebar"] button[kind="secondary"]:hover{background:rgba(108,92,231,0.15)!important;border-color:rgba(108,92,231,0.3)!important;color:rgba(255,255,255,.9)!important;}
+section[data-testid="stSidebar"] .stButton>button{background:transparent!important;border:1px solid transparent!important;border-radius:11px!important;padding:.5rem .95rem!important;font-size:.78rem!important;font-weight:600!important;color:rgba(255,255,255,.52)!important;min-height:0!important;height:auto!important;margin:1px 4px!important;justify-content:flex-start!important;text-align:start!important;box-shadow:none!important;transition:all .22s ease!important;}
+section[data-testid="stSidebar"] .stButton>button>div{justify-content:flex-start!important;width:100%!important;}
+section[data-testid="stSidebar"] .stButton>button:hover{background:rgba(108,92,231,.1)!important;border-color:rgba(108,92,231,.18)!important;color:#fff!important;transform:none!important;box-shadow:none!important;}
+section[data-testid="stSidebar"] .stButton>button[kind="primary"]{background:linear-gradient(135deg,rgba(108,92,231,.92) 0%,rgba(142,123,255,.8) 55%,rgba(162,155,254,.7) 100%)!important;border:none!important;color:#fff!important;box-shadow:0 6px 18px rgba(108,92,231,.35),inset 0 1px 0 rgba(255,255,255,.2)!important;}
+section[data-testid="stSidebar"] .stButton>button[kind="primary"]:hover{background:linear-gradient(135deg,rgba(122,107,240,.95) 0%,rgba(154,137,255,.85) 55%,rgba(179,173,255,.75) 100%)!important;box-shadow:0 10px 26px rgba(108,92,231,.5),inset 0 1px 0 rgba(255,255,255,.25)!important;}
+section[data-testid="stSidebar"] [class*="st-key-logout_btn"] button{justify-content:center!important;text-align:center!important;color:rgba(255,255,255,.55)!important;border-color:rgba(255,255,255,.06)!important;background:rgba(255,255,255,.02)!important;}
+section[data-testid="stSidebar"] [class*="st-key-logout_btn"] button>div{justify-content:center!important;}
+section[data-testid="stSidebar"] [class*="st-key-logout_btn"] button:hover{color:#ff8787!important;border-color:rgba(255,107,107,.3)!important;background:rgba(255,107,107,.08)!important;}
+
+/* SIDEBAR SUBMENU */
+section[data-testid="stSidebar"] [class*="st-key-submenu_"]{margin:2px 6px 6px 6px!important;padding:.2rem .3rem .2rem 0!important;border-inline-start:1px solid rgba(108,92,231,.25)!important;border-radius:0 12px 12px 0!important;background:linear-gradient(90deg,rgba(108,92,231,.06),rgba(108,92,231,.01))!important;animation:submenuFade .26s ease-out!important;}
+@keyframes submenuFade{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:translateY(0);}}
+section[data-testid="stSidebar"] [class*="st-key-submenu_"] .stButton>button{font-size:.72rem!important;font-weight:500!important;padding:.32rem .6rem .32rem .8rem!important;margin:1px 0!important;border-radius:9px!important;color:rgba(255,255,255,.42)!important;letter-spacing:.1px;}
+section[data-testid="stSidebar"] [class*="st-key-submenu_"] .stButton>button:hover{color:#fff!important;background:rgba(108,92,231,.12)!important;border-color:transparent!important;}
+section[data-testid="stSidebar"] [class*="st-key-submenu_"] .stButton>button[kind="primary"]{background:rgba(108,92,231,.18)!important;border:1px solid rgba(162,155,254,.22)!important;color:#eae7ff!important;font-weight:700!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.02)!important;}
+section[data-testid="stSidebar"] [class*="st-key-submenu_"] .stButton>button[kind="primary"]:hover{background:rgba(108,92,231,.26)!important;border-color:rgba(162,155,254,.32)!important;box-shadow:none!important;}
 section[data-testid="stSidebar"] [data-testid="stSidebarContent"] [data-testid="stVerticalBlock"]>div{gap:0!important;}
 section[data-testid="stSidebar"] hr{border-color:rgba(108,92,231,.06)!important;}
 section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p{margin:0!important;}
@@ -1736,18 +1792,24 @@ section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p{margin:0!
 .stFileUploader{border:2px dashed rgba(108,92,231,.25)!important;border-radius:12px!important;padding:1rem!important;background:rgba(108,92,231,.02)!important;}
 .stFileUploader:hover{border-color:rgba(108,92,231,.4)!important;}
 
-/* BUTTONS */
-.stButton>button[kind="primary"],.stDownloadButton>button{background:linear-gradient(135deg,#6c5ce7 0%,#a29bfe 100%)!important;border:none!important;border-radius:10px!important;font-family:'Cairo',sans-serif!important;font-weight:600!important;color:#fff!important;padding:.5rem 2rem!important;box-shadow:0 4px 15px rgba(108,92,231,.35)!important;transition:all .3s!important;}
-.stButton>button[kind="primary"]:hover,.stDownloadButton>button:hover{transform:translateY(-2px)!important;box-shadow:0 8px 25px rgba(108,92,231,.45)!important;}
-.stButton>button{background:var(--surface2)!important;border:1px solid var(--border)!important;border-radius:10px!important;color:var(--text)!important;font-family:'Cairo',sans-serif!important;}
-.stButton>button:hover{border-color:rgba(108,92,231,.25)!important;background:rgba(108,92,231,.08)!important;}
+/* BUTTONS v2 */
+.stButton>button,.stDownloadButton>button,.stFormSubmitButton>button{background:rgba(255,255,255,.03)!important;border:1px solid rgba(255,255,255,.07)!important;border-radius:12px!important;color:var(--text)!important;font-family:'Cairo',sans-serif!important;font-weight:600!important;letter-spacing:.2px!important;padding:.55rem 1.4rem!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 2px 8px rgba(0,0,0,.18)!important;transition:all .25s cubic-bezier(.2,.7,.3,1)!important;}
+.stButton>button:hover,.stDownloadButton>button:hover,.stFormSubmitButton>button:hover{background:rgba(108,92,231,.1)!important;border-color:rgba(162,155,254,.32)!important;color:#fff!important;transform:translateY(-1px)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 10px 26px rgba(0,0,0,.32)!important;}
+.stButton>button:active,.stDownloadButton>button:active,.stFormSubmitButton>button:active{transform:translateY(0) scale(.985)!important;}
+.stButton>button[kind="primary"],.stDownloadButton>button,button[kind="primaryFormSubmit"]{background:linear-gradient(135deg,#6c5ce7 0%,#8e7bff 55%,#a29bfe 100%)!important;border:none!important;color:#fff!important;box-shadow:0 6px 22px rgba(108,92,231,.38),inset 0 1px 0 rgba(255,255,255,.22)!important;position:relative!important;overflow:hidden!important;}
+.stButton>button[kind="primary"]::after,.stDownloadButton>button::after,button[kind="primaryFormSubmit"]::after{content:'';position:absolute;top:0;bottom:0;left:-70%;width:45%;background:linear-gradient(105deg,transparent,rgba(255,255,255,.3),transparent);transform:skewX(-18deg);transition:left .65s ease;pointer-events:none;}
+.stButton>button[kind="primary"]:hover::after,.stDownloadButton>button:hover::after,button[kind="primaryFormSubmit"]:hover::after{left:130%;}
+.stButton>button[kind="primary"]:hover,.stDownloadButton>button:hover,button[kind="primaryFormSubmit"]:hover{background:linear-gradient(135deg,#7a6bf0 0%,#9a89ff 55%,#b3adff 100%)!important;box-shadow:0 14px 36px rgba(108,92,231,.55),inset 0 1px 0 rgba(255,255,255,.25)!important;transform:translateY(-2px)!important;}
+.stButton>button:focus-visible,.stDownloadButton>button:focus-visible{outline:2px solid rgba(162,155,254,.55)!important;outline-offset:2px!important;}
 
 /* TABS */
-.stTabs [data-baseweb="tab-list"]{gap:4px;background:rgba(22,22,40,.4)!important;padding:4px!important;border-radius:12px!important;border:1px solid var(--border)!important;overflow-x:auto!important;flex-wrap:nowrap!important;}
-.stTabs [data-baseweb="tab"]{padding:8px 14px!important;border-radius:10px!important;font-weight:600!important;font-size:.78rem!important;color:var(--text2)!important;background:transparent!important;white-space:nowrap!important;flex-shrink:0!important;}
-.stTabs [aria-selected="true"]{background:var(--surface)!important;color:var(--accent2)!important;box-shadow:0 2px 10px rgba(0,0,0,.2)!important;border:1px solid rgba(108,92,231,.15)!important;}
+/* TABS v2 */
+.stTabs [data-baseweb="tab-list"]{gap:6px;background:rgba(13,13,28,.65)!important;padding:6px!important;border-radius:14px!important;border:1px solid rgba(255,255,255,.06)!important;overflow-x:auto!important;flex-wrap:nowrap!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.03);}
+.stTabs [data-baseweb="tab"]{padding:9px 16px!important;border-radius:10px!important;font-weight:700!important;font-size:.8rem!important;color:var(--text2)!important;background:transparent!important;white-space:nowrap!important;flex-shrink:0!important;transition:all .25s!important;}
+.stTabs [data-baseweb="tab"]:hover{color:#fff!important;background:rgba(108,92,231,.08)!important;}
+.stTabs [aria-selected="true"]{background:linear-gradient(135deg,rgba(108,92,231,.26),rgba(162,155,254,.12))!important;color:#fff!important;border-radius:10px!important;box-shadow:0 4px 16px rgba(108,92,231,.22),inset 0 1px 0 rgba(255,255,255,.08)!important;}
 .stTabs [data-baseweb="tab-border"]{display:none!important;}
-.stTabs [data-baseweb="tab-highlight"]{background:var(--accent)!important;}
+.stTabs [data-baseweb="tab-highlight"]{background:transparent!important;}
 
 .stDataFrame{border-radius:12px!important;overflow:hidden!important;border:1px solid var(--border)!important;}
 .stAlert{border-radius:10px!important;}
@@ -1757,7 +1819,60 @@ section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p{margin:0!
 .erp-empty h3{color:var(--text);margin:0 0 .5rem;font-size:1.1rem;}
 .erp-empty p{color:var(--text2);margin:0;font-size:.85rem;}
 
+/* ============ GLASS v2 REFINEMENTS ============ */
+.stApp{background:radial-gradient(130% 100% at 50% -10%,#0c0c1e 0%,#090916 48%,#070710 100%)!important;}
+.stMain .block-container{padding-top:1.2rem!important;}
+hr{border-color:rgba(255,255,255,.05)!important;}
+.stMarkdown a{color:#a29bfe;}
+.stMain h1,.stMain h2,.stMain h3,.stMain h4{letter-spacing:.2px;color:#f2f2fa;}
+
+/* surfaces */
+.erp-topbar{background:linear-gradient(135deg,rgba(26,26,52,.7) 0%,rgba(14,14,32,.6) 100%)!important;border:1px solid rgba(162,155,254,.12)!important;border-radius:22px!important;box-shadow:0 24px 60px rgba(0,0,0,.32),inset 0 1px 0 rgba(255,255,255,.05)!important;backdrop-filter:blur(24px)!important;}
+.erp-stat{background:linear-gradient(180deg,rgba(26,26,50,.55) 0%,rgba(15,15,32,.5) 100%)!important;border:1px solid rgba(255,255,255,.07)!important;border-radius:18px!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 12px 32px rgba(0,0,0,.25)!important;}
+.erp-stat:hover{transform:translateY(-4px)!important;border-color:rgba(162,155,254,.24)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 26px 54px rgba(0,0,0,.4)!important;}
+.erp-stat-value{font-variant-numeric:tabular-nums;letter-spacing:-.5px;}
+.erp-card{background:linear-gradient(180deg,rgba(22,22,42,.52) 0%,rgba(14,14,30,.48) 100%)!important;border:1px solid rgba(255,255,255,.06)!important;border-radius:18px!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.04);backdrop-filter:blur(18px)!important;}
+.erp-card:hover{border-color:rgba(162,155,254,.18)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 18px 44px rgba(0,0,0,.3)!important;}
+.erp-batch{border-radius:22px!important;background:linear-gradient(180deg,rgba(24,24,46,.6) 0%,rgba(13,13,28,.55) 100%)!important;border:1px solid rgba(255,255,255,.06)!important;box-shadow:0 14px 36px rgba(0,0,0,.26),inset 0 1px 0 rgba(255,255,255,.04)!important;}
+.erp-batch:hover{transform:translateY(-5px)!important;border-color:rgba(162,155,254,.22)!important;box-shadow:0 32px 72px rgba(0,0,0,.42),inset 0 1px 0 rgba(255,255,255,.06)!important;}
+.erp-meta-item{background:linear-gradient(180deg,rgba(24,24,46,.5) 0%,rgba(15,15,32,.45) 100%)!important;border:1px solid rgba(255,255,255,.06)!important;border-radius:16px!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.03);}
+.erp-empty{background:linear-gradient(180deg,rgba(24,24,46,.45) 0%,rgba(14,14,30,.4) 100%)!important;border:1px dashed rgba(162,155,254,.18)!important;border-radius:22px!important;}
+.erp-info{border-radius:14px!important;border:1px solid rgba(162,155,254,.14)!important;background:rgba(108,92,231,.06)!important;}
+.erp-section h3{font-size:.98rem!important;letter-spacing:.2px;}
+
+/* inputs */
+.stTextInput>div>div>input,.stNumberInput input,.stTextArea textarea{background:rgba(255,255,255,.03)!important;border:1px solid rgba(255,255,255,.08)!important;border-radius:12px!important;color:var(--text)!important;transition:border-color .22s,box-shadow .22s,background .22s!important;}
+.stTextInput>div>div>input:hover,.stNumberInput input:hover,.stTextArea textarea:hover{border-color:rgba(162,155,254,.24)!important;}
+.stTextInput>div>div>input:focus,.stNumberInput input:focus,.stTextArea textarea:focus{border-color:rgba(162,155,254,.55)!important;box-shadow:0 0 0 3px rgba(108,92,231,.14)!important;background:rgba(255,255,255,.05)!important;}
+.stSelectbox>div>div,.stMultiSelect>div>div,[data-baseweb="select"]>div{background:rgba(255,255,255,.03)!important;border:1px solid rgba(255,255,255,.08)!important;border-radius:12px!important;transition:all .22s!important;}
+.stSelectbox>div>div:hover,.stMultiSelect>div>div:hover,[data-baseweb="select"]>div:hover{border-color:rgba(162,155,254,.26)!important;}
+.stDateInput>div>div>div{background:rgba(255,255,255,.03)!important;border:1px solid rgba(255,255,255,.08)!important;border-radius:12px!important;}
+[data-baseweb="popover"] [data-baseweb="menu"]{background:#131327!important;border:1px solid rgba(255,255,255,.08)!important;border-radius:12px!important;box-shadow:0 20px 50px rgba(0,0,0,.5)!important;}
+[data-baseweb="menu"] li[aria-selected="true"]{background:rgba(108,92,231,.18)!important;}
+.stFileUploader section,[data-testid="stFileUploader"] section{border:1.5px dashed rgba(162,155,254,.28)!important;border-radius:16px!important;background:rgba(108,92,231,.035)!important;transition:all .3s!important;}
+.stFileUploader section:hover,[data-testid="stFileUploader"] section:hover{border-color:rgba(162,155,254,.5)!important;background:rgba(108,92,231,.06)!important;}
+
+/* alerts */
+[data-testid="stAlert"]{border-radius:14px!important;overflow:hidden!important;border:none!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.04);}
+[data-testid="stAlertContentSuccess"]{background:rgba(0,184,148,.07)!important;border:1px solid rgba(0,184,148,.2)!important;border-radius:14px!important;}
+[data-testid="stAlertContentWarning"]{background:rgba(253,203,110,.06)!important;border:1px solid rgba(253,203,110,.2)!important;border-radius:14px!important;}
+[data-testid="stAlertContentError"]{background:rgba(255,107,107,.07)!important;border:1px solid rgba(255,107,107,.2)!important;border-radius:14px!important;}
+[data-testid="stAlertContentInfo"]{background:rgba(116,185,255,.06)!important;border:1px solid rgba(116,185,255,.18)!important;border-radius:14px!important;}
+
+/* expander / dataframe / progress */
+[data-testid="stExpander"] details{border:1px solid rgba(255,255,255,.07)!important;border-radius:14px!important;background:rgba(22,22,42,.4)!important;overflow:hidden!important;}
+[data-testid="stExpander"] summary{transition:background .2s!important;}
+[data-testid="stExpander"] summary:hover{background:rgba(108,92,231,.07)!important;}
+.stDataFrame{border-radius:14px!important;overflow:hidden!important;border:1px solid rgba(255,255,255,.07)!important;box-shadow:0 8px 26px rgba(0,0,0,.22)!important;}
+.stProgress>div>div{height:8px!important;border-radius:99px!important;background:rgba(255,255,255,.06)!important;overflow:hidden;}
+.stProgress>div>div>div>div{background:linear-gradient(90deg,#6c5ce7,#a29bfe)!important;border-radius:99px!important;box-shadow:0 0 12px rgba(108,92,231,.45)!important;}
+.stRadio label p,.stCheckbox label p{font-size:.82rem!important;}
+
+/* forms inside pages */
+[data-testid="stForm"]:not(:has(.login-hero)){background:rgba(17,17,34,.45)!important;border:1px solid rgba(255,255,255,.06)!important;border-radius:18px!important;padding:1.2rem 1.3rem!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.03);}
+
 ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(108,92,231,.25);border-radius:5px}
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -1795,11 +1910,19 @@ with st.sidebar:
     if cu.get('role')=='admin': nav_pages.append(ADMIN_PAGE)
     if 'selected_page' not in st.session_state or st.session_state.get('selected_page') not in nav_pages:
         st.session_state['selected_page']=nav_pages[0]
-    for _np in nav_pages:
+    for _i,_np in enumerate(nav_pages):
         _sel=(st.session_state['selected_page']==_np)
         if st.button(_np,key=f"navbtn_{_np}",use_container_width=True,type="primary" if _sel else "secondary"):
             st.session_state['selected_page']=_np
             st.rerun()
+        if _sel and _np in SUB_PAGES:
+            _subs=SUB_PAGES[_np]
+            _cur=st.session_state.setdefault(_sub_key(_np),_subs[0])
+            with st.container(key=f"submenu_{_i}"):
+                for _si,_sl in enumerate(_subs):
+                    if st.button(_sl,key=f"subbtn_{_i}_{_si}",use_container_width=True,type="primary" if _cur==_sl else "secondary"):
+                        st.session_state[_sub_key(_np)]=_sl
+                        st.rerun()
     page=st.session_state['selected_page']
     st.markdown("<div style='height:1px;background:linear-gradient(90deg,transparent,rgba(108,92,231,.1),transparent);margin:1.2rem .8rem;'></div>", unsafe_allow_html=True)
     st.markdown(f"""<div style="padding:.7rem 1rem;border-radius:14px;background:rgba(108,92,231,.04);border:1px solid rgba(108,92,231,.06);margin:0 .5rem;text-align:center;">
@@ -2338,8 +2461,8 @@ if page == ADMIN_PAGE:
         st.error("لا تملك صلاحية الوصول");st.stop()
     st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>إدارة المستخدمين</h3></div>',unsafe_allow_html=True)
     users=load_users()
-    tab_add,tab_list,tab_edit=st.tabs(["➕ إضافة مستخدم","📋 قائمة المستخدمين","✏️ تعديل الصلاحيات"])
-    with tab_add:
+    _usr_sub=st.session_state.get(_sub_key(ADMIN_PAGE),"➕ إضافة مستخدم")
+    if _usr_sub=="➕ إضافة مستخدم":
         with st.form("add_user_form",clear_on_submit=True):
             c1,c2=st.columns(2)
             with c1: new_user=st.text_input("اسم المستخدم (Username)")
@@ -2364,7 +2487,7 @@ if page == ADMIN_PAGE:
                     users.append({"username":new_user.strip(),"password":_hash_pw(new_pw),"display_name":new_name.strip(),"role":new_role,"permissions":perms,"created_at":datetime.now().isoformat()})
                     save_users(users)
                     st.success(f"تم إضافة {new_name.strip()} بنجاح!")
-    with tab_list:
+    elif _usr_sub=="📋 قائمة المستخدمين":
         if users:
             for idx,u in enumerate(users):
                 is_admin=u.get('role')=='admin'
@@ -2383,7 +2506,7 @@ if page == ADMIN_PAGE:
                             save_users(users);st.success(f"تم حذف {u.get('display_name','')}");st.rerun()
         else:
             st.info("لا يوجد مستخدمون")
-    with tab_edit:
+    elif _usr_sub=="✏️ تعديل الصلاحيات":
         editable_users=[u for u in users if u.get('role')!='admin']
         if not editable_users:
             st.info("لا يوجد مستخدمون للتعديل")
@@ -2558,7 +2681,7 @@ if page == "🏠 الرئيسية":
 # ====================== FORM 41 ======================
 elif page == "📋 نموذج 41":
     if not user_has_permission(page): st.error("لا تملك صلاحية الوصول");st.stop()
-    sub = st.radio("f41", ["📤 رفع وربط البيانات","🔍 استعلام بالسجل الضريبي","📅 استعلام بالفترة"], horizontal=True, label_visibility="collapsed")
+    sub = st.session_state.get(_sub_key("📋 نموذج 41"), "📤 رفع وربط البيانات")
 
     if sub == "📤 رفع وربط البيانات":
         st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>رفع شيت نموذج 41</h3></div>', unsafe_allow_html=True)
@@ -2723,7 +2846,7 @@ elif page == "📋 نموذج 41":
 # ====================== VAT ======================
 elif page == "💰 القيمة المضافة":
     if not user_has_permission(page): st.error("لا تملك صلاحية الوصول");st.stop()
-    sub=st.radio("vat",["📤 رفع وربط البيانات","🔍 استعلام بالسجل الضريبي","📅 استعلام بالفترة"],horizontal=True,label_visibility="collapsed")
+    sub=st.session_state.get(_sub_key("💰 القيمة المضافة"),"📤 رفع وربط البيانات")
     if sub=="📤 رفع وربط البيانات":
         st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>رفع شيت القيمة المضافة</h3></div>',unsafe_allow_html=True)
         st.markdown('<div class="erp-info"><strong>الأعمدة:</strong> م • رقم التسجيل الضريبي • اسم الممول • 20% قيمة مضافة • ضريبة الجدول</div>',unsafe_allow_html=True)
@@ -2872,9 +2995,9 @@ elif page == "💰 القيمة المضافة":
 # ====================== MARKET ======================
 elif page=="🛒 فواتير الماركت":
     if not user_has_permission(page): st.error("لا تملك صلاحية الوصول");st.stop()
-    _tab_mkt1,_tab_mkt2,_tab_mkt3,_tab_mkt4=st.tabs(["📝 إنشاء Template","📋 سجل الريسيتات","✏️ تعديل الأكواد","🧩 Template مجمع"])
+    _mkt_sub=st.session_state.get(_sub_key("🛒 فواتير الماركت"),"📝 إنشاء Template")
 
-    with _tab_mkt1:
+    if _mkt_sub=="📝 إنشاء Template":
         st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>فواتير الماركت — إنشاء Template Portal</h3></div>',unsafe_allow_html=True)
         if 'mkt_step' not in st.session_state: st.session_state['mkt_step']=1
 
@@ -3043,7 +3166,7 @@ elif page=="🛒 فواتير الماركت":
                 if st.button("← السابق",key="prev3b"):
                     st.session_state['mkt_step']=2;st.rerun()
 
-    with _tab_mkt2:
+    elif _mkt_sub=="📋 سجل الريسيتات":
         st.markdown('<div class="erp-section"><div class="erp-section-dot" style="background:#fdcb6e;"></div><h3>📋 سجل الريسيتات</h3></div>',unsafe_allow_html=True)
         receipts_list=load_receipts()
         if receipts_list:
@@ -3070,7 +3193,7 @@ elif page=="🛒 فواتير الماركت":
                 <p style="color:var(--text2);">سيظهر السجل هنا تلقائياً عند إنشاء Templates من الريسيتات</p>
             </div>""",unsafe_allow_html=True)
 
-    with _tab_mkt3:
+    elif _mkt_sub=="✏️ تعديل الأكواد":
         barcodes_db=load_barcodes()
         st.markdown('<div class="erp-section"><div class="erp-section-dot" style="background:#00cec9;"></div><h3>➕ إضافة كود جديد</h3></div>',unsafe_allow_html=True)
         ac1,ac2,ac3=st.columns([2,2,1])
@@ -3167,7 +3290,7 @@ elif page=="🛒 فواتير الماركت":
                             st.success(f"تم تعديل {len(match)} كود بنجاح!")
                             st.rerun()
 
-    with _tab_mkt4:
+    elif _mkt_sub=="🧩 Template مجمع":
         st.markdown('<div class="erp-section"><div class="erp-section-dot" style="background:#fd79a8;"></div><h3>🧩 إنشاء Template مجمع</h3></div>',unsafe_allow_html=True)
         st.caption("ارفع أكثر من شيت Detailed Receipt بنفس الصيغة المعتادة، واختار طريقة التصدير. الباركود بييجي تلقائياً من الأكواد المحفوظة.")
         cm_bd=load_barcodes()
@@ -3209,7 +3332,7 @@ elif page=="📄 Portal الفواتير الإلكترونية":
     st.markdown(f"""<div class="erp-topbar"><div><h2>{page}</h2><p>إدارة فواتير الصادرة والواردة من بوابة الفواتير الإلكترونية</p></div>
 <div class="erp-topbar-right"><a href="https://invoicing.eta.gov.eg/" target="_blank" style="background:linear-gradient(135deg,rgba(0,206,201,.18),rgba(108,92,231,.12));border:1px solid rgba(0,206,201,.35);border-radius:12px;padding:.5rem 1.2rem;color:#00cec9;font-size:.82rem;font-weight:700;text-decoration:none;cursor:pointer;transition:all .3s;display:inline-flex;align-items:center;gap:.5rem;">🔗 فتح بوابة الفواتير الإلكترونية</a></div></div>""", unsafe_allow_html=True)
 
-    _tab1,_tab2,_tab3,_tab4,_tab5=st.tabs(["🔗 الربط","📤 الصادرة","📥 الوارد","🏷️ أكواد","🔬 GPC Browser"])
+    _portal_sub=st.session_state.get(_sub_key("📄 Portal الفواتير الإلكترونية"),"🔗 الربط")
 
     def _portal_dashboard(data,label,color_icon,label_type):
         if not data:
@@ -3390,7 +3513,7 @@ elif page=="📄 Portal الفواتير الإلكترونية":
                 zip_buf.seek(0)
                 st.download_button(f"📦 تحميل مضغوط ({len(all_records)} فاتورة PDF+Excel)",data=zip_buf.getvalue(),file_name=f"invoices_{label_type}_{sel_period.replace('/','_') if sel_period!='الكل' else 'all'}.zip",mime="application/zip",key=f"dl_zip_{label_type}")
 
-    with _tab1:
+    if _portal_sub=="🔗 الربط":
         st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>ربط مباشر مع بوابة الفواتير الإلكترونية</h3></div>',unsafe_allow_html=True)
 
         eta_cid=os.environ.get("ETA_CLIENT_ID","")
@@ -3515,7 +3638,7 @@ elif page=="📄 Portal الفواتير الإلكترونية":
                 <p style="color:var(--text2);font-size:.85rem;margin:.5rem 0;">أدخل بياناتك من البورتال المصري للاتصال وجلب الفواتير تلقائياً</p>
             </div>""",unsafe_allow_html=True)
 
-    with _tab2:
+    elif _portal_sub=="📤 الصادرة":
         st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>فواتير الصادرة</h3></div>',unsafe_allow_html=True)
 
         out_data=load_data(PORTAL_OUT_FILE)
@@ -3611,7 +3734,7 @@ elif page=="📄 Portal الفواتير الإلكترونية":
             if st.button("🗑️ حذف جميع الفواتير الصادرة",key="del_all_out",type="secondary"):
                 save_data(PORTAL_OUT_FILE,[]);st.success("تم الحذف");st.rerun()
 
-    with _tab3:
+    elif _portal_sub=="📥 الوارد":
         st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>فواتير الوارد</h3></div>',unsafe_allow_html=True)
 
         in_data=load_data(PORTAL_IN_FILE)
@@ -3707,7 +3830,7 @@ elif page=="📄 Portal الفواتير الإلكترونية":
             if st.button("🗑️ حذف جميع فواتير الوارد",key="del_all_in",type="secondary"):
                 save_data(PORTAL_IN_FILE,[]);st.success("تم الحذف");st.rerun()
 
-    with _tab4:
+    elif _portal_sub=="🏷️ أكواد":
         st.markdown('<div class="erp-section"><div class="erp-section-dot" style="background:#74b9ff;box-shadow:0 0 12px #74b9ff;"></div><h3>الاستعلام عن أكواد الأصناف</h3></div>',unsafe_allow_html=True)
 
         out_data=load_data(PORTAL_OUT_FILE)
@@ -3824,7 +3947,7 @@ elif page=="📄 Portal الفواتير الإلكترونية":
                 <p>ارفع فواتير صادرة أو وارد أولاً ثم عد إلى هذا التاب</p>
             </div>""",unsafe_allow_html=True)
 
-    with _tab5:
+    elif _portal_sub=="🔬 GPC Browser":
         st.markdown('<div class="erp-section"><div class="erp-section-dot" style="background:#fdcb6e;box-shadow:0 0 12px #fdcb6e;"></div><h3>الاستعلام من GPC Browser — تصنيف GS1</h3></div>',unsafe_allow_html=True)
         gpc_cache=_gpc_load_cache()
         c_hdr1,c_hdr2=st.columns([3,1])
@@ -3950,11 +4073,7 @@ elif page=="🏷️ الاستعلام عن الأكواد":
     st.markdown(f"""<div class="erp-topbar"><div><h2>{page}</h2><p>بحث واستعلام عن أكواد الأصناف في الفواتير الإلكترونية</p></div>
 <div class="erp-topbar-right"><span class="erp-badge">🏷️ أكواد</span></div></div>""", unsafe_allow_html=True)
 
-    _codes_labels=["🔗 أكواد البورتال","🔬 GPC Browser","🏷️ أكواد GS1","🏷️ أكواد الموردين"]
-    if hasattr(st,"pills"):
-        _codes_sel=st.pills("القسم",_codes_labels,selection_mode="single",default="🔗 أكواد البورتال",key="codes_sec_pills",label_visibility="collapsed")
-    else:
-        _codes_sel=st.radio("القسم",_codes_labels,horizontal=True,key="codes_sec_radio")
+    _codes_sel=st.session_state.get(_sub_key("🏷️ الاستعلام عن الأكواد"),"🔗 أكواد البورتال")
     if not _codes_sel: _codes_sel="🔗 أكواد البورتال"
     if _codes_sel=="🔬 GPC Browser": _standalone_gpc_tab()
     elif _codes_sel=="🏷️ أكواد GS1": _standalone_gs1_tab()
@@ -4051,7 +4170,7 @@ elif page=="🔍 الاستعلام عن ممول":
         st.markdown(f'<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(116,185,255,.08);border:1px solid rgba(116,185,255,.18);color:#74b9ff;font-size:.82rem;margin-bottom:.6rem;">📋 إجمالي أرقام التسجيل: <strong>{len(nums)}</strong></div>',unsafe_allow_html=True)
         st.code("\n".join(nums),language="")
 
-    search_mode=st.radio("search_mode",["🔍 بحث بالسجل الضريبي","📝 بحث بالاسم","📁 رفع شيت أرقام تسجيل (استعلام من البورتال)"],horizontal=True,label_visibility="collapsed")
+    search_mode=st.session_state.get(_sub_key("🔍 الاستعلام عن ممول"),"🔍 بحث بالسجل الضريبي")
 
     if search_mode=="🔍 بحث بالسجل الضريبي":
         st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>بحث بالسجل الضريبي</h3></div>',unsafe_allow_html=True)
@@ -4283,9 +4402,9 @@ elif page=="📑 اقرار 10 قيمة مضافة":
     st.markdown(f"""<div class="erp-topbar"><div><h2>{page}</h2><p>تحضيرات الاقرار والاقرارات الشهرية</p></div>
 <div class="erp-topbar-right"><span class="erp-badge">📑 VAT 10</span></div></div>""", unsafe_allow_html=True)
 
-    _vtab1,_vtab2=st.tabs(["📝 تحضيرات الاقرار","📋 الاقرار"])
+    _vat10_sub=st.session_state.get(_sub_key("📑 اقرار 10 قيمة مضافة"),"📝 تحضيرات الاقرار")
 
-    with _vtab1:
+    if _vat10_sub=="📝 تحضيرات الاقرار":
         st.markdown('<div class="erp-section"><div class="erp-section-dot" style="background:#fdcb6e;"></div><h3>تحضيرات الاقرار</h3></div>',unsafe_allow_html=True)
         prep_data=load_vat10_prep()
         cu=get_current_user()
@@ -4349,7 +4468,7 @@ elif page=="📑 اقرار 10 قيمة مضافة":
         else:
             st.info("لا توجد تحضيرات محفوظة" + ("" if filter_prep_month=="الكل" and filter_prep_year=="الكل" else " في الفترة المحددة"))
 
-    with _vtab2:
+    elif _vat10_sub=="📋 الاقرار":
         st.markdown('<div class="erp-section"><div class="erp-section-dot" style="background:#00cec9;"></div><h3>الاقرار</h3></div>',unsafe_allow_html=True)
         decl_data=load_vat10_decl()
         cu=get_current_user()
@@ -4497,12 +4616,12 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
     st.markdown(f"""<div class="erp-topbar"><div><h2>{page}</h2><p>إنشاء وترحيل فواتير مبيعات الجملة والإيجارات للبورتال</p></div>
 <div class="erp-topbar-right">{_portal_led()}</div></div>""", unsafe_allow_html=True)
 
-    _tab_ws,_tab_rent_grp=st.tabs(["📦 مبيعات الجملة","🏢 فواتير الإيجارات"])
+    _ws_sub=st.session_state.get(_sub_key("📦 فواتير مبيعات الجملة والإيجارات"),"📦 مبيعات الجملة")
 
-    with _tab_ws:
+    if _ws_sub=="📦 مبيعات الجملة":
         st.info("تاب مبيعات الجملة قيد التطوير - جارٍ التحضير")
 
-    with _tab_rent_grp:
+    elif _ws_sub=="🏢 فواتير الإيجارات":
         _tab_rent,_tab_xl=st.tabs(["✍️ التوقيع مباشر","📊 تحويل الفاتورة لأكسيل"])
         with _tab_rent:
             import re as _rent_re
@@ -4720,11 +4839,36 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                             if cand: return f"{max(cand):g}"
                 return ''
 
+            def _rent_address(lines):
+                parts=lines.split('\n')
+                anchor=None
+                for k,p in enumerate(parts):
+                    if 'جهاز الخدمات العامة' in p:
+                        anchor=k; break
+                if anchor is None:
+                    for k,p in enumerate(parts):
+                        if 'وزارة الدفاع' in p:
+                            anchor=k; break
+                if anchor is None: return ''
+                out=[]
+                tail=' '.join(parts[anchor].split()).replace('جهاز الخدمات العامة للقوات المسلحة','').strip(' :-–—')
+                if tail: out.append(tail)
+                k=anchor+1
+                while k<len(parts) and len(out)<3:
+                    t=' '.join(parts[k].split())
+                    k+=1
+                    if not t: continue
+                    if t.upper()=='EGY' or 'تليفون' in t or t.startswith(':'): break
+                    if _rent_re.search(r'(CIV|رقم التسجيل|الرقم الضريبي|فاتورة مبيعات|تاريخ|اسم العميل)',t): break
+                    if not _rent_re.search(r'[\u0621-\u064A]',t): break
+                    out.append(t)
+                return ' - '.join(out)
+
             def _rent_parse(html_bytes):
                 html=_rent_clean_html(html_bytes)
                 lines=_rent_collapse(html)
                 tables=_rent_tables(html)
-                info={'rent':'','elec':'','water':'','tax_num':'','civ':'','so_ref':'','customer':''}
+                info={'rent':'','elec':'','water':'','tax_num':'','civ':'','so_ref':'','customer':'','address':''}
                 info['rent']=_rent_table_value(tables,'G127409') or _rent_val_near(lines,'G127409')
                 info['elec']=_rent_table_value(tables,'G127411') or _rent_val_near(lines,'G127411')
                 info['water']=_rent_table_value(tables,'G134260') or _rent_val_near(lines,'G134260')
@@ -4736,6 +4880,7 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                   or _rent_name_after(lines,'المشتري') or _rent_name_before(lines,'المشتري')
                   or _rent_name_after(lines,'اسم المستأجر') or _rent_name_before(lines,'اسم المستأجر')
                   or _rent_name_after(lines,'اسم المستلم') or _rent_name_before(lines,'اسم المستلم'))
+                info['address']=_rent_address(lines)
                 return info
 
             _rent_env_cd=_eta_smartcard_diag()
@@ -5185,7 +5330,11 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                                 if not _lines:
                                     _bad.append(getattr(_up,"name","ملف؟")); continue
                                 _xbuf=_bk_build_xlsx(_lines)
-                                _fn=f"{_bk_safe_name(_rc)} - {str(_p.get('civ','')).strip() or 'no-civ'} - {str(_p.get('so_ref','')).strip() or 'no-so'}.xlsx"
+                                _fn=f"{_bk_safe_name(_rc)} - {str(_p.get('civ','')).strip() or 'no-civ'} - {str(_p.get('so_ref','')).strip() or 'no-so'} - {str(_p.get('tax_num','')).strip() or 'no-tax'}"
+                                _addr_clean=str(_p.get('address','') or '').strip().replace(':','').replace('/','').replace('\\','').replace('<','').replace('>','').replace('"','').replace('*','').replace('?','').replace('|','').strip()
+                                if _addr_clean:
+                                    _fn+=f" - {_addr_clean[:90]}"
+                                _fn+=".xlsx"
                                 _zf.writestr(_fn,_xbuf.getvalue())
                                 _made+=1
                         _bz.seek(0)
@@ -5212,15 +5361,19 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                 xcA,xcB,xcC=st.columns(3)
                 with xcA:
                     st.markdown("**رقم التسجيل الضريبي**")
-                    xl_tax=st.text_input("",value=xl_parsed.get('tax_num',''),key="xl_tax_num",placeholder="الرقم الضريبي")
+                    xl_tax_no=st.text_input("",value=xl_parsed.get('tax_num',''),key="xl_tax_num",placeholder="الرقم الضريبي")
                 with xcB:
                     st.markdown("**الرقم الداخلي (CIV)**")
                     xl_civ=st.text_input("",value=xl_parsed.get('civ',''),key="xl_civ",placeholder="CIV...")
                 with xcC:
                     st.markdown("**رقم أمر المبيعات**")
                     xl_so=st.text_input("",value=xl_parsed.get('so_ref',''),key="xl_so_ref",placeholder="مرجع طلب المبيعات")
-                st.markdown("**المستلم (To) — الاسم:**")
-                xl_rec=st.text_input("اسم المستلم (المستأجر)",value=xl_parsed.get('customer','') or "المستأجر",key="xl_rec_name")
+                st.markdown("**المستلم (To) — الاسم والعنوان:**")
+                xr1,xr2=st.columns(2)
+                with xr1:
+                    xl_rec=st.text_input("اسم المستلم (المستأجر)",value=xl_parsed.get('customer','') or "المستأجر",key="xl_rec_name")
+                with xr2:
+                    xl_addr=st.text_input("العنوان",value=xl_parsed.get('address',''),key="xl_rec_addr")
                 st.markdown("**المبالغ المكتشفة (قابلة للتعديل):**")
                 xl_c1,xl_c2,xl_c3=st.columns(3)
                 with xl_c1:
@@ -5289,7 +5442,11 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                             xl_buf.seek(0)
                             xl_safe=str(xl_rec or "المستأجر").strip().replace(':','').replace('/','').replace('\\','').replace('<','').replace('>','').replace('"','').replace('*','').replace('?','').replace('|','').strip()
                             xl_safe=xl_safe or "المستأجر"
-                            xl_fname=f"{xl_safe} - {str(xl_civ).strip() or 'no-civ'} - {str(xl_so).strip() or 'no-so'}.xlsx"
+                            xl_fname=f"{xl_safe} - {str(xl_civ).strip() or 'no-civ'} - {str(xl_so).strip() or 'no-so'} - {str(xl_tax_no).strip() or 'no-tax'}"
+                            _xl_addr_clean=str(xl_addr or '').strip().replace(':','').replace('/','').replace('\\','').replace('<','').replace('>','').replace('"','').replace('*','').replace('?','').replace('|','').strip()
+                            if _xl_addr_clean:
+                                xl_fname+=f" - {_xl_addr_clean[:90]}"
+                            xl_fname+=".xlsx"
                             st.success("✅ تم تجهيز الشيت")
                             st.download_button("⬇️ نزّل شيت Excel",data=xl_buf.getvalue(),file_name=xl_fname,mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",key="xl_dl")
                         except Exception as xl_e:
