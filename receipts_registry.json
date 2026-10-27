@@ -2221,5 +2221,14 @@
     "upload_date": "2026-10-27T11:03:47.013464",
     "items_count": 7,
     "matched": 6
+  },
+  {
+    "receipt_number": "201011-02196767-1",
+    "receipt_date": "2026-10-27",
+    "receiver_name": "الفوج 37 محطات مياه",
+    "file_name": "201011-02196767-1_2026-10-27_الفوج 37 محطات مياه.xlsx",
+    "upload_date": "2026-10-27T11:08:02.775692",
+    "items_count": 13,
+    "matched": 12
   }
 ]
