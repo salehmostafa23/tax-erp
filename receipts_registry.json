@@ -2248,5 +2248,14 @@
     "upload_date": "2026-10-28T07:39:25.187473",
     "items_count": 23,
     "matched": 21
+  },
+  {
+    "receipt_number": "201011-03183822",
+    "receipt_date": "2026-10-28",
+    "receiver_name": "الكتيبة 585 محطات مياه",
+    "file_name": "201011-03183822_2026-10-28_الكتيبة 585 محطات مياه.xlsx",
+    "upload_date": "2026-10-28T09:43:12.178157",
+    "items_count": 26,
+    "matched": 25
   }
 ]
