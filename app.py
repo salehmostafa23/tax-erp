@@ -69,6 +69,33 @@ def _sub_key(p): return f"subsel|{p}"
 def _hash_pw(pw,salt="tax_erp_salt_2024"):
     return hashlib.sha256(f"{salt}{pw}".encode()).hexdigest()
 
+def _pw_key():
+    _k=''
+    try:
+        _k=str(st.secrets.get("PW_KEY") or st.secrets.get("GITHUB_TOKEN") or "")
+    except Exception:
+        _k=''
+    return hashlib.sha256(("tax_erp_pw_v1|"+(_k or "local-dev-only")).encode()).digest()
+
+def _pw_seal(pw):
+    if not pw: return ''
+    raw=str(pw).encode('utf-8'); key=_pw_key(); out=bytearray(); blk=b''
+    for i in range(len(raw)):
+        if i%32==0: blk=hashlib.sha256(key+i.to_bytes(8,'big')).digest()
+        out.append(raw[i]^blk[i%32])
+    return 'v1:'+base64.b64encode(bytes(out)).decode()
+
+def _pw_unseal(v):
+    try:
+        s=str(v or '')
+        if not s.startswith('v1:'): return ''
+        data=base64.b64decode(s[3:]); key=_pw_key(); out=bytearray(); blk=b''
+        for i in range(len(data)):
+            if i%32==0: blk=hashlib.sha256(key+i.to_bytes(8,'big')).digest()
+            out.append(data[i]^blk[i%32])
+        return bytes(out).decode('utf-8')
+    except Exception: return ''
+
 @st.cache_data(ttl=300, show_spinner=False)
 def load_users():
     gh=gh_read("users.json")
@@ -2484,7 +2511,7 @@ if page == ADMIN_PAGE:
                 else:
                     perms=[p for p,c in perm_checks if c]
                     if new_role=='admin': perms=ALL_PAGES+[ADMIN_PAGE]
-                    users.append({"username":new_user.strip(),"password":_hash_pw(new_pw),"display_name":new_name.strip(),"role":new_role,"permissions":perms,"created_at":datetime.now().isoformat()})
+                    users.append({"username":new_user.strip(),"password":_hash_pw(new_pw),"password_enc":_pw_seal(new_pw),"display_name":new_name.strip(),"role":new_role,"permissions":perms,"created_at":datetime.now().isoformat()})
                     save_users(users)
                     st.success(f"تم إضافة {new_name.strip()} بنجاح!")
     elif _usr_sub=="📋 قائمة المستخدمين":
@@ -2499,11 +2526,42 @@ if page == ADMIN_PAGE:
                         <div><strong style="color:var(--text);font-size:.9rem;">{u.get('display_name','')}</strong> <span style="color:rgba(255,255,255,.3);font-size:.75rem;">@{u['username']}</span></div>
                         <span style="color:var(--accent2);font-size:.75rem;">{role_label}</span></div>""",unsafe_allow_html=True)
                     st.markdown(f'<p style="color:var(--text2);font-size:.7rem;margin:-.5rem 0 .5rem;">الصلاحيات: {perms_display}</p>',unsafe_allow_html=True)
+                    if st.session_state.pop(f"pw_ok_{idx}",False):
+                        st.success(f"تم تغيير كلمة مرور {u.get('display_name','')} بنجاح")
                     ec1,ec2=st.columns([3,1])
+                    with ec1:
+                        _pw_show=st.session_state.get(f"show_pw_{idx}",False)
+                        if st.button(("🙈 إخفاء كلمة المرور" if _pw_show else "👁️ عرض كلمة المرور"),key=f"show_pw_btn_{idx}",type="secondary",use_container_width=True):
+                            st.session_state[f"show_pw_{idx}"]=not _pw_show
+                            st.rerun()
+                        if _pw_show:
+                            _plain=_pw_unseal(u.get('password_enc',''))
+                            if _plain:
+                                st.code(_plain,language=None)
+                            else:
+                                st.info("كلمة المرور الحالية متخزنة مشفّرة (Hash) ومش ممكن تظهر — حدد واحدة جديدة من «تغيير كلمة المرور» تحت.")
                     with ec2:
                         if u['username']!='admin' and st.button("🗑️ حذف",key=f"del_user_{idx}",type="secondary",use_container_width=True):
                             users=[x for x in users if x['username']!=u['username']]
                             save_users(users);st.success(f"تم حذف {u.get('display_name','')}");st.rerun()
+                    with st.expander("🔑 تغيير كلمة المرور"):
+                        _np1,_np2=st.columns(2)
+                        with _np1: _new_pw1=st.text_input("كلمة المرور الجديدة",type="password",key=f"newpw_{idx}")
+                        with _np2: _new_pw2=st.text_input("تأكيد كلمة المرور",type="password",key=f"newpw2_{idx}")
+                        if st.button("💾 حفظ كلمة المرور",key=f"savepw_{idx}",type="primary",use_container_width=True):
+                            if len(_new_pw1)<4:
+                                st.error("كلمة المرور لازم 4 حروف/أرقام على الأقل")
+                            elif _new_pw1!=_new_pw2:
+                                st.error("كلمتا المرور غير متطابقتين")
+                            else:
+                                for _u in users:
+                                    if _u['username']==u['username']:
+                                        _u['password']=_hash_pw(_new_pw1)
+                                        _u['password_enc']=_pw_seal(_new_pw1)
+                                save_users(users)
+                                st.session_state[f"show_pw_{idx}"]=True
+                                st.session_state[f"pw_ok_{idx}"]=True
+                                st.rerun()
         else:
             st.info("لا يوجد مستخدمون")
     elif _usr_sub=="✏️ تعديل الصلاحيات":
@@ -3289,6 +3347,50 @@ elif page=="🛒 فواتير الماركت":
                             save_barcodes(barcodes_db)
                             st.success(f"تم تعديل {len(match)} كود بنجاح!")
                             st.rerun()
+        st.markdown('<div class="erp-section" style="margin-top:1.2rem"><div class="erp-section-dot" style="background:#55efc4;"></div><h3>📥 تحديث من سيستم ERP — إضافة الجديد فقط</h3></div>',unsafe_allow_html=True)
+        st.caption("العمود A: الكود الداخلي (الرقم اللي قبله G زي G127409) | العمود B: الباركود. الأكواد الموجودة بالفعل مش هتتعدل ومش هتتضاف تاني حتى لو الباركود مختلف.")
+        if st.session_state.get('bc_erp_ok') is not None:
+            st.success(f"تم إضافة {st.session_state.pop('bc_erp_ok')} كود جديد — لم يتم تعديل أي كود موجود")
+        erp_file=st.file_uploader("ارفع شيت الـ ERP",type=["xlsx","xls"],key="bc_erp_add_upload")
+        if erp_file:
+            try:
+                edf=pd.read_excel(erp_file,header=None,dtype=str)
+            except Exception:
+                st.error("تعذر قراءة الملف - تأكد من صيغته")
+            else:
+                _hdr_a={'item number','internal code','internal_code','الكود الداخلي','كود','رقم الصنف'}
+                _hdr_b={'bar code','barcode','الباركود','باركود'}
+                erp_rows=[];erp_seen=set();erp_nobc=0
+                for _,erp_row in edf.iterrows():
+                    ea=erp_row[0];eb=erp_row[1] if len(erp_row)>1 else None
+                    ca=str(ea).strip() if not pd.isna(ea) else ''
+                    cb=str(eb).strip() if (eb is not None and not pd.isna(eb)) else ''
+                    if ca.endswith('.0') and ca[:-2].isdigit(): ca=ca[:-2]
+                    if cb.endswith('.0') and cb[:-2].isdigit(): cb=cb[:-2]
+                    if not ca: continue
+                    if ca.casefold() in _hdr_a or cb.casefold() in _hdr_b: continue
+                    if ca.casefold() in erp_seen: continue
+                    erp_seen.add(ca.casefold())
+                    if not cb:
+                        erp_nobc+=1;continue
+                    erp_rows.append((ca,cb))
+                if not erp_rows:
+                    st.warning("الملف فاضي من بيانات صالحة")
+                else:
+                    existing_ids={str(x.get('internal_code','')).strip().casefold() for x in barcodes_db if str(x.get('internal_code','')).strip()}
+                    erp_new=[p for p in erp_rows if p[0].casefold() not in existing_ids]
+                    erp_old=[p for p in erp_rows if p[0].casefold() in existing_ids]
+                    erp_prev=pd.DataFrame([{'الكود الداخلي':p[0],'الباركود':p[1],'الحالة':'🆕 هيتم إضافته' if p[0].casefold() not in existing_ids else '✅ موجود — مش هيتم تعديله'} for p in erp_rows])
+                    st.dataframe(erp_prev,use_container_width=True,height=250)
+                    st.markdown(f'<div style="padding:.5rem 1rem;border-radius:10px;background:rgba(85,239,196,.06);border:1px solid rgba(85,239,196,.15);color:#55efc4;font-size:.82rem;">📊 سيتم إضافة <strong>{len(erp_new)}</strong> كود جديد — موجود بالفعل وتم تجاهله <strong>{len(erp_old)}</strong>' + (f' — بدون باركود <strong>{erp_nobc}</strong>' if erp_nobc else '') + '</div>',unsafe_allow_html=True)
+                    if st.button(f"💾 إضافة الأكواد الجديدة ({len(erp_new)})",key="bc_erp_add_save",type="primary"):
+                        _cur_ids={str(x.get('internal_code','')).strip().casefold() for x in barcodes_db if str(x.get('internal_code','')).strip()}
+                        _to_add=[p for p in erp_new if p[0].casefold() not in _cur_ids]
+                        if _to_add:
+                            barcodes_db.extend({'internal_code':p[0],'barcode':p[1]} for p in _to_add)
+                            save_barcodes(barcodes_db)
+                        st.session_state['bc_erp_ok']=len(_to_add)
+                        st.rerun()
 
     elif _mkt_sub=="🧩 Template مجمع":
         st.markdown('<div class="erp-section"><div class="erp-section-dot" style="background:#fd79a8;"></div><h3>🧩 إنشاء Template مجمع</h3></div>',unsafe_allow_html=True)
