@@ -51,7 +51,7 @@ DATA_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # ====================== USERS ======================
 USERS_FILE=os.path.join(DATA_DIR,"users.json")
-ALL_PAGES=["🏠 الرئيسية","📋 نموذج 41","💰 القيمة المضافة","🛒 فواتير الماركت","📄 Portal الفواتير الإلكترونية","🔍 الاستعلام عن ممول","🏷️ الاستعلام عن الأكواد","📑 اقرار 10 قيمة مضافة","📦 فواتير مبيعات الجملة والإيجارات","📤 تحديث الفواتير"]
+ALL_PAGES=["🏠 الرئيسية","📋 نموذج 41","💰 القيمة المضافة","🛒 فواتير الماركت","📄 Portal الفواتير الإلكترونية","🔍 الاستعلام عن ممول","🏷️ الاستعلام عن الأكواد","📑 اقرار 10 قيمة مضافة","📦 فواتير مبيعات الجملة والإيجارات","📤 تحديث الفواتير","🧮 حاسبة الضرائب"]
 ADMIN_PAGE="👥 إدارة المستخدمين"
 SUB_PAGES={
  "📋 نموذج 41":["📤 رفع وربط البيانات","🔍 استعلام بالسجل الضريبي","📅 استعلام بالفترة"],
@@ -62,6 +62,7 @@ SUB_PAGES={
  "🏷️ الاستعلام عن الأكواد":["🔗 أكواد البورتال","🔬 GPC Browser","🏷️ أكواد GS1","🏷️ أكواد الموردين"],
  "📑 اقرار 10 قيمة مضافة":["📝 تحضيرات الاقرار","📋 الاقرار"],
  "📦 فواتير مبيعات الجملة والإيجارات":["📦 مبيعات الجملة","🏢 فواتير الإيجارات"],
+ "🧮 حاسبة الضرائب":["🧾 حساب على المبلغ الأساسي","🔄 استخراج من مبلغ شامل"],
  ADMIN_PAGE:["➕ إضافة مستخدم","📋 قائمة المستخدمين","✏️ تعديل الصلاحيات"],
 }
 def _sub_key(p): return f"subsel|{p}"
@@ -2480,6 +2481,115 @@ def _home_n_records(data):
 def _home_n_portal(data):
     try: return sum((r.get('records_count',len(r.get('records',[]))) if isinstance(r,dict) else 0) for r in data)
     except: return 0
+
+# ====================== TAX CALCULATOR (حاسبة الضرائب) ======================
+from decimal import Decimal as _TcDecimal, ROUND_HALF_UP as _TcHalfUp
+TC_WHT_RATES={"1% توريدات":0.01,"3% خدمات":0.03,"5% مهن حرة":0.05}
+TC_VAT_RATE=0.14
+TC_VAT20_SHARE=0.20
+_TC_STAMP_STEPS=((250.0,0.048),(500.0,0.052),(1000.0,0.058),(5000.0,0.060),(10000.0,0.064))
+_TC_STAMP_OFFSET=50.0
+_TC_STAMP_FLAT_FROM=10050.0
+_TC_STAMP_FLAT_FIXED=640.0
+_TC_STAMP_FLAT_RATE=0.024
+
+def tc_r2(x):
+    try: return float(_TcDecimal(repr(float(x))).quantize(_TcDecimal("0.01"),rounding=_TcHalfUp))
+    except Exception: return 0.0
+
+def tc_stamp_raw(net,exempt=False):
+    n=float(net)
+    if exempt: return 0.0,"معفى — الدمغة النسبية الحكومية",0.0
+    base=n-_TC_STAMP_OFFSET
+    if base<=0: return 0.0,"لا تُحسب — المبلغ ≤ 50",0.0
+    for _lim,_rate in _TC_STAMP_STEPS:
+        if base<=_lim:
+            return base*_rate,f"{_rate*100:.1f}% × (المبلغ − 50)",_rate
+    return ((n-_TC_STAMP_FLAT_FROM)*_TC_STAMP_FLAT_RATE+_TC_STAMP_FLAT_FIXED,
+            "2.4% × (المبلغ − 10,050) + 640",_TC_STAMP_FLAT_RATE)
+
+def tc_breakdown(net,wht_rate=0.0,vat=True,stamp=True,vat20=False,exempt=False):
+    net=float(net)
+    vat_amt=tc_r2(net*TC_VAT_RATE) if vat else 0.0
+    vat20_amt=tc_r2(vat_amt*TC_VAT20_SHARE) if (vat and vat20) else 0.0
+    if stamp:
+        _s_amt,_s_note,_s_rate=tc_stamp_raw(net,exempt)
+        stamp_amt,stamp_note,stamp_rate=tc_r2(_s_amt),_s_note,_s_rate
+    else:
+        stamp_amt,stamp_note,stamp_rate=0.0,"غير مطبقة",0.0
+    wht_amt=tc_r2(net*wht_rate)
+    invoice_total=tc_r2(net+vat_amt+vat20_amt+stamp_amt)
+    return {"net":tc_r2(net),"vat":vat_amt,"vat20":vat20_amt,"stamp":stamp_amt,
+            "stamp_note":stamp_note,"stamp_rate":stamp_rate,
+            "wht":wht_amt,"wht_rate":float(wht_rate),
+            "invoice_total":invoice_total,
+            "tax_total":tc_r2(vat_amt+vat20_amt+stamp_amt+wht_amt),
+            "payable":tc_r2(invoice_total-wht_amt),
+            "vat_on":bool(vat),"vat20_on":bool(vat and vat20),
+            "stamp_on":bool(stamp),"exempt":bool(exempt)}
+
+def tc_net_from_total(total,vat=True,stamp=True,vat20=False,exempt=False):
+    total=float(total)
+    if total<=0: return 0.0
+    def _gross(n):
+        g=n
+        if vat: g+=n*TC_VAT_RATE
+        if vat and vat20: g+=n*TC_VAT_RATE*TC_VAT20_SHARE
+        if stamp: g+=tc_stamp_raw(n,exempt)[0]
+        return g
+    lo,hi=0.0,total
+    for _ in range(120):
+        mid=(lo+hi)/2.0
+        if _gross(mid)<total: lo=mid
+        else: hi=mid
+    return tc_r2((lo+hi)/2.0)
+
+def tc_from_total(total,wht_rate=0.0,vat=True,stamp=True,vat20=False,exempt=False):
+    net=tc_net_from_total(total,vat,stamp,vat20,exempt)
+    res=tc_breakdown(net,wht_rate,vat,stamp,vat20,exempt)
+    res["gross_input"]=tc_r2(total)
+    res["rounding_diff"]=tc_r2(float(total)-res["invoice_total"])
+    return res
+
+def tc_render(res):
+    def _card(col,cls,label,value,sub):
+        with col:
+            st.markdown(f'<div class="erp-stat {cls}"><div class="erp-stat-label">{label}</div><div class="erp-stat-value">{value}</div><div class="erp-stat-sub">{sub}</div></div>',unsafe_allow_html=True)
+    _r1=st.columns(5)
+    _card(_r1[0],"s-blue","المبلغ الأساسي",fmt(res["net"]),"قبل الضرائب — ج.م")
+    _card(_r1[1],"s-cyan","ضريبة القيمة المضافة",fmt(res["vat"]) if res["vat_on"] else "—","14% من الأساس" if res["vat_on"] else "غير مطبقة")
+    _card(_r1[2],"s-pink","20% من القيمة المضافة",fmt(res["vat20"]) if res["vat20_on"] else "—","20% × ض.ق.م (2.8% من الأساس)" if res["vat20_on"] else "غير مطبقة")
+    _card(_r1[3],"s-orange","ضريبة الدمغة",fmt(res["stamp"]) if res["stamp_on"] else "—",res["stamp_note"] if res["stamp_on"] else "غير مطبقة")
+    _card(_r1[4],"s-red","ضريبة الخصم والتحصيل",fmt(res["wht"]) if res["wht"] else "—",f"{res['wht_rate']*100:g}% — تُخصم من المستحق" if res["wht"] else "غير مطبقة")
+    _r2=st.columns(3)
+    _card(_r2[0],"s-green","إجمالي الفاتورة",fmt(res["invoice_total"]),"الأساس + الضرائب المضافة")
+    _card(_r2[1],"s-orange","إجمالي الأعباء الضريبية",fmt(res["tax_total"]),f"{res['tax_total']/res['net']*100:.1f}% من الأساس" if res["net"]>0 else "الأنواع الأربعة مجتمعة")
+    _card(_r2[2],"s-blue","صافي المستحق للدفع",fmt(res["payable"]),"بعد خصم ض. الخصم والتحصيل")
+    def _row(label,base,rate,amount,note,tone):
+        _color={"add":"#55efc4","ded":"#ff9f9f"}.get(tone,"#eaeaf2")
+        return ('<tr style="border-top:1px solid rgba(255,255,255,.05);">'
+                f'<td style="padding:.62rem .9rem;color:#eaeaf2;">{label}</td>'
+                f'<td style="padding:.62rem .9rem;color:#a9a9c8;">{base}</td>'
+                f'<td style="padding:.62rem .9rem;color:#a9a9c8;">{rate}</td>'
+                f'<td style="padding:.62rem .9rem;font-weight:800;color:{_color};font-variant-numeric:tabular-nums;">{amount}</td>'
+                f'<td style="padding:.62rem .9rem;color:#7878a0;font-size:.72rem;">{note}</td></tr>')
+    _body="".join([
+        _row("ضريبة الخصم والتحصيل تحت حساب الضريبة",fmt(res["net"]),f"{res['wht_rate']*100:g}%" if res["wht"] else "—",fmt(res["wht"]) if res["wht"] else "—","تُخصم من المستحق للمورد" if res["wht"] else "غير مطبقة","ded"),
+        _row("ضريبة القيمة المضافة",fmt(res["net"]),"14%",fmt(res["vat"]) if res["vat_on"] else "—","تُضاف على الفاتورة" if res["vat_on"] else "غير مطبقة","add"),
+        _row("ضريبة 20% من القيمة المضافة",fmt(res["vat"]) if res["vat_on"] else "—","20% من ض.ق.م",fmt(res["vat20"]) if res["vat20_on"] else "—","تُضاف — مرتبطة بضريبة القيمة المضافة" if res["vat20_on"] else "غير مطبقة","add"),
+        _row("ضريبة الدمغة النسبية",fmt(res["net"]),f"{res['stamp_rate']*100:.1f}%" if res["stamp_rate"] else "—",fmt(res["stamp"]) if res["stamp_on"] else "—",res["stamp_note"],"add"),
+        _row("إجمالي الفاتورة","—","—",fmt(res["invoice_total"]),"الأساس + الضرائب المضافة",""),
+        _row("إجمالي الأعباء الضريبية","—","—",fmt(res["tax_total"]),"الأنواع الأربعة مجتمعة",""),
+        _row("صافي المستحق للدفع","—","—",fmt(res["payable"]),"بعد خصم ضريبة الخصم والتحصيل",""),
+    ])
+    st.markdown('<div style="overflow-x:auto;margin-top:.9rem;"><table style="width:100%;border-collapse:collapse;font-size:.82rem;direction:rtl;text-align:right;background:rgba(17,17,34,.45);border:1px solid rgba(255,255,255,.07);border-radius:16px;overflow:hidden;">'
+                '<thead><tr style="background:rgba(108,92,231,.12);color:#c9c4ff;">'
+                '<th style="padding:.7rem .9rem;text-align:right;font-weight:700;">البند</th>'
+                '<th style="padding:.7rem .9rem;text-align:right;font-weight:700;">الأساس</th>'
+                '<th style="padding:.7rem .9rem;text-align:right;font-weight:700;">النسبة</th>'
+                '<th style="padding:.7rem .9rem;text-align:right;font-weight:700;">المبلغ (ج.م)</th>'
+                '<th style="padding:.7rem .9rem;text-align:right;font-weight:700;">ملاحظات</th>'
+                '</tr></thead><tbody>'+_body+'</tbody></table></div>',unsafe_allow_html=True)
 
 # ====================== ADMIN ======================
 if page == ADMIN_PAGE:
@@ -5553,3 +5663,47 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                             st.download_button("⬇️ نزّل شيت Excel",data=xl_buf.getvalue(),file_name=xl_fname,mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",key="xl_dl")
                         except Exception as xl_e:
                             st.error("خطأ أثناء تصدير Excel: "+str(xl_e)[:200])
+
+# ====================== TAX CALCULATOR PAGE ======================
+elif page == "🧮 حاسبة الضرائب":
+    if not user_has_permission(page): st.error("لا تملك صلاحية الوصول");st.stop()
+    _tc_sub=st.session_state.get(_sub_key("🧮 حاسبة الضرائب"),"🧾 حساب على المبلغ الأساسي")
+    st.markdown('<div class="erp-topbar"><div><h2>حاسبة الضرائب</h2><p>احسب ضريبة الخصم والقيمة المضافة والدمغة و20% من ض.ق.م — أو استخرجها من مبلغ شامل.</p></div><div class="erp-topbar-right"><span class="erp-badge">🧮 4 أنواع ضرائب</span></div></div>',unsafe_allow_html=True)
+    st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>البيانات</h3></div>',unsafe_allow_html=True)
+    _tc_opts=["بدون"]+list(TC_WHT_RATES.keys())
+    _tc_l,_tc_r=st.columns([1,1.15])
+    if _tc_sub=="🧾 حساب على المبلغ الأساسي":
+        with _tc_l:
+            _tc_net=st.number_input("المبلغ قبل الضرائب (ج.م)",min_value=0.0,value=1000.0,step=100.0,format="%.2f",key="tc_fwd_net")
+            _tc_wht_sel=st.radio("ضريبة الخصم والتحصيل",_tc_opts,horizontal=True,index=0,key="tc_fwd_wht")
+            _tc_net_f=float(_tc_net)
+            st.caption("نسب الخصم على هذا المبلغ — "+" • ".join(f"{_k.split(' ')[0]}: {fmt(_tc_net_f*_r)} ج.م" for _k,_r in TC_WHT_RATES.items()))
+        with _tc_r:
+            st.markdown('<p style="color:var(--text2);font-size:.72rem;font-weight:700;letter-spacing:.3px;margin:.1rem 0 .4rem;text-align:right;">الضرائب المطبقة</p>',unsafe_allow_html=True)
+            _tc_vat=st.checkbox("ضريبة القيمة المضافة — 14%",value=True,key="tc_fwd_vat")
+            if not _tc_vat: st.session_state["tc_fwd_vat20"]=False
+            _tc_vat20=st.checkbox("ضريبة 20% من القيمة المضافة — تعادل 2.8% من الأساس",value=False,key="tc_fwd_vat20",disabled=not _tc_vat)
+            _tc_stamp=st.checkbox("ضريبة الدمغة النسبية",value=True,key="tc_fwd_stamp")
+            if not _tc_stamp: st.session_state["tc_fwd_stamp_ex"]=False
+            _tc_ex=st.checkbox("معفى من الدمغة (جهة حكومية — الدمغة النسبية الحكومية)",value=False,key="tc_fwd_stamp_ex",disabled=not _tc_stamp)
+        _tc_res=tc_breakdown(_tc_net_f,TC_WHT_RATES.get(_tc_wht_sel,0.0),_tc_vat,_tc_stamp,_tc_vat20,_tc_ex)
+    else:
+        with _tc_l:
+            _tc_gross=st.number_input("المبلغ الشامل للضرائب (ج.م)",min_value=0.0,value=2397.0,step=100.0,format="%.2f",key="tc_rev_gross")
+            _tc_wht_sel=st.radio("ضريبة الخصم والتحصيل",_tc_opts,horizontal=True,index=0,key="tc_rev_wht")
+            st.caption("ض. الخصم تُحسب على المبلغ الأساسي المستخرج وتُخصم من الدفعة — وهي غير داخلة في معادلة الاستخراج.")
+        with _tc_r:
+            st.markdown('<p style="color:var(--text2);font-size:.72rem;font-weight:700;letter-spacing:.3px;margin:.1rem 0 .4rem;text-align:right;">الضرائب المضمّنة في المبلغ</p>',unsafe_allow_html=True)
+            _tc_vat=st.checkbox("المبلغ شامل ضريبة القيمة المضافة — 14%",value=True,key="tc_rev_vat")
+            if not _tc_vat: st.session_state["tc_rev_vat20"]=False
+            _tc_vat20=st.checkbox("المبلغ شامل ضريبة 20% من القيمة المضافة",value=False,key="tc_rev_vat20",disabled=not _tc_vat)
+            _tc_stamp=st.checkbox("المبلغ شامل ضريبة الدمغة النسبية",value=True,key="tc_rev_stamp")
+            if not _tc_stamp: st.session_state["tc_rev_stamp_ex"]=False
+            _tc_ex=st.checkbox("معفى من الدمغة (جهة حكومية — الدمغة النسبية الحكومية)",value=False,key="tc_rev_stamp_ex",disabled=not _tc_stamp)
+        _tc_res=tc_from_total(float(_tc_gross),TC_WHT_RATES.get(_tc_wht_sel,0.0),_tc_vat,_tc_stamp,_tc_vat20,_tc_ex)
+    st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>النتيجة</h3></div>',unsafe_allow_html=True)
+    if _tc_sub!="🧾 حساب على المبلغ الأساسي":
+        _tc_diff=_tc_res["rounding_diff"]
+        st.caption(f"المبلغ الشامل المُدخل: {fmt(_tc_res['gross_input'])} ج.م"+(f" • فرق تقريب: {fmt(_tc_diff)} ج.م" if abs(_tc_diff)>=0.005 else ""))
+    tc_render(_tc_res)
+    st.caption("ضريبة الخصم والتحصيل تُحسب على المبلغ قبل الضرائب وتُخصم من المستحق للمورد (لا تُضاف إلى إجمالي الفاتورة). الدمغة النسبية تُحسب على (المبلغ − 50) بشرائح تصاعدية، وتُعفى الجهات الواردة في قائمة الدمغة النسبية الحكومية. الأرقام تقديرية وتُراجع قبل الاستخدام الرسمي.")
