@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import json
 import os
+import re
 import uuid
 import shutil
 import math
@@ -19,6 +20,11 @@ from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives.serialization import pkcs12
 from cryptography.hazmat.primitives.serialization import Encoding
 from cryptography.x509.oid import NameOID
+
+try:
+    import i18n as _i18n
+except Exception:
+    _i18n = None
 
 st.set_page_config(page_title="Tax Management System", page_icon="🏢", layout="wide", initial_sidebar_state="expanded")
 
@@ -66,6 +72,25 @@ SUB_PAGES={
  ADMIN_PAGE:["➕ إضافة مستخدم","📋 قائمة المستخدمين","✏️ تعديل الصلاحيات"],
 }
 def _sub_key(p): return f"subsel|{p}"
+
+# ====================== UI PREFERENCES (theme / language) ======================
+def _ui_lang():
+    return 'en' if st.session_state.get('ui_lang')=='en' else 'ar'
+
+def _ui_theme():
+    return 'light' if st.session_state.get('ui_theme')=='light' else 'dark'
+
+def _is_en(): return _ui_lang()=='en'
+def _is_light(): return _ui_theme()=='light'
+
+def _tr(s):
+    if _is_en() and _i18n is not None and isinstance(s,str):
+        return _i18n.translate(s)
+    return s
+
+def _page_label(p):
+    # display-only calculator icon; the stored page key stays unchanged (permissions)
+    return p.replace("🧮","🖩",1) if p.startswith("🧮") else p
 
 def _hash_pw(pw,salt="tax_erp_salt_2024"):
     return hashlib.sha256(f"{salt}{pw}".encode()).hexdigest()
@@ -1633,7 +1658,269 @@ def _generate_pdf_for_records(records, title="فواتير"):
     buf.seek(0)
     return buf
 
+# ====================== BILINGUAL UI ======================
+# In light mode the content HTML still carries dark-theme colours, so map the
+# near-white / neon literals to readable ones at render time.
+_LT_STYLE_RE = re.compile(r'style="([^"]*)"')
+_LT_WHITE_RGBA_RE = re.compile(r'rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*([\d.]+)\s*\)')
+_LT_TEXT_MAP = {'#fff':'#191c34','#ffffff':'#191c34','#eaeaf2':'#191c34','#f2f2fa':'#191c34',
+                '#a9a9c8':'#5d6285','#7878a0':'#6a6f92','#a29bfe':'#5b49d6','#8e7bff':'#5b49d6',
+                '#00cec9':'#0e9f9a','#55efc4':'#0a8064','#74b9ff':'#2f6fd0','#fdcb6e':'#a86207',
+                '#ff8787':'#c0392b','#ff7675':'#c0392b','#ff6b6b':'#c0392b','#ff9f9f':'#c0392b',
+                '#e17055':'#c0392b','#fab1a0':'#b02a6e','#fd79a8':'#b02a6e','#9be3d8':'#0e9f9a'}
+
+def _lt_fix_style(style):
+    if 'linear-gradient' in style and ('#6c5ce7' in style or '#a29bfe' in style or '108,92,231' in style):
+        return style  # coloured chip: keep the white text
+    out = []
+    for decl in style.split(';'):
+        prop, sep, val = decl.partition(':')
+        if not sep:
+            out.append(decl); continue
+        p, v = prop.strip().lower(), val.strip()
+        m = _LT_WHITE_RGBA_RE.fullmatch(v)
+        if p in ('color', 'text-decoration-color', 'caret-color'):
+            low = v.lower()
+            if low in _LT_TEXT_MAP:
+                v = _LT_TEXT_MAP[low]
+            elif m:
+                v = 'rgba(20,23,46,%.2f)' % min(.92, .30 + float(m.group(1)))
+        elif p in ('background', 'background-color'):
+            if m:
+                v = 'rgba(20,23,46,%.3f)' % min(.16, float(m.group(1)) * 1.4)
+        elif 'border' in p or p == 'box-shadow':
+            if m:
+                v = 'rgba(20,23,46,%.2f)' % min(.32, float(m.group(1)) * 1.5)
+        out.append(p + ':' + v)
+    return ';'.join(out)
+
+def _light_html(html):
+    if not isinstance(html, str) or 'style="' not in html:
+        return html
+    return _LT_STYLE_RE.sub(lambda m: 'style="%s"' % _lt_fix_style(m.group(1)), html)
+
+def _install_i18n():
+    if _i18n is None or getattr(st,'_erp_i18n',False):
+        return
+    import functools
+    def _on():
+        try: return st.session_state.get('ui_lang')=='en'
+        except Exception: return False
+    def _wrap(name,pos=0,kws=(),as_list=False):
+        try: orig=getattr(st,name)
+        except Exception: return
+        @functools.wraps(orig)
+        def _f(*args,**kwargs):
+            if _on():
+                a=list(args)
+                if pos<len(a):
+                    v=a[pos]
+                    if isinstance(v,str):
+                        a[pos]=_i18n.translate(v)
+                    elif as_list and isinstance(v,(list,tuple)):
+                        a[pos]=type(v)(_i18n.translate(x) if isinstance(x,str) else x for x in v)
+                for k in kws:
+                    if isinstance(kwargs.get(k),str):
+                        kwargs[k]=_i18n.translate(kwargs[k])
+                args=tuple(a)
+            return orig(*args,**kwargs)
+        setattr(st,name,_f)
+    for _n in ('markdown','caption','button','form_submit_button','checkbox','radio','selectbox',
+               'multiselect','text_input','text_area','number_input','date_input','time_input',
+               'file_uploader','expander','info','warning','error','success','toast','metric',
+               'download_button','link_button','title','header','subheader','toggle'):
+        _wrap(_n,0,('help','placeholder'))
+    _wrap('tabs',0,(),True)
+    # option VALUES stay Arabic (business logic compares them); only the shown
+    # label is translated through format_func
+    def _wrap_opts(name):
+        try: inner=getattr(st,name)
+        except Exception: return
+        @functools.wraps(inner)
+        def _f(*args,**kwargs):
+            if _on() and 'format_func' not in kwargs:
+                opts=kwargs.get('options',args[1] if len(args)>1 else None)
+                if isinstance(opts,(list,tuple)) and any(isinstance(o,str) for o in opts):
+                    # Streamlit's default format_func is str, so non-strings must
+                    # still be stringified (e.g. int year options)
+                    kwargs['format_func']=lambda x: _i18n.translate(x) if isinstance(x,str) else str(x)
+            return inner(*args,**kwargs)
+        setattr(st,name,_f)
+    for _n in ('radio','selectbox','multiselect'):
+        _wrap_opts(_n)
+    _base_md = st.markdown
+    @functools.wraps(_base_md)
+    def _md_light(*args,**kwargs):
+        try: light = st.session_state.get('ui_theme')=='light'
+        except Exception: light = False
+        if light:
+            a=list(args)
+            if a and isinstance(a[0],str):
+                a[0]=_light_html(a[0])
+            args=tuple(a)
+        return _base_md(*args,**kwargs)
+    st.markdown = _md_light
+    setattr(st,'_erp_i18n',True)
+
+_install_i18n()
+
+# ====================== LIGHT THEME / LTR OVERRIDES ======================
+_LIGHT_CSS = """<style>
+:root{--bg:#f7f8fd;--surface:rgba(255,255,255,.95);--surface2:#ffffff;--border:rgba(23,28,64,.08);--text:#191c34;--text2:#5d6285;--accent:#6c5ce7;--accent2:#5b49d6;--cyan:#0e9f9a;--green:#0a8a6d;--orange:#b96a09;--red:#d64545;--pink:#c02a74;--blue:#2f6fd0;--tc-add:#0a8064;--tc-ded:#c0392b;}
+html,body,[class*="css"]{color:#191c34;}
+.stApp{background:radial-gradient(130% 100% at 50% -10%,#ffffff 0%,#f7f8fd 48%,#eef0f8 100%)!important;color:#191c34!important;}
+section[data-testid="stSidebar"]{background:linear-gradient(180deg,#ffffff 0%,#f8f6ff 45%,#f2f4fb 100%)!important;border-left:1px solid rgba(23,28,64,.07)!important;box-shadow:8px 0 40px rgba(23,28,64,.06)!important;}
+section[data-testid="stSidebar"] .stMarkdown p,section[data-testid="stSidebar"] .stMarkdown span,section[data-testid="stSidebar"] label{color:#6a6f92!important;}
+section[data-testid="stSidebar"] .stButton>button{color:#5b6080!important;}
+section[data-testid="stSidebar"] .stButton>button:hover{background:rgba(108,92,231,.08)!important;border-color:rgba(108,92,231,.18)!important;color:#191c34!important;}
+section[data-testid="stSidebar"] .stButton>button[kind="primary"]{color:#fff!important;}
+section[data-testid="stSidebar"] [class*="st-key-submenu_"]{border-inline-start:1px solid rgba(108,92,231,.22)!important;background:linear-gradient(90deg,rgba(108,92,231,.05),rgba(108,92,231,.01))!important;}
+section[data-testid="stSidebar"] [class*="st-key-submenu_"] .stButton>button{color:#767b9c!important;}
+section[data-testid="stSidebar"] [class*="st-key-submenu_"] .stButton>button:hover{color:#191c34!important;background:rgba(108,92,231,.09)!important;}
+section[data-testid="stSidebar"] [class*="st-key-submenu_"] .stButton>button[kind="primary"]{background:rgba(108,92,231,.12)!important;border:1px solid rgba(108,92,231,.24)!important;color:#3a2fb8!important;}
+section[data-testid="stSidebar"] hr{border-color:rgba(23,28,64,.07)!important;}
+section[data-testid="stSidebar"] [class*="st-key-logout_btn"] button{color:#6a6f92!important;border-color:rgba(23,28,64,.08)!important;background:rgba(255,255,255,.6)!important;}
+section[data-testid="stSidebar"] .pref-title{color:#8b90ad!important;}
+section[data-testid="stSidebar"] .st-key-sb_prefs .stButton>button{font-size:.68rem!important;padding:.34rem .15rem!important;letter-spacing:0!important;}
+section[data-testid="stSidebar"] .st-key-sb_prefs [data-testid="stHorizontalBlock"]{gap:.35rem!important;}
+section[data-testid="stSidebar"] h1,section[data-testid="stSidebar"] h2,section[data-testid="stSidebar"] h3,section[data-testid="stSidebar"] h4{color:#191c34!important;}
+[data-testid="stWidgetLabel"] p,[data-testid="stWidgetLabel"] label p{color:#3a3f5e!important;}
+[data-testid="stWidgetLabel"],[data-testid="stWidgetLabel"] span,[data-testid="stWidgetLabel"] label{color:#3a3f5e!important;}
+[data-testid="stCheckbox"] label p,[data-testid="stCheckbox"] label span,[data-testid="stRadio"] label p,[data-testid="stRadio"] label span{color:#2a2f4d!important;}
+[data-testid="stTextInput"] input,[data-testid="stNumberInput"] input,[data-testid="stTextArea"] textarea,[data-testid="stDateInput"] input{color:#191c34!important;}
+[data-testid="stTextInput"] input::placeholder,[data-testid="stNumberInput"] input::placeholder,[data-testid="stTextArea"] textarea::placeholder{color:#a2a7bf!important;}
+[data-baseweb="select"] div,[data-baseweb="select"] span,[data-baseweb="input"] input{color:#191c34!important;}
+[data-testid="stExpander"] summary p,[data-testid="stExpander"] summary span{color:#2a2f4d!important;}
+[data-testid="stFileUploaderDropzone"] small,[data-testid="stFileUploaderDropzone"] span,[data-testid="stFileUploaderDropzone"] p{color:#5d6285!important;}
+[data-testid="stDownloadButton"] button p,[data-testid="stButton"] button p{color:inherit!important;}
+[data-testid="stNumberInputContainer"]{background:#ffffff!important;border:1px solid #e2e5f0!important;border-radius:12px!important;}
+[data-testid="stNumberInputStepDown"],[data-testid="stNumberInputStepUp"]{background:#f4f5fb!important;color:#4a4f6e!important;border:none!important;}
+[data-testid="stNumberInputStepDown"]:hover,[data-testid="stNumberInputStepUp"]:hover{background:rgba(108,92,231,.12)!important;color:#191c34!important;}
+[data-testid="stTimeInputContainer"],[data-testid="stDateInputContainer"]{background:#ffffff!important;border-color:#e2e5f0!important;}
+[data-testid="stMetricLabel"] p,[data-testid="stMetricLabel"] div{color:#5d6285!important;}
+[data-testid="stMetricValue"]{color:#191c34!important;}
+[data-testid="stCaptionContainer"] p,[data-testid="stCaptionContainer"] span{color:#5d6285!important;}
+.erp-topbar{background:linear-gradient(135deg,#ffffff 0%,#f7f5ff 100%)!important;border:1px solid rgba(108,92,231,.12)!important;box-shadow:0 18px 44px rgba(23,28,64,.07),inset 0 1px 0 #fff!important;}
+.erp-topbar h2{background:linear-gradient(135deg,#14172e 0%,#5b49d6 100%)!important;-webkit-background-clip:text!important;background-clip:text!important;}
+.erp-topbar p{color:#5d6285!important;}
+.erp-badge{background:rgba(108,92,231,.08)!important;border:1px solid rgba(108,92,231,.18)!important;color:#5b49d6!important;}
+.erp-time{color:#6a6f92!important;}
+.erp-stat{background:linear-gradient(180deg,#ffffff 0%,#fbfbff 100%)!important;border:1px solid rgba(23,28,64,.08)!important;box-shadow:0 10px 26px rgba(23,28,64,.06),inset 0 1px 0 #fff!important;}
+.erp-stat:hover{border-color:rgba(108,92,231,.22)!important;box-shadow:0 18px 38px rgba(23,28,64,.10)!important;}
+.erp-stat-label{color:#6a6f92!important;}
+.erp-stat-sub{color:#8b90ad!important;}
+.s-blue .erp-stat-value{color:#5b49d6!important;}
+.s-cyan .erp-stat-value{color:#0d8f8a!important;}
+.s-orange .erp-stat-value{color:#a86207!important;}
+.s-green .erp-stat-value{color:#0a8064!important;}
+.s-pink .erp-stat-value{color:#b02a6e!important;}
+.s-red .erp-stat-value{color:#cf3b3b!important;}
+.erp-card{background:linear-gradient(180deg,#ffffff 0%,#fbfbff 100%)!important;border:1px solid rgba(23,28,64,.08)!important;box-shadow:0 8px 24px rgba(23,28,64,.05),inset 0 1px 0 #fff!important;}
+.erp-card:hover{border-color:rgba(108,92,231,.18)!important;box-shadow:0 16px 38px rgba(23,28,64,.08)!important;}
+.erp-batch{background:linear-gradient(180deg,#ffffff 0%,#fbfbff 100%)!important;border:1px solid rgba(23,28,64,.08)!important;box-shadow:0 12px 30px rgba(23,28,64,.06)!important;}
+.erp-batch:hover{border-color:rgba(108,92,231,.2)!important;box-shadow:0 24px 54px rgba(23,28,64,.10)!important;}
+.erp-batch-title,.erp-batch-v{color:#191c34!important;}
+.erp-batch-sub,.erp-batch-k,.erp-batch-count{color:#7a7f9c!important;}
+.erp-batch-foot{border-top:1px solid rgba(23,28,64,.07)!important;}
+.erp-batch-count span{color:#5b49d6!important;}
+.erp-detail-title{color:#191c34!important;}
+.erp-back{background:#fff!important;border-color:rgba(23,28,64,.09)!important;color:#2a2f4d!important;}
+.erp-meta-item{background:linear-gradient(180deg,#ffffff 0%,#fbfbff 100%)!important;border:1px solid rgba(23,28,64,.08)!important;box-shadow:inset 0 1px 0 #fff!important;}
+.erp-meta-k{color:#7a7f9c!important;}
+.erp-meta-v{color:#191c34!important;}
+.erp-section h3{color:#191c34!important;}
+.erp-info{background:rgba(108,92,231,.05)!important;border:1px solid rgba(108,92,231,.14)!important;color:#4c5170!important;}
+.erp-empty{background:linear-gradient(180deg,#ffffff 0%,#fbfbff 100%)!important;border:1px dashed rgba(108,92,231,.22)!important;}
+.erp-empty h3{color:#191c34!important;}
+.erp-empty p{color:#6a6f92!important;}
+.erp-empty-icon{background:rgba(108,92,231,.07)!important;}
+.stTextInput>div>div>input,.stNumberInput input,.stTextArea textarea{background:#ffffff!important;border:1px solid #e2e5f0!important;color:#191c34!important;}
+.stTextInput>div>div>input::placeholder,.stNumberInput input::placeholder,.stTextArea textarea::placeholder{color:#a2a7bf!important;}
+.stTextInput>div>div>input:hover,.stNumberInput input:hover,.stTextArea textarea:hover{border-color:rgba(108,92,231,.32)!important;}
+.stTextInput>div>div>input:focus,.stNumberInput input:focus,.stTextArea textarea:focus{border-color:rgba(108,92,231,.55)!important;box-shadow:0 0 0 3px rgba(108,92,231,.12)!important;background:#fff!important;}
+.stSelectbox>div>div,.stMultiSelect>div>div,[data-baseweb="select"]>div{background:#ffffff!important;border:1px solid #e2e5f0!important;}
+.stSelectbox>div>div:hover,.stMultiSelect>div>div:hover,[data-baseweb="select"]>div:hover{border-color:rgba(108,92,231,.32)!important;}
+.stDateInput>div>div>div{background:#ffffff!important;border:1px solid #e2e5f0!important;}
+[data-baseweb="popover"] [data-baseweb="menu"]{background:#ffffff!important;border:1px solid #e6e8f2!important;box-shadow:0 20px 50px rgba(23,28,64,.14)!important;}
+[data-baseweb="menu"] li{color:#2a2f4d!important;}
+[data-baseweb="menu"] li[aria-selected="true"]{background:rgba(108,92,231,.1)!important;}
+[data-baseweb="calendar"]{background:#ffffff!important;border:1px solid #e6e8f2!important;}
+.stFileUploader section,[data-testid="stFileUploader"] section{border:1.5px dashed rgba(108,92,231,.3)!important;background:rgba(108,92,231,.03)!important;}
+.stFileUploader section:hover,[data-testid="stFileUploader"] section:hover{border-color:rgba(108,92,231,.5)!important;background:rgba(108,92,231,.06)!important;}
+.stButton>button,.stDownloadButton>button,.stFormSubmitButton>button{background:#ffffff!important;border:1px solid #e4e6f1!important;color:#2a2f4d!important;box-shadow:0 2px 8px rgba(23,28,64,.05),inset 0 1px 0 #fff!important;}
+.stButton>button:hover,.stDownloadButton>button:hover,.stFormSubmitButton>button:hover{background:rgba(108,92,231,.07)!important;border-color:rgba(108,92,231,.3)!important;color:#191c34!important;box-shadow:0 10px 24px rgba(23,28,64,.10)!important;}
+.stButton>button[kind="primary"],.stDownloadButton>button,button[kind="primaryFormSubmit"]{background:linear-gradient(135deg,#6c5ce7 0%,#8e7bff 55%,#a29bfe 100%)!important;border:none!important;color:#fff!important;box-shadow:0 6px 22px rgba(108,92,231,.32),inset 0 1px 0 rgba(255,255,255,.25)!important;}
+.stButton>button[kind="primary"]:hover,.stDownloadButton>button:hover,button[kind="primaryFormSubmit"]:hover{background:linear-gradient(135deg,#7a6bf0 0%,#9a89ff 55%,#b3adff 100%)!important;color:#fff!important;}
+.stTabs [data-baseweb="tab-list"]{background:#ffffff!important;border:1px solid #e8eaf3!important;box-shadow:inset 0 1px 0 #fff!important;}
+.stTabs [data-baseweb="tab"]{color:#6a6f92!important;}
+.stTabs [data-baseweb="tab"]:hover{color:#191c34!important;background:rgba(108,92,231,.07)!important;}
+.stTabs [aria-selected="true"]{background:linear-gradient(135deg,rgba(108,92,231,.14),rgba(162,155,254,.08))!important;color:#2a2f4d!important;box-shadow:0 4px 14px rgba(108,92,231,.12),inset 0 1px 0 #fff!important;}
+.stDataFrame{border:1px solid #e4e6f1!important;box-shadow:0 8px 26px rgba(23,28,64,.07)!important;}
+[data-testid="stAlert"]{box-shadow:0 2px 10px rgba(23,28,64,.05);}
+[data-testid="stAlert"] p,[data-testid="stAlert"] span{color:#2a2f4d!important;}
+[data-testid="stAlertContentSuccess"]{background:#eefaf4!important;border:1px solid #c8ecdc!important;}
+[data-testid="stAlertContentWarning"]{background:#fff8e8!important;border:1px solid #f0dfb4!important;}
+[data-testid="stAlertContentError"]{background:#fdf0f0!important;border:1px solid #f2cccc!important;}
+[data-testid="stAlertContentInfo"]{background:#eff5ff!important;border:1px solid #cfe0f7!important;}
+[data-testid="stExpander"] details{background:#ffffff!important;border:1px solid #e6e8f2!important;}
+[data-testid="stExpander"] summary:hover{background:rgba(108,92,231,.05)!important;}
+[data-testid="stForm"]:not(:has(.login-hero)){background:#ffffff!important;border:1px solid #e6e8f2!important;box-shadow:0 8px 24px rgba(23,28,64,.05),inset 0 1px 0 #fff!important;}
+.stMain h1,.stMain h2,.stMain h3,.stMain h4{color:#191c34!important;}
+hr{border-color:rgba(23,28,64,.08)!important;}
+.stMarkdown a{color:#5b49d6!important;}
+::-webkit-scrollbar-thumb{background:rgba(108,92,231,.3);}
+[style*="color:#fff"]{color:#191c34!important;}
+[style*="color:#eaeaf2"]{color:#191c34!important;}
+[style*="color:#f2f2fa"]{color:#191c34!important;}
+[style*="color:#a9a9c8"]{color:#5d6285!important;}
+[style*="color:#7878a0"]{color:#6a6f92!important;}
+[style*="color:rgba(255,255,255,.5"]{color:#5d6285!important;}
+[style*="color:rgba(255,255,255,.3"]{color:#7a7f9c!important;}
+[style*="color:rgba(255,255,255,.2"]{color:#8b90ad!important;}
+[style*="background:rgba(255,255,255,.03"],[style*="background:rgba(255,255,255,.04"]{background:rgba(23,28,64,.04)!important;}
+.erp-tc-table{background:#ffffff;border:1px solid #e6e8f2;}
+.erp-tc-table thead tr{background:rgba(108,92,231,.08)!important;color:#5b49d6!important;}
+.erp-tc-table th{color:#5b49d6!important;}
+.erp-tc-table tr{border-top:1px solid rgba(23,28,64,.07)!important;}
+.erp-tc-table td{color:#191c34;}
+</style>"""
+
+_LOGIN_LIGHT_CSS = """<style>
+:root{--accent:#6c5ce7;--accent2:#5b49d6;--cyan:#0e9f9a;}
+.stApp{background:radial-gradient(120% 95% at 50% -10%,#ffffff 0%,#f6f7fd 48%,#eceff8 100%)!important;}
+.stApp::before{background:radial-gradient(55% 45% at 18% 22%,rgba(108,92,231,.10),transparent 60%),radial-gradient(45% 40% at 82% 12%,rgba(0,206,201,.08),transparent 60%),radial-gradient(50% 50% at 78% 88%,rgba(232,67,147,.06),transparent 60%),radial-gradient(40% 40% at 12% 82%,rgba(108,92,231,.08),transparent 60%)!important;}
+.stApp::after{background:radial-gradient(62% 58% at 50% 44%,transparent 58%,rgba(23,28,64,.05) 100%)!important;}
+body::after{opacity:.15!important;}
+.login-title{background:linear-gradient(90deg,#171a33 10%,#5b49d6 55%,#0e9f9a 100%)!important;-webkit-background-clip:text!important;background-clip:text!important;}
+.login-sub{color:#5d6285!important;}
+.login-badge{background:rgba(0,206,201,.08)!important;border:1px solid rgba(0,160,155,.28)!important;color:#0b8d86!important;}
+[data-testid="stForm"]{background:rgba(255,255,255,.94)!important;border:1px solid rgba(23,28,64,.08)!important;box-shadow:0 32px 80px rgba(23,28,64,.12),0 0 0 1px rgba(108,92,231,.04)!important;}
+[data-testid="stForm"]::before{background:linear-gradient(90deg,transparent,rgba(108,92,231,.55),transparent)!important;}
+[data-testid="stForm"] label p{color:#5d6285!important;}
+[data-testid="stForm"] .stTextInput>div>div>input{background:#ffffff!important;border:1px solid #e2e5f0!important;color:#191c34!important;}
+[data-testid="stForm"] .stTextInput>div>div>input::placeholder{color:#a2a7bf!important;}
+[data-testid="stForm"] .stTextInput>div>div>input:focus{border-color:rgba(108,92,231,.55)!important;box-shadow:0 0 0 3px rgba(108,92,231,.12)!important;background:#fff!important;}
+.login-err{background:rgba(214,69,69,.07)!important;border:1px solid rgba(214,69,69,.25)!important;color:#c0392b!important;}
+.login-foot{color:rgba(23,28,64,.35)!important;}
+.st-key-login_prefs .stButton>button[kind="secondary"]{background:#ffffff!important;border:1px solid #e4e6f1!important;color:#5d6285!important;box-shadow:0 2px 8px rgba(23,28,64,.05)!important;}
+.st-key-login_prefs .stButton>button[kind="secondary"]:hover{background:rgba(108,92,231,.07)!important;border-color:rgba(108,92,231,.3)!important;color:#191c34!important;}
+</style>"""
+
+_LTR_CSS = """<style>
+html,body,[class*="css"]{direction:ltr!important;}
+.stApp{direction:ltr!important;}
+section[data-testid="stSidebar"]{border-left:none!important;border-right:1px solid rgba(108,92,231,.08)!important;}
+section[data-testid="stSidebar"] [class*="st-key-submenu_"]{border-inline-start:1px solid rgba(108,92,231,.25)!important;border-radius:0 12px 12px 0!important;background:linear-gradient(90deg,rgba(108,92,231,.06),rgba(108,92,231,.01))!important;}
+.erp-topbar,.erp-topbar h2,.erp-topbar p{text-align:left!important;}
+.erp-section{justify-content:flex-start;}
+.erp-tc-table{direction:ltr!important;}
+.erp-tc-table th,.erp-tc-table td{text-align:left!important;}
+.erp-tc-wrap{direction:ltr!important;}
+</style>"""
+
 # ====================== LOGIN ======================
+if 'ui_theme' not in st.session_state: st.session_state['ui_theme']='dark'
+if 'ui_lang' not in st.session_state: st.session_state['ui_lang']='ar'
 if 'current_user' not in st.session_state:
     st.session_state['current_user']=None
 
@@ -1688,8 +1975,16 @@ div[data-testid="stDecoration"]{display:none!important;visibility:hidden!importa
     [data-testid="stForm"] button[kind="primary"]:active,[data-testid="stForm"] button[kind="primaryFormSubmit"]:active{transform:translateY(0)!important;}
     .login-err{background:rgba(255,90,90,.09);border:1px solid rgba(255,90,90,.26);border-radius:12px;padding:.62rem 1rem;color:#ff8787;font-size:.79rem;text-align:center;margin-top:.6rem;animation:shake .4s;}
     .login-foot{text-align:center;color:rgba(255,255,255,.2);font-size:.62rem;margin-top:1.7rem;letter-spacing:.3px;animation:fadeUp .8s .26s both;position:relative;z-index:1;}
+    .st-key-login_prefs{max-width:352px;margin:.85rem auto 0;animation:fadeUp .8s .2s both;position:relative;z-index:1;}
+    .st-key-login_prefs [data-testid="stHorizontalBlock"]{gap:.4rem!important;}
+    .st-key-login_prefs .stButton>button{padding:.34rem 0!important;min-height:0!important;font-size:.7rem!important;font-weight:700!important;border-radius:10px!important;letter-spacing:.2px;}
+    .st-key-login_prefs .stButton>button[kind="secondary"]{background:rgba(255,255,255,.04)!important;border:1px solid rgba(255,255,255,.1)!important;color:rgba(255,255,255,.62)!important;box-shadow:none!important;}
+    .st-key-login_prefs .stButton>button[kind="secondary"]:hover{background:rgba(162,155,254,.12)!important;color:#fff!important;border-color:rgba(162,155,254,.35)!important;}
+    .st-key-login_prefs .stButton>button[kind="primary"]{background:linear-gradient(135deg,#6c5ce7,#a29bfe)!important;border:none!important;color:#fff!important;box-shadow:0 6px 18px rgba(108,92,231,.35)!important;}
     </style>
     """, unsafe_allow_html=True)
+    if _is_light(): st.markdown(_LOGIN_LIGHT_CSS, unsafe_allow_html=True)
+    if _is_en(): st.markdown(_LTR_CSS, unsafe_allow_html=True)
     st.markdown('<div class="login-hero"><div class="login-icon">🏢</div><h1 class="login-title">Tax Management System</h1><p class="login-sub">نظام إدارة الضرائب المتكامل</p><div class="login-badge"><span class="dot"></span> تسجيل دخول آمن ومحمي</div></div>', unsafe_allow_html=True)
     with st.form("login_form",clear_on_submit=False):
         u=st.text_input("اسم المستخدم",key="login_user",placeholder="Username")
@@ -1705,6 +2000,20 @@ div[data-testid="stDecoration"]{display:none!important;visibility:hidden!importa
                     st.rerun()
                 else:
                     st.markdown('<div class="login-err">بيانات الدخول غير صحيحة</div>', unsafe_allow_html=True)
+    with st.container(key="login_prefs"):
+        _lp1,_lp2,_lp3,_lp4=st.columns(4)
+        with _lp1:
+            if st.button("العربية",key="login_lang_ar",use_container_width=True,type="primary" if _ui_lang()=='ar' else "secondary"):
+                st.session_state['ui_lang']='ar';st.rerun()
+        with _lp2:
+            if st.button("English",key="login_lang_en",use_container_width=True,type="primary" if _ui_lang()=='en' else "secondary"):
+                st.session_state['ui_lang']='en';st.rerun()
+        with _lp3:
+            if st.button("🌙 داكن",key="login_theme_dark",use_container_width=True,type="primary" if _ui_theme()=='dark' else "secondary"):
+                st.session_state['ui_theme']='dark';st.rerun()
+        with _lp4:
+            if st.button("☀️ فاتح",key="login_theme_light",use_container_width=True,type="primary" if _ui_theme()=='light' else "secondary"):
+                st.session_state['ui_theme']='light';st.rerun()
     st.markdown('<p class="login-foot">جميع الحقوق محفوظة © تصميم محاسب / صالح مصطفى</p>', unsafe_allow_html=True)
     st.stop()
 
@@ -1712,7 +2021,7 @@ div[data-testid="stDecoration"]{display:none!important;visibility:hidden!importa
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Cairo:wght@300;400;500;600;700;800&display=swap');
-:root{--bg:#0a0a15;--surface:rgba(22,22,40,0.7);--surface2:#1e1e38;--border:rgba(255,255,255,0.06);--text:#eaeaf2;--text2:#7878a0;--accent:#6c5ce7;--accent2:#a29bfe;--cyan:#00cec9;--green:#00b894;--orange:#fdcb6e;--red:#ff6b6b;--pink:#fd79a8;--blue:#74b9ff;}
+:root{--bg:#0a0a15;--surface:rgba(22,22,40,0.7);--surface2:#1e1e38;--border:rgba(255,255,255,0.06);--text:#eaeaf2;--text2:#7878a0;--accent:#6c5ce7;--accent2:#a29bfe;--cyan:#00cec9;--green:#00b894;--orange:#fdcb6e;--red:#ff6b6b;--pink:#fd79a8;--blue:#74b9ff;--tc-add:#55efc4;--tc-ded:#ff9f9f;}
 html,body,[class*="css"]{font-family:'Inter','Cairo',sans-serif!important;direction:rtl;}
 #MainMenu,footer,header,.stDeployButton{visibility:hidden!important;}
 div[data-testid="stDecoration"]{display:none!important;visibility:hidden!important;height:0!important;width:0!important;overflow:hidden!important;}
@@ -1739,6 +2048,7 @@ section[data-testid="stSidebar"] [class*="st-key-logout_btn"] button:hover{color
 /* SIDEBAR SUBMENU */
 section[data-testid="stSidebar"] [class*="st-key-submenu_"]{margin:2px 6px 6px 6px!important;padding:.2rem .3rem .2rem 0!important;border-inline-start:1px solid rgba(108,92,231,.25)!important;border-radius:0 12px 12px 0!important;background:linear-gradient(90deg,rgba(108,92,231,.06),rgba(108,92,231,.01))!important;animation:submenuFade .26s ease-out!important;}
 @keyframes submenuFade{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:translateY(0);}}
+section[data-testid="stSidebar"] .st-key-sb_prefs .stButton>button{font-size:.7rem!important;padding:.36rem .15rem!important;letter-spacing:0!important;}
 section[data-testid="stSidebar"] [class*="st-key-submenu_"] .stButton>button{font-size:.72rem!important;font-weight:500!important;padding:.32rem .6rem .32rem .8rem!important;margin:1px 0!important;border-radius:9px!important;color:rgba(255,255,255,.42)!important;letter-spacing:.1px;}
 section[data-testid="stSidebar"] [class*="st-key-submenu_"] .stButton>button:hover{color:#fff!important;background:rgba(108,92,231,.12)!important;border-color:transparent!important;}
 section[data-testid="stSidebar"] [class*="st-key-submenu_"] .stButton>button[kind="primary"]{background:rgba(108,92,231,.18)!important;border:1px solid rgba(162,155,254,.22)!important;color:#eae7ff!important;font-weight:700!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.02)!important;}
@@ -1901,8 +2211,13 @@ hr{border-color:rgba(255,255,255,.05)!important;}
 
 ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(108,92,231,.25);border-radius:5px}
 
+/* PREFERENCES */
+section[data-testid="stSidebar"] .pref-title{color:rgba(255,255,255,.2)!important;font-size:.55rem!important;font-weight:700!important;letter-spacing:3px!important;padding:.2rem .8rem!important;margin:.5rem 0 .25rem!important;text-transform:uppercase!important;}
+
 </style>
 """, unsafe_allow_html=True)
+if _is_light(): st.markdown(_LIGHT_CSS, unsafe_allow_html=True)
+if _is_en(): st.markdown(_LTR_CSS, unsafe_allow_html=True)
 
 # ====================== SIDEBAR ======================
 with st.sidebar:
@@ -1918,6 +2233,22 @@ with st.sidebar:
         <div style="width:40px;height:2px;background:linear-gradient(90deg,transparent,rgba(108,92,231,.4),transparent);margin:.8rem auto 0;border-radius:2px;"></div>
     </div>
     """, unsafe_allow_html=True)
+    st.markdown("<p class='pref-title'>الإعدادات</p>", unsafe_allow_html=True)
+    with st.container(key="sb_prefs"):
+        _pf1,_pf2=st.columns(2)
+        with _pf1:
+            if st.button("العربية",key="pref_lang_ar",use_container_width=True,type="primary" if _ui_lang()=='ar' else "secondary"):
+                st.session_state['ui_lang']='ar';st.rerun()
+        with _pf2:
+            if st.button("English",key="pref_lang_en",use_container_width=True,type="primary" if _ui_lang()=='en' else "secondary"):
+                st.session_state['ui_lang']='en';st.rerun()
+        _pf3,_pf4=st.columns(2)
+        with _pf3:
+            if st.button("🌙 داكن",key="pref_theme_dark",use_container_width=True,type="primary" if _ui_theme()=='dark' else "secondary"):
+                st.session_state['ui_theme']='dark';st.rerun()
+        with _pf4:
+            if st.button("☀️ فاتح",key="pref_theme_light",use_container_width=True,type="primary" if _ui_theme()=='light' else "secondary"):
+                st.session_state['ui_theme']='light';st.rerun()
     st.markdown("<p style='color:rgba(255,255,255,.18);font-size:.55rem;font-weight:700;letter-spacing:3px;padding:.2rem .8rem;margin:.2rem 0 .3rem;text-transform:uppercase;'>القائمة</p>", unsafe_allow_html=True)
     cu=get_current_user()
     try:
@@ -1940,7 +2271,7 @@ with st.sidebar:
         st.session_state['selected_page']=nav_pages[0]
     for _i,_np in enumerate(nav_pages):
         _sel=(st.session_state['selected_page']==_np)
-        if st.button(_np,key=f"navbtn_{_np}",use_container_width=True,type="primary" if _sel else "secondary"):
+        if st.button(_page_label(_np),key=f"navbtn_{_np}",use_container_width=True,type="primary" if _sel else "secondary"):
             st.session_state['selected_page']=_np
             st.rerun()
         if _sel and _np in SUB_PAGES:
@@ -1959,7 +2290,7 @@ with st.sidebar:
     if st.button("🚪 خروج",key="logout_btn",use_container_width=True):
         st.session_state['current_user']=None
         for k in list(st.session_state.keys()):
-            if k!='current_user': del st.session_state[k]
+            if k not in ('current_user','ui_theme','ui_lang'): del st.session_state[k]
         st.rerun()
     st.markdown("<div style='height:1px;background:linear-gradient(90deg,transparent,rgba(108,92,231,.1),transparent);margin:1.2rem .8rem;'></div>", unsafe_allow_html=True)
     st.markdown("""<div style="padding:.8rem 1rem;border-radius:14px;background:linear-gradient(135deg,rgba(108,92,231,.04),rgba(0,206,201,.02));border:1px solid rgba(108,92,231,.06);margin:0 .5rem;text-align:center;">
@@ -2566,13 +2897,13 @@ def tc_render(res):
     _card(_r2[1],"s-orange","إجمالي الأعباء الضريبية",fmt(res["tax_total"]),f"{res['tax_total']/res['net']*100:.1f}% من الأساس" if res["net"]>0 else "الأنواع الأربعة مجتمعة")
     _card(_r2[2],"s-blue","صافي المستحق للدفع",fmt(res["payable"]),"بعد خصم ض. الخصم والتحصيل")
     def _row(label,base,rate,amount,note,tone):
-        _color={"add":"#55efc4","ded":"#ff9f9f"}.get(tone,"#eaeaf2")
-        return ('<tr style="border-top:1px solid rgba(255,255,255,.05);">'
-                f'<td style="padding:.62rem .9rem;color:#eaeaf2;">{label}</td>'
-                f'<td style="padding:.62rem .9rem;color:#a9a9c8;">{base}</td>'
-                f'<td style="padding:.62rem .9rem;color:#a9a9c8;">{rate}</td>'
+        _color={"add":"var(--tc-add)","ded":"var(--tc-ded)"}.get(tone,"var(--text)")
+        return ('<tr style="border-top:1px solid var(--border);">'
+                f'<td style="padding:.62rem .9rem;color:var(--text);">{label}</td>'
+                f'<td style="padding:.62rem .9rem;color:var(--text2);">{base}</td>'
+                f'<td style="padding:.62rem .9rem;color:var(--text2);">{rate}</td>'
                 f'<td style="padding:.62rem .9rem;font-weight:800;color:{_color};font-variant-numeric:tabular-nums;">{amount}</td>'
-                f'<td style="padding:.62rem .9rem;color:#7878a0;font-size:.72rem;">{note}</td></tr>')
+                f'<td style="padding:.62rem .9rem;color:var(--text2);font-size:.72rem;">{note}</td></tr>')
     _body="".join([
         _row("ضريبة الخصم والتحصيل تحت حساب الضريبة",fmt(res["net"]),f"{res['wht_rate']*100:g}%" if res["wht"] else "—",fmt(res["wht"]) if res["wht"] else "—","تُخصم من المستحق للمورد" if res["wht"] else "غير مطبقة","ded"),
         _row("ضريبة القيمة المضافة",fmt(res["net"]),"14%",fmt(res["vat"]) if res["vat_on"] else "—","تُضاف على الفاتورة" if res["vat_on"] else "غير مطبقة","add"),
@@ -2582,13 +2913,13 @@ def tc_render(res):
         _row("إجمالي الأعباء الضريبية","—","—",fmt(res["tax_total"]),"الأنواع الأربعة مجتمعة",""),
         _row("صافي المستحق للدفع","—","—",fmt(res["payable"]),"بعد خصم ضريبة الخصم والتحصيل",""),
     ])
-    st.markdown('<div style="overflow-x:auto;margin-top:.9rem;"><table style="width:100%;border-collapse:collapse;font-size:.82rem;direction:rtl;text-align:right;background:rgba(17,17,34,.45);border:1px solid rgba(255,255,255,.07);border-radius:16px;overflow:hidden;">'
-                '<thead><tr style="background:rgba(108,92,231,.12);color:#c9c4ff;">'
-                '<th style="padding:.7rem .9rem;text-align:right;font-weight:700;">البند</th>'
-                '<th style="padding:.7rem .9rem;text-align:right;font-weight:700;">الأساس</th>'
-                '<th style="padding:.7rem .9rem;text-align:right;font-weight:700;">النسبة</th>'
-                '<th style="padding:.7rem .9rem;text-align:right;font-weight:700;">المبلغ (ج.م)</th>'
-                '<th style="padding:.7rem .9rem;text-align:right;font-weight:700;">ملاحظات</th>'
+    st.markdown('<div class="erp-tc-wrap" style="overflow-x:auto;margin-top:.9rem;"><table class="erp-tc-table" style="width:100%;border-collapse:collapse;font-size:.82rem;text-align:start;background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;">'
+                '<thead><tr style="background:rgba(108,92,231,.12);color:var(--accent2);">'
+                '<th style="padding:.7rem .9rem;text-align:start;font-weight:700;">البند</th>'
+                '<th style="padding:.7rem .9rem;text-align:start;font-weight:700;">الأساس</th>'
+                '<th style="padding:.7rem .9rem;text-align:start;font-weight:700;">النسبة</th>'
+                '<th style="padding:.7rem .9rem;text-align:start;font-weight:700;">المبلغ (ج.م)</th>'
+                '<th style="padding:.7rem .9rem;text-align:start;font-weight:700;">ملاحظات</th>'
                 '</tr></thead><tbody>'+_body+'</tbody></table></div>',unsafe_allow_html=True)
 
 # ====================== ADMIN ======================
@@ -2612,7 +2943,7 @@ if page == ADMIN_PAGE:
             perm_checks=[]
             for i,pg in enumerate(ALL_PAGES):
                 with perm_cols[i%4]:
-                    perm_checks.append((pg,st.checkbox(pg,key=f"perm_{i}")))
+                    perm_checks.append((pg,st.checkbox(_page_label(pg),key=f"perm_{i}")))
             if st.form_submit_button("💾 إضافة المستخدم",type="primary",use_container_width=True):
                 if not new_user or not new_pw or not new_name:
                     st.error("أدخل كل البيانات المطلوبة")
@@ -5668,7 +5999,7 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
 elif page == "🧮 حاسبة الضرائب":
     if not user_has_permission(page): st.error("لا تملك صلاحية الوصول");st.stop()
     _tc_sub=st.session_state.get(_sub_key("🧮 حاسبة الضرائب"),"🧾 حساب على المبلغ الأساسي")
-    st.markdown('<div class="erp-topbar"><div><h2>حاسبة الضرائب</h2><p>احسب ضريبة الخصم والقيمة المضافة والدمغة و20% من ض.ق.م — أو استخرجها من مبلغ شامل.</p></div><div class="erp-topbar-right"><span class="erp-badge">🧮 4 أنواع ضرائب</span></div></div>',unsafe_allow_html=True)
+    st.markdown('<div class="erp-topbar"><div><h2>حاسبة الضرائب</h2><p>احسب ضريبة الخصم والقيمة المضافة والدمغة و20% من ض.ق.م — أو استخرجها من مبلغ شامل.</p></div><div class="erp-topbar-right"><span class="erp-badge">🖩 4 أنواع ضرائب</span></div></div>',unsafe_allow_html=True)
     st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>البيانات</h3></div>',unsafe_allow_html=True)
     _tc_opts=["بدون"]+list(TC_WHT_RATES.keys())
     _tc_l,_tc_r=st.columns([1,1.15])
@@ -5679,7 +6010,7 @@ elif page == "🧮 حاسبة الضرائب":
             _tc_net_f=float(_tc_net)
             st.caption("نسب الخصم على هذا المبلغ — "+" • ".join(f"{_k.split(' ')[0]}: {fmt(_tc_net_f*_r)} ج.م" for _k,_r in TC_WHT_RATES.items()))
         with _tc_r:
-            st.markdown('<p style="color:var(--text2);font-size:.72rem;font-weight:700;letter-spacing:.3px;margin:.1rem 0 .4rem;text-align:right;">الضرائب المطبقة</p>',unsafe_allow_html=True)
+            st.markdown('<p style="color:var(--text2);font-size:.72rem;font-weight:700;letter-spacing:.3px;margin:.1rem 0 .4rem;text-align:start;">الضرائب المطبقة</p>',unsafe_allow_html=True)
             _tc_vat=st.checkbox("ضريبة القيمة المضافة — 14%",value=True,key="tc_fwd_vat")
             if not _tc_vat: st.session_state["tc_fwd_vat20"]=False
             _tc_vat20=st.checkbox("ضريبة 20% من القيمة المضافة — تعادل 2.8% من الأساس",value=False,key="tc_fwd_vat20",disabled=not _tc_vat)
@@ -5693,7 +6024,7 @@ elif page == "🧮 حاسبة الضرائب":
             _tc_wht_sel=st.radio("ضريبة الخصم والتحصيل",_tc_opts,horizontal=True,index=0,key="tc_rev_wht")
             st.caption("ض. الخصم تُحسب على المبلغ الأساسي المستخرج وتُخصم من الدفعة — وهي غير داخلة في معادلة الاستخراج.")
         with _tc_r:
-            st.markdown('<p style="color:var(--text2);font-size:.72rem;font-weight:700;letter-spacing:.3px;margin:.1rem 0 .4rem;text-align:right;">الضرائب المضمّنة في المبلغ</p>',unsafe_allow_html=True)
+            st.markdown('<p style="color:var(--text2);font-size:.72rem;font-weight:700;letter-spacing:.3px;margin:.1rem 0 .4rem;text-align:start;">الضرائب المضمّنة في المبلغ</p>',unsafe_allow_html=True)
             _tc_vat=st.checkbox("المبلغ شامل ضريبة القيمة المضافة — 14%",value=True,key="tc_rev_vat")
             if not _tc_vat: st.session_state["tc_rev_vat20"]=False
             _tc_vat20=st.checkbox("المبلغ شامل ضريبة 20% من القيمة المضافة",value=False,key="tc_rev_vat20",disabled=not _tc_vat)
