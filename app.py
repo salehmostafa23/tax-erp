@@ -7,6 +7,7 @@ import uuid
 import shutil
 import math
 import hashlib
+import html as _htmlesc
 import requests as http_requests
 from datetime import datetime, timedelta, timezone
 from io import BytesIO
@@ -25,6 +26,11 @@ try:
     import i18n as _i18n
 except Exception:
     _i18n = None
+
+try:
+    import notifications as _notif
+except Exception:
+    _notif = None
 
 st.set_page_config(page_title="Tax Management System", page_icon="🏢", layout="wide", initial_sidebar_state="expanded")
 
@@ -92,6 +98,41 @@ def _page_label(p):
     # display-only calculator icon; the stored page key stays unchanged (permissions)
     return p.replace("🧮","🖩",1) if p.startswith("🧮") else p
 
+# ====================== NOTIFICATIONS (admin audit feed) ======================
+NOTIF_PAGE="🔔 الإشعارات"
+
+def _notify(title,detail="",kind="other",action="create",dedupe=0):
+    try:
+        if _notif is not None:
+            _notif.log(title,detail,kind=kind,action=action,dedupe_minutes=dedupe)
+    except Exception:
+        pass
+
+def _notify_as(user_obj,title,detail="",kind="other",action="create",dedupe=0):
+    try:
+        if _notif is not None and user_obj:
+            _notif.log(title,detail,kind=kind,action=action,page="تسجيل الدخول",
+                       user=user_obj.get('display_name') or user_obj.get('username'),
+                       username=user_obj.get('username',''),role=user_obj.get('role',''),
+                       dedupe_minutes=dedupe)
+    except Exception:
+        pass
+
+def _notify_change(label,kind,old,new,names=()):
+    try:
+        if _notif is not None:
+            _notif.change("",label,kind,old,new,names=names)
+    except Exception:
+        pass
+
+def _peek_json(path):
+    try:
+        if os.path.exists(path):
+            with open(path,'r',encoding='utf-8') as fh: return json.load(fh)
+    except Exception:
+        pass
+    return []
+
 def _hash_pw(pw,salt="tax_erp_salt_2024"):
     return hashlib.sha256(f"{salt}{pw}".encode()).hexdigest()
 
@@ -133,13 +174,16 @@ def load_users():
             with open(USERS_FILE,'r',encoding='utf-8') as f: return json.load(f)
         except: pass
     default=[{"username":"admin","password":_hash_pw("admin123"),"display_name":"المدير","role":"admin","permissions":ALL_PAGES+[ADMIN_PAGE],"created_at":datetime.now().isoformat()}]
-    save_users(default)
+    save_users(default,notify=False)
     return default
 
-def save_users(data):
+def save_users(data,notify=True):
+    _old_users=_peek_json(USERS_FILE)
     with open(USERS_FILE,'w',encoding='utf-8') as f: json.dump(data,f,ensure_ascii=False,indent=2,default=str)
     gh_write("users.json",data)
     load_users.clear()
+    if notify:
+        _notify_change("مستخدم","users",_old_users,data,names=("display_name","username"))
 
 def authenticate_user(username,password):
     users=load_users()
@@ -292,9 +336,11 @@ def save_codes_db(data):
         if k not in seen:
             seen.add(k)
             unique.append(c)
+    _old_codes=_peek_json(CODES_DB_FILE)
     with open(CODES_DB_FILE,'w',encoding='utf-8') as f: json.dump(unique,f,ensure_ascii=False,indent=2,default=str)
     gh_write("codes_database.json",unique)
     load_codes_db.clear()
+    _notify_change("كود / أصناف","codes",_old_codes,unique,names=("itemCode","internalCode"))
     return unique
 
 def eta_get_document_details(token, uuid_val):
@@ -885,9 +931,11 @@ def _load_gs1_db():
     return []
 
 def _save_gs1_db(products):
+    _old=_peek_json(GS1_DATA_FILE)
     gh_write("gs1_products.json",products)
     with open(GS1_DATA_FILE,'w',encoding='utf-8') as f: json.dump(products,f,ensure_ascii=False,indent=2,default=str)
     _load_gs1_db.clear()
+    _notify_change("منتج GS1","gs1",_old,products,names=("name","barcode","gtin","code"))
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def _load_supplier_codes():
@@ -900,10 +948,12 @@ def _load_supplier_codes():
     return []
 
 def _save_supplier_codes(data):
+    _old=_peek_json(SUPPLIER_CODES_FILE)
     gh_write("supplier_codes.json",data)
     with open(SUPPLIER_CODES_FILE,'w',encoding='utf-8') as f: json.dump(data,f,ensure_ascii=False,indent=2,default=str)
     _load_supplier_codes.clear()
     _sup_search_result.clear()
+    _notify_change("كود مورد","supplier",_old,data,names=("code","name","supplier_name"))
 
 @st.cache_data(ttl=900, show_spinner=False)
 def _sup_search_result(sig, query):
@@ -1996,6 +2046,7 @@ div[data-testid="stDecoration"]{display:none!important;visibility:hidden!importa
             else:
                 user=authenticate_user(u.strip(),p)
                 if user:
+                    _notify_as(user,"سجل دخول للنظام",f"@{u.strip()}",kind="login",action="login")
                     st.session_state['current_user']=user
                     st.rerun()
                 else:
@@ -2262,16 +2313,22 @@ with st.sidebar:
                 for u in users:
                     if u.get('username')==cu.get('username'):
                         u['permissions']=cu['permissions']
-                save_users(users)
+                save_users(users,notify=False)
     except Exception:
         pass
     nav_pages=[p for p in ALL_PAGES if p in cu.get('permissions',[]) or cu.get('role')=='admin']
-    if cu.get('role')=='admin': nav_pages.append(ADMIN_PAGE)
+    if cu.get('role')=='admin': nav_pages.append(ADMIN_PAGE); nav_pages.append(NOTIF_PAGE)
     if 'selected_page' not in st.session_state or st.session_state.get('selected_page') not in nav_pages:
         st.session_state['selected_page']=nav_pages[0]
+    _unread_n=0
+    if cu.get('role')=='admin':
+        try: _unread_n=_notif.unread(cu.get('username','')) if _notif is not None else 0
+        except Exception: _unread_n=0
     for _i,_np in enumerate(nav_pages):
         _sel=(st.session_state['selected_page']==_np)
-        if st.button(_page_label(_np),key=f"navbtn_{_np}",use_container_width=True,type="primary" if _sel else "secondary"):
+        _nav_lbl=_page_label(_np)
+        if _np==NOTIF_PAGE and _unread_n: _nav_lbl=f"{_nav_lbl} · {_unread_n}"
+        if st.button(_nav_lbl,key=f"navbtn_{_np}",use_container_width=True,type="primary" if _sel else "secondary"):
             st.session_state['selected_page']=_np
             st.rerun()
         if _sel and _np in SUB_PAGES:
@@ -2314,9 +2371,11 @@ def load_receipts():
     return []
 
 def save_receipts(data):
+    _old=_peek_json(RECEIPTS_FILE)
     gh_write("receipts_registry.json",data)
     with open(RECEIPTS_FILE,'w',encoding='utf-8') as f: json.dump(data,f,ensure_ascii=False,indent=2)
     load_receipts.clear()
+    _notify_change("Template Portal / ريسيت","receipts",_old,data,names=("receipt_number","receiver_name"))
 
 BARCODES_FILE=os.path.join(DATA_DIR,"barcodes_db.json")
 
@@ -2331,9 +2390,11 @@ def load_barcodes():
     return []
 
 def save_barcodes(data):
+    _old=_peek_json(BARCODES_FILE)
     gh_write("barcodes_db.json",data)
     with open(BARCODES_FILE,'w',encoding='utf-8') as f: json.dump(data,f,ensure_ascii=False,indent=2)
     load_barcodes.clear()
+    _notify_change("باركود","barcodes",_old,data,names=("internal_code","item_code","barcode"))
 
 FORM41_FILE = os.path.join(DATA_DIR, "form41_data.json")
 VAT_FILE = os.path.join(DATA_DIR, "vat_data.json")
@@ -2343,10 +2404,21 @@ PORTAL_IN_FILE = os.path.join(DATA_DIR, "portal_incoming.json")
 def _gh_key(f):
     return os.path.basename(f)
 
+_DATA_LABELS={
+    "form41_data.json":("نماذج 41","form41"),
+    "vat_data.json":("بيانات القيمة المضافة","vat"),
+    "portal_outgoing.json":("فواتير Portal الصادرة","portal"),
+    "portal_incoming.json":("فواتير Portal الواردة","portal"),
+}
+
 def save_data(f,d):
+    _old=_peek_json(f)
     with open(f,'w',encoding='utf-8') as fh: json.dump(d,fh,ensure_ascii=False,indent=2,default=str)
     gh_write(_gh_key(f),d)
     load_data.clear()
+    _lbl,_knd=_DATA_LABELS.get(_gh_key(f),(_gh_key(f),"other"))
+    if _lbl!=_gh_key(f):
+        _notify_change(_lbl,_knd,_old,d,names=("internal_id","civ","uuid","invoice_number","documentNumber","tax_number"))
 @st.cache_data(ttl=1800, show_spinner=False)
 def load_data(f):
     gh=gh_read(_gh_key(f))
@@ -2505,9 +2577,11 @@ def load_requests():
     return []
 
 def save_requests(data):
+    _old=_peek_json(REQUESTS_FILE)
     with open(REQUESTS_FILE,'w',encoding='utf-8') as f: json.dump(data,f,ensure_ascii=False,indent=2,default=str)
     gh_write("requests_registry.json",data)
     load_requests.clear()
+    _notify_change("طلب نموذج","requests",_old,data,names=("request_number","supplier_name","tax_number"))
 
 VAT10_PREP_FILE=os.path.join(DATA_DIR,"vat10_preparations.json")
 VAT10_DECL_FILE=os.path.join(DATA_DIR,"vat10_declarations.json")
@@ -2523,9 +2597,11 @@ def load_vat10_prep():
     return []
 
 def save_vat10_prep(data):
+    _old=_peek_json(VAT10_PREP_FILE)
     with open(VAT10_PREP_FILE,'w',encoding='utf-8') as f: json.dump(data,f,ensure_ascii=False,indent=2)
     gh_write("vat10_preparations.json",data)
     load_vat10_prep.clear()
+    _notify_change("تحضير إقرار 10","vat10",_old,data,names=("name","file","month","period"))
 
 @st.cache_data(ttl=300, show_spinner=False)
 def load_vat10_decl():
@@ -2538,9 +2614,11 @@ def load_vat10_decl():
     return []
 
 def save_vat10_decl(data):
+    _old=_peek_json(VAT10_DECL_FILE)
     with open(VAT10_DECL_FILE,'w',encoding='utf-8') as f: json.dump(data,f,ensure_ascii=False,indent=2)
     gh_write("vat10_declarations.json",data)
     load_vat10_decl.clear()
+    _notify_change("إقرار 10","vat10",_old,data,names=("name","file","month","period"))
 
 
 def _replace_in_paragraph(para, old, new):
@@ -3030,6 +3108,142 @@ if page == ADMIN_PAGE:
                     cu['permissions']=final_perms
                 st.success(f"تم تعديل صلاحيات {sel_user.get('display_name','')} بنجاح!")
                 st.rerun()
+    st.stop()
+
+# ====================== NOTIFICATIONS PAGE (ADMIN ONLY) ======================
+if page == NOTIF_PAGE:
+    cu=get_current_user()
+    if not cu or cu.get('role')!='admin':
+        st.error("لا تملك صلاحية الوصول");st.stop()
+    _nt_uid=cu.get('username','')
+    if _is_light():
+        st.markdown("""<style>
+        [data-testid="stTextInput"] input{background:#ffffff!important;border:1px solid #e2e5f0!important;color:#191c34!important;border-radius:10px!important;}
+        [data-baseweb="select"]>div{background:#ffffff!important;border:1px solid #e2e5f0!important;border-radius:10px!important;}
+        [data-baseweb="select"] div,[data-baseweb="select"] span{color:#191c34!important;}
+        [data-testid="stSelectbox"] [role="group"]{background:#ffffff!important;border:1px solid #e2e5f0!important;border-radius:10px!important;}
+        [data-testid="stSelectbox"] input{background:transparent!important;color:#191c34!important;}
+        </style>""",unsafe_allow_html=True)
+    st.markdown('<div class="erp-section"><div class="erp-section-dot" style="background:#fd79a8;"></div><h3>🔔 الإشعارات</h3></div>',unsafe_allow_html=True)
+    st.markdown('<p style="color:var(--text2);font-size:.78rem;margin:-.4rem 0 1rem;">كل حركة بتحصل في السيستم — مين عملها، إيه هي، وإمتى.</p>',unsafe_allow_html=True)
+
+    _nt_data=_notif.load() if _notif is not None else {"events":[],"seen":{}}
+    _nt_events=list(reversed(_nt_data.get("events",[])))
+    _nt_seen=_nt_data.get("seen",{}).get(_nt_uid,"")
+
+    _now_dt=datetime.now()
+    _today=_now_dt.strftime("%Y-%m-%d")
+    _week=(_now_dt-timedelta(days=7)).isoformat(timespec="seconds")
+    _n_today=sum(1 for e in _nt_events if str(e.get("ts","")).startswith(_today))
+    _n_week=sum(1 for e in _nt_events if str(e.get("ts",""))>=_week)
+    _n_users=len({e.get("username") or e.get("user","") for e in _nt_events if str(e.get("ts",""))>=_week})
+    _n_unread=sum(1 for e in _nt_events if str(e.get("ts",""))>_nt_seen)
+
+    _sc=st.columns(4)
+    for _col,(_lbl,_val,_clr) in zip(_sc,[
+        ("إجمالي الإشعارات",len(_nt_events),"#6c5ce7"),
+        ("اليوم",_n_today,"#00cec9"),
+        ("آخر 7 أيام",_n_week,"#fdcb6e"),
+        ("مستخدمون نشطون (7 أيام)",_n_users,"#fd79a8")]):
+        with _col:
+            st.markdown(f'<div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:.85rem 1rem;"><p style="margin:0;color:var(--text2);font-size:.68rem;font-weight:600;">{_lbl}</p><p style="margin:.25rem 0 0;color:{_clr};font-size:1.4rem;font-weight:800;line-height:1.1;">{_val}</p></div>',unsafe_allow_html=True)
+
+    _tc=st.columns([1,1,1,1.4])
+    with _tc[0]:
+        if st.button("🔄 تحديث",key="nt_refresh",use_container_width=True):
+            if _notif is not None: _notif.clear_cache()
+            st.rerun()
+    with _tc[1]:
+        if st.button(f"✅ تحديد كمقروء ({_n_unread})",key="nt_seen",use_container_width=True,type="primary" if _n_unread else "secondary"):
+            if _notif is not None: _notif.mark_seen(_nt_uid)
+            st.rerun()
+    _nt_kinds={"invoice":"فاتورة","template":"Template","codes":"أكواد","form41":"نموذج 41","vat":"قيمة مضافة","portal":"بورتال","receipts":"ريسيتات / Template","barcodes":"باركودات","users":"مستخدمون","gs1":"GS1","supplier":"أكواد موردين","vat10":"إقرار 10","requests":"طلبات","submit":"ترحيل للبورتال","login":"دخول","other":"أخرى"}
+    _nt_csv="\ufeffالتاريخ,المستخدم,النوع,الحدث,التفاصيل,الصفحة\n"
+    for _e in _nt_events:
+        _row=[str(_e.get("ts","")),str(_e.get("user","")),_nt_kinds.get(_e.get("kind","other"),"أخرى"),str(_e.get("title","")),str(_e.get("detail","")),str(_e.get("page",""))]
+        _nt_csv+=",".join('"'+c.replace('"','""')+'"' for c in _row)+"\n"
+    with _tc[2]:
+        st.download_button("⬇️ تصدير CSV",data=_nt_csv.encode("utf-8-sig"),file_name=f"notifications_{_today}.csv",mime="text/csv",use_container_width=True,key="nt_csv")
+
+    _f1,_f2,_f3,_f4=st.columns([2,1.1,1.1,1.1])
+    with _f1:
+        _q=st.text_input("بحث",key="nt_q",placeholder="اسم مستخدم / حدث / تفاصيل...",label_visibility="collapsed")
+    _kind_opts=["الكل"]+list(_nt_kinds.values())
+    with _f2:
+        _fk=st.selectbox("النوع",_kind_opts,key="nt_kind",label_visibility="collapsed")
+    _user_opts=["الكل"]+sorted({str(e.get("user","")) for e in _nt_events if e.get("user")})
+    with _f3:
+        _fu=st.selectbox("المستخدم",_user_opts,key="nt_user",label_visibility="collapsed")
+    with _f4:
+        _fp=st.selectbox("الفترة",["الكل","اليوم","آخر 7 أيام","آخر 30 يوم"],key="nt_period",label_visibility="collapsed")
+
+    _flt=_nt_events
+    if _q.strip():
+        _qs=_q.strip().lower()
+        _flt=[e for e in _flt if _qs in str(e.get("title","")).lower() or _qs in str(e.get("detail","")).lower() or _qs in str(e.get("user","")).lower() or _qs in str(e.get("username","")).lower() or _qs in str(e.get("page","")).lower()]
+    if _fk!="الكل":
+        _flt=[e for e in _flt if _nt_kinds.get(e.get("kind","other"),"أخرى")==_fk]
+    if _fu!="الكل":
+        _flt=[e for e in _flt if str(e.get("user",""))==_fu]
+    if _fp!="الكل":
+        _cut={"اليوم":_today,"آخر 7 أيام":_week,"آخر 30 يوم":(_now_dt-timedelta(days=30)).isoformat(timespec="seconds")}[_fp]
+        _flt=[e for e in _flt if (str(e.get("ts","")).startswith(_today) if _fp=="اليوم" else str(e.get("ts",""))>=_cut)]
+
+    def _nt_ago(ts):
+        try: _dt=datetime.fromisoformat(str(ts))
+        except Exception: return str(ts)
+        _s=max(0,int((datetime.now()-_dt).total_seconds()))
+        if _s<60: return "الآن" if not _is_en() else "now"
+        if _s<3600:
+            _m=_s//60; return (f"منذ {_m} دقيقة" if not _is_en() else f"{_m}m ago")
+        if _s<86400:
+            _h=_s//3600; return (f"منذ {_h} ساعة" if not _is_en() else f"{_h}h ago")
+        _d=_s//86400
+        if _d<30: return (f"منذ {_d} يوم" if not _is_en() else f"{_d}d ago")
+        return _dt.strftime("%Y-%m-%d")
+
+    if not _flt:
+        st.markdown("""<div class="erp-empty" style="padding:2.4rem;margin-top:1rem;text-align:center;"><div class="erp-empty-icon">🔕</div><h3>لا توجد إشعارات</h3><p>أول ما أي مستخدم يضيف أو يعدّل أي حاجة هتظهر هنا فوراً.</p></div>""",unsafe_allow_html=True)
+    else:
+        _lim=st.session_state.get("nt_limit",60)
+        _cards=[]
+        for _e in _flt[:_lim]:
+            _kind=_e.get("kind","other")
+            _icon,_clr=_notif.KIND_META.get(_kind,("⚙️","#7878a0")) if _notif is not None else ("⚙️","#7878a0")
+            _unread=str(_e.get("ts",""))>_nt_seen
+            _u=_htmlesc.escape(str(_e.get("user","")))
+            _uname=_htmlesc.escape(str(_e.get("username","")))
+            _title=_htmlesc.escape(_tr(str(_e.get("title",""))))
+            _detail=_htmlesc.escape(_tr(str(_e.get("detail",""))))
+            _pg=_htmlesc.escape(str(_e.get("page",""))[:48])
+            _abs=_htmlesc.escape(str(_e.get("ts","")).replace("T"," "))
+            _rel=_htmlesc.escape(_nt_ago(_e.get("ts","")))
+            _cards.append(
+                f'<div style="display:flex;gap:.8rem;padding:.8rem 1rem;border-radius:14px;'
+                f'background:var(--surface);border:1px solid var(--border);'
+                + (f'border-inline-start:3px solid {_clr};' if _unread else '')
+                + f'margin-bottom:.5rem;">'
+                f'<div style="flex:0 0 38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.05rem;background:{_clr}1f;border:1px solid {_clr}40;">{_icon}</div>'
+                f'<div style="flex:1;min-width:0;">'
+                f'<div style="display:flex;justify-content:space-between;gap:.6rem;flex-wrap:wrap;align-items:baseline;">'
+                f'<strong style="color:var(--text);font-size:.86rem;">{_title}{" •" if _unread else ""}</strong>'
+                f'<span style="color:var(--text2);font-size:.68rem;">{_rel} · {_abs}</span></div>'
+                + (f'<p style="margin:.18rem 0 0;color:var(--text2);font-size:.76rem;word-break:break-word;">{_detail}</p>' if _detail else '')
+                + f'<div style="margin-top:.4rem;display:flex;gap:.35rem;flex-wrap:wrap;">'
+                f'<span style="font-size:.64rem;padding:.12rem .5rem;border-radius:99px;background:{_clr}18;color:{_clr};font-weight:700;">{_u}' + (f' @{_uname}' if _uname and _uname!=_u else '') + f'</span>'
+                f'<span style="font-size:.64rem;padding:.12rem .5rem;border-radius:99px;background:rgba(108,92,231,.12);color:#a29bfe;font-weight:600;">{_htmlesc.escape(_tr(_nt_kinds.get(_kind,"أخرى")))}</span>'
+                + (f'<span style="font-size:.64rem;padding:.12rem .5rem;border-radius:99px;background:rgba(255,255,255,.05);color:var(--text2);">{_pg}</span>' if _pg else '')
+                + f'</div></div></div>'
+            )
+        st.markdown("".join(_cards),unsafe_allow_html=True)
+        if len(_flt)>_lim:
+            _showing=(f"Showing {min(_lim,len(_flt))} of {len(_flt)} notifications" if _is_en() else f"عرض {min(_lim,len(_flt))} من {len(_flt)} إشعار")
+            st.markdown(f'<p style="color:var(--text2);font-size:.72rem;text-align:center;margin:.3rem 0;">{_showing}</p>',unsafe_allow_html=True)
+            if st.button("عرض المزيد",key="nt_more",use_container_width=True):
+                st.session_state["nt_limit"]=_lim+60
+                st.rerun()
+    if _notif is not None and _n_unread:
+        _notif.mark_seen(_nt_uid)
     st.stop()
 
 # ====================== HOME ======================
@@ -3854,6 +4068,7 @@ elif page=="🛒 فواتير الماركت":
                         cm_merge=cm_mode.startswith("🧮")
                         cm_out=merge_g_items(cm_all) if cm_merge else cm_all.copy()
                         cm_buf=gen_template(cm_out,cm_bm)
+                        _notify("أنشأ Template مجمّع",f"{cm_npn} صنف أصلي — {len(cm_out)} بعد التجميع",kind="template")
                         cm_miss=[str(c).strip() for c in cm_out['internal_code'] if str(cm_bm.get(str(c).strip(),'')).strip()=='']
                         st.success(f"تم إنشاء Template بنجاح: {cm_npn} صنف أصلي" + (f" — بعد التجميع {len(cm_out)} صنف ({cm_npn-len(cm_out)} مدمج)" if cm_merge else ""))
                         st.dataframe(cm_out,use_container_width=True,height=300)
@@ -4103,6 +4318,7 @@ elif page=="📄 Portal الفواتير الإلكترونية":
                         st.session_state["eta_token"]=token
                         st.session_state["eta_client_id"]=eta_client_id_input
                         st.session_state["eta_client_secret"]=eta_client_secret_input
+                        _notify("اتصل ببورتال الفواتير","تم تسجيل الدخول للبورتال يدوياً",kind="portal",action="connect",dedupe=30)
                         st.success("✅ تم الاتصال بالبورتال بنجاح!")
                         st.rerun()
 
@@ -5624,6 +5840,7 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                                                 _doc_uuid=_it.get("uuid","")
                                         _rejs=_sr.get("rejectedDocuments") if isinstance(_sr,dict) else None
                                         if isinstance(_rejs,list) and _rejs: _rej=len(_rejs)
+                                        _notify("رحّل فاتورة إيجار موقّعة للبورتال",f"HTTP {_st}"+(f" — UUID {_doc_uuid}" if _doc_uuid else ""),kind="submit",action="submit")
                                         st.success(f"✅ البورتال استلم الفاتورة (HTTP {_st})")
                                         if _done:
                                             st.success("📍 تم اعتمادها رسميًا. UUID: "+str(_doc_uuid or "قام البورتال بتعيين UUID"))
@@ -5735,6 +5952,7 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                                         token=ntoken
                                         status,resp=eta_submit_invoice(token,document)
                                 if status in (200,201,202):
+                                    _notify("رحّل فاتورة إيجار للبورتال",f"CIV {civ_val} — HTTP {status}",kind="submit",action="submit")
                                     st.success(f"✅ البورتال استلم الفاتورة للمعالجة (HTTP {status}) - جاري التحقق من وصولها فعلاً في البورتال...")
                                     verdict_label="معالجة"
                                     details={}
@@ -5788,6 +6006,7 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                                         st.markdown("**رد الاستعلام (Reconcile):**")
                                         st.json(rc_res if isinstance(rc_res,dict) else {"raw":rc_res})
                                 else:
+                                    _notify("فشل ترحيل فاتورة إيجار",f"CIV {civ_val} — HTTP {status}",kind="submit",action="failed")
                                     msg=[]
                                     msg.append(f"الرد: HTTP {status}")
                                     if isinstance(resp,dict):
