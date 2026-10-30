@@ -1,0 +1,17 @@
+{
+  "events": [
+    {
+      "id": "4d997f3c0a0a",
+      "ts": "2026-10-30T05:29:32",
+      "user": "المدير",
+      "username": "admin",
+      "role": "admin",
+      "kind": "users",
+      "action": "update",
+      "title": "حدّث مستخدم",
+      "detail": "4 سجل",
+      "page": "👥 إدارة المستخدمين"
+    }
+  ],
+  "seen": {}
+}
