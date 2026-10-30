@@ -2141,7 +2141,11 @@ div[data-testid="stDecoration"]{display:none!important;visibility:hidden!importa
         with _lp4:
             if st.button("☀️ فاتح",key="login_theme_light",use_container_width=True,type="primary" if _ui_theme()=='light' else "secondary"):
                 st.session_state['ui_theme']='light';st.rerun()
-    st.markdown('<p class="login-foot">جميع الحقوق محفوظة © تصميم محاسب / صالح مصطفى</p>', unsafe_allow_html=True)
+    try:
+        _build=datetime.fromtimestamp(os.path.getmtime(__file__)).strftime("%Y-%m-%d %H:%M:%S")
+    except Exception:
+        _build=""
+    st.markdown(f'<p class="login-foot">جميع الحقوق محفوظة © تصميم محاسب / صالح مصطفى</p><span id="erp-build" style="display:none">{_build}</span>', unsafe_allow_html=True)
     st.stop()
 
 # ====================== SESSION GUARD ======================
