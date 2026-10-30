@@ -3042,7 +3042,7 @@ def tc_extract(total,vat=True,stamp=False,vat20=False,exempt=False):
 
 def tc_reverse(total,inc_vat=True,inc_stamp=False,inc_vat20=False,exempt=False,
                wht_rate=0.0,add_vat20=False,add_stamp=False):
-    """Part 1 extracts the taxes already inside `total`; part 2 adds taxes on top."""
+    """Part 1 extracts the taxes inside `total`; part 2 amounts are deducted from the payable."""
     total=float(total)
     raw=tc_extract_raw(total,inc_vat,inc_stamp,inc_vat20,exempt)
     net=tc_r2(raw)
@@ -3060,15 +3060,15 @@ def tc_reverse(total,inc_vat=True,inc_stamp=False,inc_vat20=False,exempt=False,
         add_stamp_amt,add_stamp_rate=tc_r2(_as_amt),_as_rate
     wht_amt=tc_r2(raw*float(wht_rate))
     included=tc_r2(vat_amt+inc_vat20_amt+inc_stamp_amt)
-    additions=tc_r2(wht_amt+add_vat20_amt+add_stamp_amt)
-    invoice_total=tc_r2(total+additions)
+    deductions=tc_r2(wht_amt+add_vat20_amt+add_stamp_amt)
+    invoice_total=tc_r2(total)
     return {"mode":"reverse","net":net,"vat":vat_amt,"vat20":inc_vat20_amt,
             "stamp":inc_stamp_amt,"stamp_note":stamp_note,"stamp_rate":stamp_rate,
             "wht":wht_amt,"wht_rate":float(wht_rate),
             "add_vat20":add_vat20_amt,"add_stamp":add_stamp_amt,"add_stamp_rate":add_stamp_rate,
-            "included":included,"additions":additions,
-            "invoice_total":invoice_total,"tax_total":tc_r2(included+additions),
-            "payable":invoice_total,
+            "included":included,"deductions":deductions,
+            "invoice_total":invoice_total,"tax_total":tc_r2(included+deductions),
+            "payable":tc_r2(total-deductions),
             "vat_on":bool(inc_vat),"vat20_on":bool(inc_vat and inc_vat20),
             "stamp_on":bool(inc_stamp),"exempt":bool(exempt),
             "gross_input":tc_r2(total),"rounding_diff":tc_r2(total-net-included)}
@@ -3081,19 +3081,19 @@ def tc_render(res):
     _r1=st.columns(5)
     if _rev:
         _v20=res["vat20"] or res["add_vat20"]
-        _v20sub=(("مضمّنة داخل المبلغ" if res["vat20"] else "مضافة على المبلغ") if _v20 else "غير مطبقة")
+        _v20sub=(("مضمّنة داخل المبلغ" if res["vat20"] else "خصم من المستحق") if _v20 else "غير مطبقة")
         _st=res["stamp"] or res["add_stamp"]
         if res["stamp"]:
             _stsub=res["stamp_note"]
         elif res["add_stamp"]:
-            _stsub="مضافة على المبلغ — "+res["stamp_note"]
+            _stsub="خصم من المستحق — "+res["stamp_note"]
         else:
             _stsub="غير مطبقة"
         _card(_r1[0],"s-blue","المبلغ الأساسي (مستخرج)",fmt(res["net"]),"بعد استبعاد الضرائب المضمّنة")
         _card(_r1[1],"s-cyan","ضريبة القيمة المضافة",fmt(res["vat"]) if res["vat_on"] else "—","14% — مضمّنة داخل المبلغ" if res["vat_on"] else "غير مطبقة")
         _card(_r1[2],"s-pink","20% من القيمة المضافة",fmt(_v20) if _v20 else "—",_v20sub)
         _card(_r1[3],"s-orange","ضريبة الدمغة",fmt(_st) if _st else "—",_stsub)
-        _card(_r1[4],"s-red","ضريبة الخصم والتحصيل",fmt(res["wht"]) if res["wht"] else "—",f"{res['wht_rate']*100:g}% — تُضاف على المبلغ" if res["wht"] else "غير مطبقة")
+        _card(_r1[4],"s-red","ضريبة الخصم والتحصيل",fmt(res["wht"]) if res["wht"] else "—",f"{res['wht_rate']*100:g}% — تُخصم من المستحق" if res["wht"] else "غير مطبقة")
     else:
         _card(_r1[0],"s-blue","المبلغ الأساسي",fmt(res["net"]),"قبل الضرائب — ج.م")
         _card(_r1[1],"s-cyan","ضريبة القيمة المضافة",fmt(res["vat"]) if res["vat_on"] else "—","14% من الأساس" if res["vat_on"] else "غير مطبقة")
@@ -3101,9 +3101,9 @@ def tc_render(res):
         _card(_r1[3],"s-orange","ضريبة الدمغة",fmt(res["stamp"]) if res["stamp_on"] else "—",res["stamp_note"] if res["stamp_on"] else "غير مطبقة")
         _card(_r1[4],"s-red","ضريبة الخصم والتحصيل",fmt(res["wht"]) if res["wht"] else "—",f"{res['wht_rate']*100:g}% — تُضاف على الفاتورة" if res["wht"] else "غير مطبقة")
     _r2=st.columns(3)
-    _card(_r2[0],"s-green","إجمالي الفاتورة",fmt(res["invoice_total"]),"المبلغ الشامل + الإضافات" if _rev else "الأساس + الضرائب المضافة")
+    _card(_r2[0],"s-green","إجمالي الفاتورة",fmt(res["invoice_total"]),"المبلغ الشامل كما هو" if _rev else "الأساس + الضرائب المضافة")
     _card(_r2[1],"s-orange","إجمالي الأعباء الضريبية",fmt(res["tax_total"]),f"{res['tax_total']/res['net']*100:.1f}% من الأساس" if res["net"]>0 else "الأنواع الأربعة مجتمعة")
-    _card(_r2[2],"s-blue","صافي المستحق للدفع",fmt(res["payable"]),"المبلغ الشامل + الإضافات — بدون أي خصم" if _rev else "الإجمالي شامل كل الضرائب — بدون أي خصم")
+    _card(_r2[2],"s-blue","صافي المستحق للدفع",fmt(res["payable"]),"المبلغ الشامل بعد خصم البند ٢" if _rev else "الإجمالي شامل كل الضرائب — بدون أي خصم")
 
     def _row(label,base,rate,amount,note,tone):
         _color={"add":"var(--tc-add)","ded":"var(--tc-ded)"}.get(tone,"var(--text)")
@@ -3124,12 +3124,13 @@ def tc_render(res):
         if res["stamp_on"]:
             _rr.append(_row("ضريبة الدمغة النسبية",fmt(res["net"]),f"{res['stamp_rate']*100:.1f}%" if res["stamp_rate"] else "—",fmt(res["stamp"]),res["stamp_note"]+" — مضمّنة",""))
         if res["add_vat20"]:
-            _rr.append(_row("20% من ضريبة القيمة المضافة (مضافة)",fmt(res["vat"]),"20% من ض.ق.م",fmt(res["add_vat20"]),"تُضاف على المبلغ — 20% من ض.ق.م المحسوبة","add"))
+            _rr.append(_row("20% من ضريبة القيمة المضافة (خصم)",fmt(res["vat"]),"20% من ض.ق.م",fmt(res["add_vat20"]),"تُخصم من صافي المستحق","ded"))
         if res["add_stamp"]:
-            _rr.append(_row("ضريبة الدمغة النسبية (مضافة)",fmt(res["net"]),f"{res['add_stamp_rate']*100:.1f}%" if res["add_stamp_rate"] else "—",fmt(res["add_stamp"]),"تُضاف على المبلغ","add"))
-        _rr.append(_row("ضريبة الخصم والتحصيل تحت حساب الضريبة",fmt(res["net"]),f"{res['wht_rate']*100:g}%" if res["wht"] else "—",fmt(res["wht"]) if res["wht"] else "—","تُضاف على المبلغ (لا تُخصم من المستحق)" if res["wht"] else "غير مطبقة","add"))
-        _rr.append(_row("إجمالي الفاتورة","—","—",fmt(res["invoice_total"]),"المبلغ الشامل + الإضافات",""))
-        _rr.append(_row("صافي المستحق للدفع","—","—",fmt(res["payable"]),"بدون أي خصم",""))
+            _rr.append(_row("ضريبة الدمغة النسبية (خصم)",fmt(res["net"]),f"{res['add_stamp_rate']*100:.1f}%" if res["add_stamp_rate"] else "—",fmt(res["add_stamp"]),"تُخصم من صافي المستحق","ded"))
+        _rr.append(_row("ضريبة الخصم والتحصيل تحت حساب الضريبة",fmt(res["net"]),f"{res['wht_rate']*100:g}%" if res["wht"] else "—",fmt(res["wht"]) if res["wht"] else "—","تُخصم من صافي المستحق" if res["wht"] else "غير مطبقة","ded"))
+        _rr.append(_row("إجمالي الفاتورة","—","—",fmt(res["invoice_total"]),"المبلغ الشامل كما هو",""))
+        _rr.append(_row("إجمالي الخصومات","—","—",fmt(res["deductions"]),"مبالغ البند ٢","ded"))
+        _rr.append(_row("صافي المستحق للدفع","—","—",fmt(res["payable"]),"المبلغ الشامل − إجمالي الخصومات",""))
         _body="".join(_rr)
     else:
         _body="".join([
@@ -6413,7 +6414,7 @@ elif page == "🧮 حاسبة الضرائب":
     else:
         with _tc_l:
             _tc_gross=st.number_input("المبلغ الشامل للضرائب (ج.م)",min_value=0.0,value=1140.0,step=100.0,format="%.2f",key="tc_rev_gross")
-            st.caption("المبلغ اللي معاك شامل — الشق الأول بيستخرج الأساس والضرائب اللي جوه المبلغ، والشق الثاني بيضيف عليه الضرائب اللي إنت عايزها.")
+            st.caption("المبلغ اللي معاك شامل — الشق الأول بيستخرج الأساس والضرائب اللي جوه المبلغ، والشق الثاني بيتخصم من صافي المستحق للدفع.")
         with _tc_r:
             st.markdown('<p style="color:var(--text2);font-size:.72rem;font-weight:700;letter-spacing:.3px;margin:.1rem 0 .4rem;text-align:start;">١ — الضرائب المضمّنة داخل المبلغ</p>',unsafe_allow_html=True)
             _tc_vat=st.checkbox("المبلغ شامل ضريبة القيمة المضافة — 14%",value=True,key="tc_rev_vat")
@@ -6426,15 +6427,15 @@ elif page == "🧮 حاسبة الضرائب":
             if not _tc_stamp: st.session_state["tc_rev_stamp_ex"]=False
             if _tc_stamp: st.session_state["tc_rev_add_stamp"]=False
             _tc_ex=st.checkbox("معفى من الدمغة (جهة حكومية — الدمغة النسبية الحكومية)",value=False,key="tc_rev_stamp_ex",disabled=not _tc_stamp)
-        st.markdown('<p style="color:var(--text2);font-size:.72rem;font-weight:700;letter-spacing:.3px;margin:.9rem 0 .2rem;text-align:start;">٢ — ضرائب تُضاف على المبلغ (بعد استخراج الأساس)</p>',unsafe_allow_html=True)
+        st.markdown('<p style="color:var(--text2);font-size:.72rem;font-weight:700;letter-spacing:.3px;margin:.9rem 0 .2rem;text-align:start;">٢ — ضرائب تُخصم من صافي المستحق (على الأساس المستخرج)</p>',unsafe_allow_html=True)
         _tc_a1,_tc_a2,_tc_a3=st.columns([1.1,1,1])
         with _tc_a1:
             _tc_wht_sel=st.radio("ضريبة الخصم والتحصيل",_tc_opts,horizontal=False,index=0,key="tc_rev_wht")
         with _tc_a2:
-            _tc_add_vat20=st.checkbox("إضافة 20% من ض.ق.م على المبلغ",value=False,key="tc_rev_add_vat20",disabled=(not _tc_vat) or _tc_vat20)
+            _tc_add_vat20=st.checkbox("خصم 20% من ض.ق.م من المستحق",value=False,key="tc_rev_add_vat20",disabled=(not _tc_vat) or _tc_vat20)
             st.caption("20% من ضريبة القيمة المضافة المحسوبة — مش نسبة مستقلة.")
         with _tc_a3:
-            _tc_add_stamp=st.checkbox("إضافة الدمغة النسبية على المبلغ",value=False,key="tc_rev_add_stamp",disabled=_tc_stamp)
+            _tc_add_stamp=st.checkbox("خصم الدمغة النسبية من المستحق",value=False,key="tc_rev_add_stamp",disabled=_tc_stamp)
         _tc_res=tc_reverse(float(_tc_gross),_tc_vat,_tc_stamp,_tc_vat20,_tc_ex,TC_WHT_RATES.get(_tc_wht_sel,0.0),_tc_add_vat20,_tc_add_stamp)
         st.caption(f"على الأساس المستخرج {fmt(_tc_res['net'])} ج.م — "+" • ".join(f"{_k.split(' ')[0]}: {fmt(_tc_res['net']*_r)} ج.م" for _k,_r in TC_WHT_RATES.items()))
     st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>النتيجة</h3></div>',unsafe_allow_html=True)
@@ -6442,4 +6443,4 @@ elif page == "🧮 حاسبة الضرائب":
         _tc_diff=_tc_res["rounding_diff"]
         st.caption(f"المبلغ الشامل المُدخل: {fmt(_tc_res['gross_input'])} ج.م"+(f" • فرق تقريب: {fmt(_tc_diff)} ج.م" if abs(_tc_diff)>=0.005 else ""))
     tc_render(_tc_res)
-    st.caption("في وضع المبلغ الشامل: الشق الأول يستبعد الضرائب المضمّنة فقط (ض.ق.م 14%، و20% منها لو محددة، والدمغة لو محددة) — وضريبة الخصم والتحصيل ليست جزءاً من المبلغ، بل تُحسب على الأساس المستخرج وتُضاف عليه. الشق الثاني يضيف الدمغة أو 20% من ض.ق.م لو غير مضمّنين. الدمغة النسبية تُحسب على (المبلغ − 50) بشرائح تصاعدية، وتُعفى الجهات الواردة في قائمة الدمغة النسبية الحكومية. الأرقام تقديرية وتُراجع قبل الاستخدام الرسمي.")
+    st.caption("في وضع المبلغ الشامل: الشق الأول يستبعد الضرائب المضمّنة فقط (ض.ق.م 14%، و20% منها لو محددة، والدمغة لو محددة) لاستخراج الأساس. الشق الثاني يُحسب على الأساس المستخرج ويُخصم من صافي المستحق للدفع (صافي المستحق = المبلغ الشامل − إجمالي الخصومات). الدمغة النسبية تُحسب على (المبلغ − 50) بشرائح تصاعدية، وتُعفى الجهات الواردة في قائمة الدمغة النسبية الحكومية. الأرقام تقديرية وتُراجع قبل الاستخدام الرسمي.")
