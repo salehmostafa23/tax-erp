@@ -437,13 +437,13 @@ EN = {
     "افتح التطبيق المحلي دوس رحّل ←": "Open the local app and press Submit ←",
 
     # ---------------- captions ----------------
-    "ضريبة الخصم والتحصيل تُحسب على المبلغ قبل الضرائب وتُخصم من المستحق للمورد (لا تُضاف إلى إجمالي الفاتورة). الدمغة النسبية تُحسب على (المبلغ − 50) بشرائح تصاعدية، وتُعفى الجهات الواردة في قائمة الدمغة النسبية الحكومية. الأرقام تقديرية وتُراجع قبل الاستخدام الرسمي.": "Withholding tax is calculated on the pre-tax amount and deducted from the supplier payable (not added to the invoice total). Proportional stamp duty is calculated on (amount − 50) using graduated brackets, and entities listed in the government stamp-duty list are exempt. Figures are estimates — review before official use.",
+    "ضريبة الخصم والتحصيل تُحسب على المبلغ قبل الضرائب وتُضاف على إجمالي الفاتورة مثل باقي الضرائب (لا تُخصم من المستحق للمورد). الدمغة النسبية تُحسب على (المبلغ − 50) بشرائح تصاعدية، وتُعفى الجهات الواردة في قائمة الدمغة النسبية الحكومية. الأرقام تقديرية وتُراجع قبل الاستخدام الرسمي.": "Withholding tax is calculated on the pre-tax amount and added to the invoice total like the other taxes (not deducted from the supplier payable). Proportional stamp duty is calculated on (amount − 50) using graduated brackets, and entities listed in the government stamp-duty list are exempt. Figures are estimates — review before official use.",
     "العمود A: الكود الداخلي (الرقم اللي قبله G زي G127409) | العمود B: الباركود. الأكواد الموجودة بالفعل مش هتتعدل ومش هتتضاف تاني حتى لو الباركود مختلف.": "Column A: internal code (the number after G, e.g. G127409) | Column B: barcode. Existing codes are neither modified nor re-added, even if the barcode differs.",
     "الملف لازم يكون الأعمدة: A = الكود • B = اسم الكود • C = وصف الكود • D = الرقم الضريبي للمورد • E = اسم المورد": "The file must have: A = code • B = code name • C = code description • D = supplier tax number • E = supplier name",
     "الملف لازم يكون فيه عمود A = Barcode وعمود D = Description Arabic (بترتيب الأعمدة)": "The file must have column A = Barcode and column D = Description Arabic (in this order)",
     "البورتال يطلب توكن تفويض (Client ID + Client Secret من إعدادات حساب البورتال) — اربط مرة واحدة بالحقول دي قبل الضغط على الترحيل:": "The portal requires an authorization token (Client ID + Client Secret from the portal account settings) — link once with these fields before submitting:",
     "ارفع أكثر من شيت Detailed Receipt بنفس الصيغة المعتادة، واختار طريقة التصدير. الباركود بييجي تلقائياً من الأكواد المحفوظة.": "Upload one or more Detailed Receipt sheets in the usual format and choose the export method. Barcodes are filled automatically from saved codes.",
-    "ض. الخصم تُحسب على المبلغ الأساسي المستخرج وتُخصم من الدفعة — وهي غير داخلة في معادلة الاستخراج.": "Withholding tax is calculated on the extracted net amount and deducted from the payment — it is not part of the extraction formula.",
+    "ض. الخصم تُحسب على المبلغ الأساسي وتُضاف على الفاتورة مثل باقي الضرائب — وهي داخلة ضمن المبلغ الشامل.": "Withholding tax is calculated on the net amount and added to the invoice like the other taxes — it is included in the gross amount.",
     "نسب الخصم على هذا المبلغ — ": "Withholding amounts on this base — ",
     "العمود A: الكود الداخلي | العمود B: الباركود": "Column A: internal code | Column B: barcode",
 
@@ -481,6 +481,9 @@ EN = {
     "تُضاف على الفاتورة": "Added to the invoice",
     "تُضاف — مرتبطة بضريبة القيمة المضافة": "Added — linked to VAT",
     "تُخصم من المستحق للمورد": "Deducted from the supplier payable",
+    "تُضاف على الفاتورة مثل باقي الضرائب": "Added to the invoice like the other taxes",
+    "الإجمالي شامل كل الضرائب — بدون أي خصم": "Total including all taxes — no deduction",
+    "إجمالي الفاتورة شامل الضرائب الأربعة — بدون خصم": "Invoice total including all four taxes — no deduction",
     "البند": "Item",
     "الأساس": "Base",
     "النسبة": "Rate",
@@ -713,6 +716,29 @@ EN = {
     "أضاف كود مورد": "Added a supplier code",
     "حدّث كود مورد": "Updated a supplier code",
     "حذف كود مورد": "Deleted a supplier code",
+
+    # ---------------- sessions ----------------
+    "مدة الجلسة": "session duration",
+    "⏱️ مدة الجلسة": "⏱️ Session duration",
+    "مدة الجلسة بدون نشاط (دقائق)": "Session duration without activity (minutes)",
+    "💾 حفظ مدة الجلسة": "💾 Save session duration",
+    "تم حفظ مدة الجلسة لـ ": "Session duration saved for ",
+    "مدة عدم النشاط اللي بعدها يظهر تنبيه «هل أنت هنا؟» — ولو مفيش رد خلال 9 دقائق يحصل تسجيل خروج تلقائي. التعديل بيتطبق من تسجيل الدخول التالي للمستخدم.": "Idle time after which the “Are you here?” prompt appears — if there is no response within 9 minutes the user is logged out automatically. The change applies from the user's next sign-in.",
+    "📜 سجل الدخول والخروج": "📜 Login / logout history",
+    "لا يوجد سجل بعد": "No history yet",
+    "دقيقة": "min",
+    "🟢 دخول": "🟢 Login",
+    "🔴 خروج": "🔴 Logout",
+    "🟠 انتهت تلقائياً": "🟠 Expired automatically",
+    "هل أنت هنا؟ — انتهت مدة صلاحية الجلسة": "Are you here? — Your session has expired",
+    "لو لم يتم الرد هيتحصل تسجيل خروج تلقائي بعد ": "If there is no response, you will be logged out automatically after ",
+    "✅ أنا هنا — تمديد الجلسة": "✅ I'm here — extend session",
+    "🚪 تسجيل خروج الآن": "🚪 Log out now",
+    "تسجيل خروج": "Logout",
+    "خروج": "Logout",
+    "انتهت الجلسة تلقائياً": "Session expired automatically",
+    "لم يتم الرد على تنبيه الجلسة": "No response to the session prompt",
+    "خروج من تنبيه الجلسة": "Logged out from the session prompt",
 }
 
 _AR = re.compile(r'[\u0621-\u064A]')

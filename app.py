@@ -100,6 +100,8 @@ def _page_label(p):
 
 # ====================== NOTIFICATIONS (admin audit feed) ======================
 NOTIF_PAGE="🔔 الإشعارات"
+SESSION_DEFAULT_MIN=60
+SESSION_PROMPT_MIN=9
 
 def _notify(title,detail="",kind="other",action="create",dedupe=0):
     try:
@@ -108,13 +110,13 @@ def _notify(title,detail="",kind="other",action="create",dedupe=0):
     except Exception:
         pass
 
-def _notify_as(user_obj,title,detail="",kind="other",action="create",dedupe=0):
+def _notify_as(user_obj,title,detail="",kind="other",action="create",dedupe=0,history=None):
     try:
         if _notif is not None and user_obj:
             _notif.log(title,detail,kind=kind,action=action,page="تسجيل الدخول",
                        user=user_obj.get('display_name') or user_obj.get('username'),
                        username=user_obj.get('username',''),role=user_obj.get('role',''),
-                       dedupe_minutes=dedupe)
+                       dedupe_minutes=dedupe,history=history)
     except Exception:
         pass
 
@@ -201,6 +203,67 @@ def user_has_permission(page):
     if not u: return False
     if u.get('role')=='admin': return True
     return page in u.get('permissions',[])
+
+def session_limit_secs():
+    u=get_current_user() or {}
+    try: m=float(u.get('session_minutes') or SESSION_DEFAULT_MIN)
+    except Exception: m=SESSION_DEFAULT_MIN
+    return max(1.0,m)*60.0
+
+def end_session(reason="logout",note=""):
+    u=get_current_user()
+    try:
+        if u and _notif is not None:
+            _notif.log("تسجيل خروج" if reason=="logout" else "انتهت الجلسة تلقائياً",note,
+                       kind="login",action=reason,page="تسجيل الدخول",
+                       user=u.get('display_name') or u.get('username'),
+                       username=u.get('username',''),role=u.get('role',''),
+                       history=(u.get('username',''),reason))
+    except Exception:
+        pass
+    st.session_state['current_user']=None
+    for k in list(st.session_state.keys()):
+        if k not in ('current_user','ui_theme','ui_lang'): del st.session_state[k]
+    st.rerun()
+
+def session_eval(now,last,prompt,limit):
+    """Return (state, seconds_left): ok | prompt | expire."""
+    if prompt is None:
+        if now-last<limit: return "ok",0
+        prompt=now
+    remain=int(prompt+SESSION_PROMPT_MIN*60-now)
+    return ("expire" if remain<=0 else "prompt"),max(remain,0)
+
+@st.fragment(run_every=15)
+def session_guard():
+    u=get_current_user()
+    if not u: return
+    _now=time.time()
+    _last=float(st.session_state.get('_sx_last') or _now)
+    _prompt=st.session_state.get('_sx_prompt')
+    _state,_remain=session_eval(_now,_last,_prompt,session_limit_secs())
+    if _state=="ok": return
+    if _prompt is None: st.session_state['_sx_prompt']=_now
+    if _state=="expire":
+        end_session("timeout","لم يتم الرد على تنبيه الجلسة")
+        return
+    _mm,_ss=divmod(_remain,60)
+    st.markdown(f"""<div style="display:flex;align-items:center;gap:.8rem;padding:.85rem 1.1rem;margin:0 0 .8rem;border-radius:16px;background:var(--surface);border:1px solid rgba(253,203,110,.45);box-shadow:0 10px 30px rgba(0,0,0,.18);">
+        <div style="font-size:1.5rem;">⏰</div>
+        <div style="flex:1;text-align:start;">
+            <div style="color:var(--text);font-weight:800;font-size:.88rem;">هل أنت هنا؟ — انتهت مدة صلاحية الجلسة</div>
+            <div style="color:var(--text2);font-size:.72rem;margin-top:.15rem;">لو لم يتم الرد هيتحصل تسجيل خروج تلقائي بعد <strong style="color:var(--accent2);">{_mm}:{_ss:02d}</strong> دقيقة</div>
+        </div>
+    </div>""",unsafe_allow_html=True)
+    _sg1,_sg2=st.columns(2)
+    with _sg1:
+        if st.button("✅ أنا هنا — تمديد الجلسة",key="sx_here",type="primary",use_container_width=True):
+            st.session_state['_sx_last']=time.time()
+            st.session_state.pop('_sx_prompt',None)
+            st.rerun()
+    with _sg2:
+        if st.button("🚪 تسجيل خروج الآن",key="sx_exit",use_container_width=True):
+            end_session("logout","خروج من تنبيه الجلسة")
 
 # ====================== ETA API ======================
 ETA_IDENTITY_URL = "https://id.eta.gov.eg/connect/token"
@@ -2046,8 +2109,11 @@ div[data-testid="stDecoration"]{display:none!important;visibility:hidden!importa
             else:
                 user=authenticate_user(u.strip(),p)
                 if user:
-                    _notify_as(user,"سجل دخول للنظام",f"@{u.strip()}",kind="login",action="login")
+                    _notify_as(user,"سجل دخول للنظام",f"@{u.strip()}",kind="login",action="login",history=("login",))
                     st.session_state['current_user']=user
+                    st.session_state['_sx_start']=time.time()
+                    st.session_state['_sx_last']=time.time()
+                    st.session_state.pop('_sx_prompt',None)
                     st.rerun()
                 else:
                     st.markdown('<div class="login-err">بيانات الدخول غير صحيحة</div>', unsafe_allow_html=True)
@@ -2067,6 +2133,12 @@ div[data-testid="stDecoration"]{display:none!important;visibility:hidden!importa
                 st.session_state['ui_theme']='light';st.rerun()
     st.markdown('<p class="login-foot">جميع الحقوق محفوظة © تصميم محاسب / صالح مصطفى</p>', unsafe_allow_html=True)
     st.stop()
+
+# ====================== SESSION GUARD ======================
+# any full script run means the user interacted; only fragment ticks are idle
+st.session_state['_sx_last']=time.time()
+st.session_state.pop('_sx_prompt',None)
+session_guard()
 
 # ====================== CSS ======================
 st.markdown("""
@@ -2345,10 +2417,7 @@ with st.sidebar:
         <p style="color:rgba(255,255,255,.6);font-size:.65rem;margin:0 0 .2rem;">المستخدم: <strong style="color:#a29bfe;">{cu.get('display_name','')}</strong></p>
         <p style="color:rgba(255,255,255,.25);font-size:.55rem;margin:0;">{cu.get('role','user')}</p></div>""", unsafe_allow_html=True)
     if st.button("🚪 خروج",key="logout_btn",use_container_width=True):
-        st.session_state['current_user']=None
-        for k in list(st.session_state.keys()):
-            if k not in ('current_user','ui_theme','ui_lang'): del st.session_state[k]
-        st.rerun()
+        end_session("logout")
     st.markdown("<div style='height:1px;background:linear-gradient(90deg,transparent,rgba(108,92,231,.1),transparent);margin:1.2rem .8rem;'></div>", unsafe_allow_html=True)
     st.markdown("""<div style="padding:.8rem 1rem;border-radius:14px;background:linear-gradient(135deg,rgba(108,92,231,.04),rgba(0,206,201,.02));border:1px solid rgba(108,92,231,.06);margin:0 .5rem;text-align:center;">
         <div style="display:flex;align-items:center;justify-content:center;gap:.4rem;margin-bottom:.3rem;">
@@ -2927,17 +2996,17 @@ def tc_breakdown(net,wht_rate=0.0,vat=True,stamp=True,vat20=False,exempt=False):
     else:
         stamp_amt,stamp_note,stamp_rate=0.0,"غير مطبقة",0.0
     wht_amt=tc_r2(net*wht_rate)
-    invoice_total=tc_r2(net+vat_amt+vat20_amt+stamp_amt)
+    invoice_total=tc_r2(net+vat_amt+vat20_amt+stamp_amt+wht_amt)
     return {"net":tc_r2(net),"vat":vat_amt,"vat20":vat20_amt,"stamp":stamp_amt,
             "stamp_note":stamp_note,"stamp_rate":stamp_rate,
             "wht":wht_amt,"wht_rate":float(wht_rate),
             "invoice_total":invoice_total,
             "tax_total":tc_r2(vat_amt+vat20_amt+stamp_amt+wht_amt),
-            "payable":tc_r2(invoice_total-wht_amt),
+            "payable":invoice_total,
             "vat_on":bool(vat),"vat20_on":bool(vat and vat20),
             "stamp_on":bool(stamp),"exempt":bool(exempt)}
 
-def tc_net_from_total(total,vat=True,stamp=True,vat20=False,exempt=False):
+def tc_net_from_total(total,wht_rate=0.0,vat=True,stamp=True,vat20=False,exempt=False):
     total=float(total)
     if total<=0: return 0.0
     def _gross(n):
@@ -2945,6 +3014,7 @@ def tc_net_from_total(total,vat=True,stamp=True,vat20=False,exempt=False):
         if vat: g+=n*TC_VAT_RATE
         if vat and vat20: g+=n*TC_VAT_RATE*TC_VAT20_SHARE
         if stamp: g+=tc_stamp_raw(n,exempt)[0]
+        g+=n*float(wht_rate)
         return g
     lo,hi=0.0,total
     for _ in range(120):
@@ -2954,7 +3024,7 @@ def tc_net_from_total(total,vat=True,stamp=True,vat20=False,exempt=False):
     return tc_r2((lo+hi)/2.0)
 
 def tc_from_total(total,wht_rate=0.0,vat=True,stamp=True,vat20=False,exempt=False):
-    net=tc_net_from_total(total,vat,stamp,vat20,exempt)
+    net=tc_net_from_total(total,wht_rate,vat,stamp,vat20,exempt)
     res=tc_breakdown(net,wht_rate,vat,stamp,vat20,exempt)
     res["gross_input"]=tc_r2(total)
     res["rounding_diff"]=tc_r2(float(total)-res["invoice_total"])
@@ -2969,11 +3039,11 @@ def tc_render(res):
     _card(_r1[1],"s-cyan","ضريبة القيمة المضافة",fmt(res["vat"]) if res["vat_on"] else "—","14% من الأساس" if res["vat_on"] else "غير مطبقة")
     _card(_r1[2],"s-pink","20% من القيمة المضافة",fmt(res["vat20"]) if res["vat20_on"] else "—","20% × ض.ق.م (2.8% من الأساس)" if res["vat20_on"] else "غير مطبقة")
     _card(_r1[3],"s-orange","ضريبة الدمغة",fmt(res["stamp"]) if res["stamp_on"] else "—",res["stamp_note"] if res["stamp_on"] else "غير مطبقة")
-    _card(_r1[4],"s-red","ضريبة الخصم والتحصيل",fmt(res["wht"]) if res["wht"] else "—",f"{res['wht_rate']*100:g}% — تُخصم من المستحق" if res["wht"] else "غير مطبقة")
+    _card(_r1[4],"s-red","ضريبة الخصم والتحصيل",fmt(res["wht"]) if res["wht"] else "—",f"{res['wht_rate']*100:g}% — تُضاف على الفاتورة" if res["wht"] else "غير مطبقة")
     _r2=st.columns(3)
     _card(_r2[0],"s-green","إجمالي الفاتورة",fmt(res["invoice_total"]),"الأساس + الضرائب المضافة")
     _card(_r2[1],"s-orange","إجمالي الأعباء الضريبية",fmt(res["tax_total"]),f"{res['tax_total']/res['net']*100:.1f}% من الأساس" if res["net"]>0 else "الأنواع الأربعة مجتمعة")
-    _card(_r2[2],"s-blue","صافي المستحق للدفع",fmt(res["payable"]),"بعد خصم ض. الخصم والتحصيل")
+    _card(_r2[2],"s-blue","صافي المستحق للدفع",fmt(res["payable"]),"الإجمالي شامل كل الضرائب — بدون أي خصم")
     def _row(label,base,rate,amount,note,tone):
         _color={"add":"var(--tc-add)","ded":"var(--tc-ded)"}.get(tone,"var(--text)")
         return ('<tr style="border-top:1px solid var(--border);">'
@@ -2983,13 +3053,13 @@ def tc_render(res):
                 f'<td style="padding:.62rem .9rem;font-weight:800;color:{_color};font-variant-numeric:tabular-nums;">{amount}</td>'
                 f'<td style="padding:.62rem .9rem;color:var(--text2);font-size:.72rem;">{note}</td></tr>')
     _body="".join([
-        _row("ضريبة الخصم والتحصيل تحت حساب الضريبة",fmt(res["net"]),f"{res['wht_rate']*100:g}%" if res["wht"] else "—",fmt(res["wht"]) if res["wht"] else "—","تُخصم من المستحق للمورد" if res["wht"] else "غير مطبقة","ded"),
+        _row("ضريبة الخصم والتحصيل تحت حساب الضريبة",fmt(res["net"]),f"{res['wht_rate']*100:g}%" if res["wht"] else "—",fmt(res["wht"]) if res["wht"] else "—","تُضاف على الفاتورة مثل باقي الضرائب" if res["wht"] else "غير مطبقة","add"),
         _row("ضريبة القيمة المضافة",fmt(res["net"]),"14%",fmt(res["vat"]) if res["vat_on"] else "—","تُضاف على الفاتورة" if res["vat_on"] else "غير مطبقة","add"),
         _row("ضريبة 20% من القيمة المضافة",fmt(res["vat"]) if res["vat_on"] else "—","20% من ض.ق.م",fmt(res["vat20"]) if res["vat20_on"] else "—","تُضاف — مرتبطة بضريبة القيمة المضافة" if res["vat20_on"] else "غير مطبقة","add"),
         _row("ضريبة الدمغة النسبية",fmt(res["net"]),f"{res['stamp_rate']*100:.1f}%" if res["stamp_rate"] else "—",fmt(res["stamp"]) if res["stamp_on"] else "—",res["stamp_note"],"add"),
         _row("إجمالي الفاتورة","—","—",fmt(res["invoice_total"]),"الأساس + الضرائب المضافة",""),
         _row("إجمالي الأعباء الضريبية","—","—",fmt(res["tax_total"]),"الأنواع الأربعة مجتمعة",""),
-        _row("صافي المستحق للدفع","—","—",fmt(res["payable"]),"بعد خصم ضريبة الخصم والتحصيل",""),
+        _row("صافي المستحق للدفع","—","—",fmt(res["payable"]),"إجمالي الفاتورة شامل الضرائب الأربعة — بدون خصم",""),
     ])
     st.markdown('<div class="erp-tc-wrap" style="overflow-x:auto;margin-top:.9rem;"><table class="erp-tc-table" style="width:100%;border-collapse:collapse;font-size:.82rem;text-align:start;background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;">'
                 '<thead><tr style="background:rgba(108,92,231,.12);color:var(--accent2);">'
@@ -3016,6 +3086,8 @@ if page == ADMIN_PAGE:
             c3,c4=st.columns(2)
             with c3: new_pw=st.text_input("كلمة المرور",type="password")
             with c4: new_role=st.selectbox("الدور",["user","admin"])
+            c5,c6=st.columns(2)
+            with c5: new_sess=st.number_input("مدة الجلسة بدون نشاط (دقائق)",min_value=1,max_value=1440,value=int(SESSION_DEFAULT_MIN),step=5)
             st.markdown('<p style="color:var(--text2);font-size:.8rem;margin:.5rem 0 .3rem;">الصلاحيات:</p>',unsafe_allow_html=True)
             perm_cols=st.columns(4)
             perm_checks=[]
@@ -3030,7 +3102,7 @@ if page == ADMIN_PAGE:
                 else:
                     perms=[p for p,c in perm_checks if c]
                     if new_role=='admin': perms=ALL_PAGES+[ADMIN_PAGE]
-                    users.append({"username":new_user.strip(),"password":_hash_pw(new_pw),"password_enc":_pw_seal(new_pw),"display_name":new_name.strip(),"role":new_role,"permissions":perms,"created_at":datetime.now().isoformat()})
+                    users.append({"username":new_user.strip(),"password":_hash_pw(new_pw),"password_enc":_pw_seal(new_pw),"display_name":new_name.strip(),"role":new_role,"permissions":perms,"session_minutes":int(new_sess),"created_at":datetime.now().isoformat()})
                     save_users(users)
                     st.success(f"تم إضافة {new_name.strip()} بنجاح!")
     elif _usr_sub=="📋 قائمة المستخدمين":
@@ -3044,7 +3116,7 @@ if page == ADMIN_PAGE:
                     st.markdown(f"""<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:1rem 1.2rem;margin-bottom:.6rem;display:flex;align-items:center;justify-content:space-between;">
                         <div><strong style="color:var(--text);font-size:.9rem;">{u.get('display_name','')}</strong> <span style="color:rgba(255,255,255,.3);font-size:.75rem;">@{u['username']}</span></div>
                         <span style="color:var(--accent2);font-size:.75rem;">{role_label}</span></div>""",unsafe_allow_html=True)
-                    st.markdown(f'<p style="color:var(--text2);font-size:.7rem;margin:-.5rem 0 .5rem;">الصلاحيات: {perms_display}</p>',unsafe_allow_html=True)
+                    st.markdown(f'<p style="color:var(--text2);font-size:.7rem;margin:-.5rem 0 .5rem;">الصلاحيات: {perms_display} — ⏱️ مدة الجلسة: {int(u.get("session_minutes") or SESSION_DEFAULT_MIN)} دقيقة</p>',unsafe_allow_html=True)
                     if st.session_state.pop(f"pw_ok_{idx}",False):
                         st.success(f"تم تغيير كلمة مرور {u.get('display_name','')} بنجاح")
                     ec1,ec2=st.columns([3,1])
@@ -3081,6 +3153,27 @@ if page == ADMIN_PAGE:
                                 st.session_state[f"show_pw_{idx}"]=True
                                 st.session_state[f"pw_ok_{idx}"]=True
                                 st.rerun()
+                    with st.expander("⏱️ مدة الجلسة"):
+                        st.caption("مدة عدم النشاط اللي بعدها يظهر تنبيه «هل أنت هنا؟» — ولو مفيش رد خلال 9 دقائق يحصل تسجيل خروج تلقائي. التعديل بيتطبق من تسجيل الدخول التالي للمستخدم.")
+                        _sxm=st.number_input("مدة الجلسة بدون نشاط (دقائق)",min_value=1,max_value=1440,value=int(u.get('session_minutes') or SESSION_DEFAULT_MIN),step=5,key=f"sxmin_{idx}")
+                        if st.button("💾 حفظ مدة الجلسة",key=f"sxsave_{idx}",type="primary",use_container_width=True):
+                            for _u in users:
+                                if _u['username']==u['username']: _u['session_minutes']=int(_sxm)
+                            save_users(users)
+                            if cu and cu.get('username')==u['username']: cu['session_minutes']=int(_sxm)
+                            st.success(f"تم حفظ مدة الجلسة لـ {u.get('display_name','')}")
+                            st.rerun()
+                    with st.expander("📜 سجل الدخول والخروج"):
+                        _hist=_notif.login_history(u['username']) if _notif is not None else []
+                        if not _hist:
+                            st.caption("لا يوجد سجل بعد")
+                        else:
+                            _ev_meta={"login":("🟢","دخول"),"logout":("🔴","خروج"),"timeout":("🟠","انتهت تلقائياً")}
+                            _rows=[]
+                            for _e in reversed(_hist[-12:]):
+                                _ic,_lbl=_ev_meta.get(_e.get('ev'),("⚪",str(_e.get('ev') or "")))
+                                _rows.append(f'<div style="display:flex;justify-content:space-between;gap:.6rem;padding:.4rem .7rem;border-bottom:1px solid var(--border);font-size:.75rem;"><span style="color:var(--text);">{_ic} {_lbl}</span><span style="color:var(--text2);font-variant-numeric:tabular-nums;">{_e.get("t","")}</span></div>')
+                            st.markdown("".join(_rows),unsafe_allow_html=True)
         else:
             st.info("لا يوجد مستخدمون")
     elif _usr_sub=="✏️ تعديل الصلاحيات":
@@ -6239,9 +6332,9 @@ elif page == "🧮 حاسبة الضرائب":
         _tc_res=tc_breakdown(_tc_net_f,TC_WHT_RATES.get(_tc_wht_sel,0.0),_tc_vat,_tc_stamp,_tc_vat20,_tc_ex)
     else:
         with _tc_l:
-            _tc_gross=st.number_input("المبلغ الشامل للضرائب (ج.م)",min_value=0.0,value=2397.0,step=100.0,format="%.2f",key="tc_rev_gross")
+            _tc_gross=st.number_input("المبلغ الشامل للضرائب (ج.م)",min_value=0.0,value=1195.1,step=100.0,format="%.2f",key="tc_rev_gross")
             _tc_wht_sel=st.radio("ضريبة الخصم والتحصيل",_tc_opts,horizontal=True,index=0,key="tc_rev_wht")
-            st.caption("ض. الخصم تُحسب على المبلغ الأساسي المستخرج وتُخصم من الدفعة — وهي غير داخلة في معادلة الاستخراج.")
+            st.caption("ض. الخصم تُحسب على المبلغ الأساسي وتُضاف على الفاتورة مثل باقي الضرائب — وهي داخلة ضمن المبلغ الشامل.")
         with _tc_r:
             st.markdown('<p style="color:var(--text2);font-size:.72rem;font-weight:700;letter-spacing:.3px;margin:.1rem 0 .4rem;text-align:start;">الضرائب المضمّنة في المبلغ</p>',unsafe_allow_html=True)
             _tc_vat=st.checkbox("المبلغ شامل ضريبة القيمة المضافة — 14%",value=True,key="tc_rev_vat")
@@ -6256,4 +6349,4 @@ elif page == "🧮 حاسبة الضرائب":
         _tc_diff=_tc_res["rounding_diff"]
         st.caption(f"المبلغ الشامل المُدخل: {fmt(_tc_res['gross_input'])} ج.م"+(f" • فرق تقريب: {fmt(_tc_diff)} ج.م" if abs(_tc_diff)>=0.005 else ""))
     tc_render(_tc_res)
-    st.caption("ضريبة الخصم والتحصيل تُحسب على المبلغ قبل الضرائب وتُخصم من المستحق للمورد (لا تُضاف إلى إجمالي الفاتورة). الدمغة النسبية تُحسب على (المبلغ − 50) بشرائح تصاعدية، وتُعفى الجهات الواردة في قائمة الدمغة النسبية الحكومية. الأرقام تقديرية وتُراجع قبل الاستخدام الرسمي.")
+    st.caption("ضريبة الخصم والتحصيل تُحسب على المبلغ قبل الضرائب وتُضاف على إجمالي الفاتورة مثل باقي الضرائب (لا تُخصم من المستحق للمورد). الدمغة النسبية تُحسب على (المبلغ − 50) بشرائح تصاعدية، وتُعفى الجهات الواردة في قائمة الدمغة النسبية الحكومية. الأرقام تقديرية وتُراجع قبل الاستخدام الرسمي.")

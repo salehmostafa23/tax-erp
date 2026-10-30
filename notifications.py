@@ -15,11 +15,12 @@ from datetime import datetime
 
 FILE_NAME = "notifications.json"
 MAX_EVENTS = 500
+MAX_LOGINS = 60
 CACHE_TTL = 45
 
 _lock = threading.Lock()
 _recent = {}
-_cache = {"at": 0.0, "data": {"events": [], "seen": {}}}
+_cache = {"at": 0.0, "data": {"events": [], "seen": {}, "logins": {}}}
 
 KIND_META = {
     "invoice": ("🧾", "#fd79a8"),
@@ -47,15 +48,22 @@ def _path():
 
 def _normalize(d):
     if isinstance(d, list):
-        return {"events": [e for e in d if isinstance(e, dict)], "seen": {}}
+        return {"events": [e for e in d if isinstance(e, dict)], "seen": {}, "logins": {}}
     if isinstance(d, dict):
         ev = d.get("events")
         seen = d.get("seen")
+        logins = {}
+        raw = d.get("logins")
+        if isinstance(raw, dict):
+            for k, v in raw.items():
+                if isinstance(v, list):
+                    logins[str(k)] = [x for x in v if isinstance(x, dict)][-MAX_LOGINS:]
         return {
             "events": [e for e in ev if isinstance(e, dict)] if isinstance(ev, list) else [],
             "seen": seen if isinstance(seen, dict) else {},
+            "logins": logins,
         }
-    return {"events": [], "seen": {}}
+    return {"events": [], "seen": {}, "logins": {}}
 
 
 def _local_read():
@@ -63,7 +71,7 @@ def _local_read():
         with open(_path(), encoding="utf-8") as f:
             return _normalize(json.load(f))
     except Exception:
-        return {"events": [], "seen": {}}
+        return {"events": [], "seen": {}, "logins": {}}
 
 
 def _local_write(d):
@@ -141,7 +149,22 @@ def _describe(items, names=()):
     return txt[:160]
 
 
-def _append(entry, sync=False):
+def _add_history(d, entry, history):
+    try:
+        if not history:
+            return
+        uname, ev = history
+        uname = str(uname or "")
+        if not uname:
+            return
+        hist = d.get("logins", {}).setdefault(uname, [])
+        hist.append({"t": entry.get("ts", ""), "ev": str(ev)})
+        d["logins"][uname] = hist[-MAX_LOGINS:]
+    except Exception:
+        pass
+
+
+def _append(entry, sync=False, history=None):
     def work():
         try:
             with _lock:
@@ -150,12 +173,14 @@ def _append(entry, sync=False):
                     d = _local_read()
                 d["events"].append(entry)
                 d["events"] = d["events"][-MAX_EVENTS:]
+                _add_history(d, entry, history)
                 if not _gh_write(d):
                     d2 = _gh_read()
                     if d2 is not None:
                         if not any(e.get("id") == entry.get("id") for e in d2["events"]):
                             d2["events"].append(entry)
                         d2["events"] = d2["events"][-MAX_EVENTS:]
+                        _add_history(d2, entry, history)
                         if _gh_write(d2):
                             d = d2
                 d["events"] = d["events"][-MAX_EVENTS:]
@@ -172,7 +197,7 @@ def _append(entry, sync=False):
 
 
 def log(title, detail="", kind="other", action="create", page=None, user=None,
-        username=None, role=None, dedupe_minutes=0, sync=False):
+        username=None, role=None, dedupe_minutes=0, sync=False, history=None):
     """Record one event. Never raises."""
     try:
         if user is None:
@@ -197,10 +222,18 @@ def log(title, detail="", kind="other", action="create", page=None, user=None,
             "detail": str(detail or "")[:400],
             "page": page if page is not None else _page(),
         }
-        _append(entry, sync=sync)
+        _append(entry, sync=sync, history=history)
         return entry
     except Exception:
         return None
+
+
+def login_history(username):
+    """Recent login/logout entries for one user (newest last)."""
+    try:
+        return list(load().get("logins", {}).get(str(username or ""), []))
+    except Exception:
+        return []
 
 
 def change(title_prefix, label, kind, old, new, names=(), page=None, sync=False):
