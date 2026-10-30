@@ -23,10 +23,29 @@
       "title": "سجل دخول للنظام",
       "detail": "@admin",
       "page": "تسجيل الدخول"
+    },
+    {
+      "id": "074b149456f0",
+      "ts": "2026-10-30T06:51:22",
+      "user": "المدير",
+      "username": "admin",
+      "role": "admin",
+      "kind": "login",
+      "action": "logout",
+      "title": "تسجيل خروج",
+      "detail": "",
+      "page": "تسجيل الدخول"
     }
   ],
   "seen": {
     "admin": "2026-10-30T05:38:16"
   },
-  "logins": {}
+  "logins": {
+    "admin": [
+      {
+        "t": "2026-10-30T06:51:22",
+        "ev": "logout"
+      }
+    ]
+  }
 }
