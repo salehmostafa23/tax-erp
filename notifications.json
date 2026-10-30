@@ -59,6 +59,18 @@
       "title": "سجل دخول للنظام",
       "detail": "@admin",
       "page": "تسجيل الدخول"
+    },
+    {
+      "id": "eec76397cbe3",
+      "ts": "2026-10-30T08:23:48",
+      "user": "المدير",
+      "username": "admin",
+      "role": "admin",
+      "kind": "login",
+      "action": "login",
+      "title": "سجل دخول للنظام",
+      "detail": "@admin",
+      "page": "تسجيل الدخول"
     }
   ],
   "seen": {
