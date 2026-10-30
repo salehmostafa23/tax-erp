@@ -11,9 +11,22 @@
       "title": "حدّث مستخدم",
       "detail": "4 سجل",
       "page": "👥 إدارة المستخدمين"
+    },
+    {
+      "id": "36771426f9f4",
+      "ts": "2026-10-30T06:49:02",
+      "user": "المدير",
+      "username": "admin",
+      "role": "admin",
+      "kind": "login",
+      "action": "login",
+      "title": "سجل دخول للنظام",
+      "detail": "@admin",
+      "page": "تسجيل الدخول"
     }
   ],
   "seen": {
     "admin": "2026-10-30T05:38:16"
-  }
+  },
+  "logins": {}
 }
