@@ -35,6 +35,18 @@
       "title": "تسجيل خروج",
       "detail": "",
       "page": "تسجيل الدخول"
+    },
+    {
+      "id": "006bd2cf82e1",
+      "ts": "2026-10-30T06:51:29",
+      "user": "المدير",
+      "username": "admin",
+      "role": "admin",
+      "kind": "login",
+      "action": "login",
+      "title": "سجل دخول للنظام",
+      "detail": "@admin",
+      "page": "تسجيل الدخول"
     }
   ],
   "seen": {
