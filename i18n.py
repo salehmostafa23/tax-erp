@@ -368,7 +368,6 @@ EN = {
     "خصم الدمغة النسبية من المستحق": "Deduct proportional stamp duty from the payable",
     "خصم من المستحق": "deducted from the payable",
     "تُخصم من المستحق": "deducted from the payable",
-    "20% من ضريبة القيمة المضافة المحسوبة — مش نسبة مستقلة.": "20% of the calculated VAT — not a standalone rate.",
     "المبلغ اللي معاك شامل — الشق الأول بيستخرج الأساس والضرائب اللي جوه المبلغ، والشق الثاني بيتخصم من صافي المستحق للدفع.": "Your amount is tax-inclusive — part 1 extracts the base and the taxes inside it, part 2 is deducted from the net payable.",
     "المبلغ الأساسي (مستخرج)": "Extracted net amount",
     "بعد استبعاد الضرائب المضمّنة": "After removing the included taxes",
@@ -387,6 +386,14 @@ EN = {
     "المبلغ الشامل − إجمالي الخصومات": "Inclusive amount − total deductions",
     "المبلغ الشامل كما هو": "the inclusive amount as-is",
     "المبلغ الشامل بعد خصم البند ٢": "the inclusive amount after deducting part 2",
+    "الأساس + ض.ق.م فقط": "Base + VAT only",
+    "داخل إجمالي الفاتورة": "Included in the invoice total",
+    "ض.ق.م + دمغة + خصم وتحصيل — بدون 20%": "VAT + stamp + WHT — excluding the 20%",
+    "ض.ق.م + دمغة + خصم وتحصيل — بدون 20% من ض.ق.م": "VAT + stamp + WHT — excluding 20% of VAT",
+    "20% من ض.ق.م + دمغة + خصم وتحصيل": "20% of VAT + stamp + WHT",
+    "20% × ض.ق.م — تُخصم من المستحق": "20% × VAT — deducted from the payable",
+    " — تُخصم": " — deducted",
+    "خصم من المستحق": "deducted from the payable",
     "بدون أي خصم": "with no deduction",
 
     # ---------------- success / info / warnings ----------------
@@ -464,7 +471,7 @@ EN = {
     "افتح التطبيق المحلي دوس رحّل ←": "Open the local app and press Submit ←",
 
     # ---------------- captions ----------------
-    "في وضع المبلغ الشامل: الشق الأول يستبعد الضرائب المضمّنة فقط (ض.ق.م 14%، و20% منها لو محددة، والدمغة لو محددة) لاستخراج الأساس. الشق الثاني يُحسب على الأساس المستخرج ويُخصم من صافي المستحق للدفع (صافي المستحق = المبلغ الشامل − إجمالي الخصومات). الدمغة النسبية تُحسب على (المبلغ − 50) بشرائح تصاعدية، وتُعفى الجهات الواردة في قائمة الدمغة النسبية الحكومية. الأرقام تقديرية وتُراجع قبل الاستخدام الرسمي.": "In inclusive mode: part 1 removes only the taxes already inside the amount (14% VAT, plus 20% of VAT and stamp duty when selected) to extract the base. Part 2 is computed on the extracted base and deducted from the net payable (net payable = inclusive amount − total deductions). Proportional stamp duty is calculated on (amount − 50) using graduated brackets, and entities listed in the government stamp-duty list are exempt. Figures are estimates — review before official use.",
+    "في وضع المبلغ الأساسي: إجمالي الفاتورة = الأساس + ض.ق.م 14% فقط، و(20% من ض.ق.م + الدمغة النسبية + الخصم والتحصيل) تُخصم من صافي المستحق للدفع. في وضع المبلغ الشامل: الشق الأول يستبعد الضرائب المضمّنة فقط (ض.ق.م 14%، و20% منها لو محددة، والدمغة لو محددة) لاستخراج الأساس، والشق الثاني يُحسب على الأساس المستخرج ويُخصم من صافي المستحق (صافي المستحق = المبلغ الشامل − إجمالي الخصومات). الـ20% من ض.ق.م داخلة أصلاً في ضريبة القيمة المضافة فلا تُضاف لإجمالي الأعباء الضريبية في كلا الوضعين. الدمغة النسبية تُحسب على (المبلغ − 50) بشرائح تصاعدية، وتُعفى الجهات الواردة في قائمة الدمغة النسبية الحكومية. الأرقام تقديرية وتُراجع قبل الاستخدام الرسمي.": "In base mode: invoice total = base + 14% VAT only, and (20% of VAT + proportional stamp duty + withholding tax) are deducted from the net payable. In inclusive mode: part 1 removes only the taxes already inside the amount (14% VAT, plus 20% of VAT and stamp duty when selected) to extract the base, and part 2 is computed on the extracted base and deducted from the net payable (net payable = inclusive amount − total deductions). The 20% of VAT is already part of VAT, so it is not added to the total tax burden in either mode. Proportional stamp duty is calculated on (amount − 50) using graduated brackets, and entities listed in the government stamp-duty list are exempt. Figures are estimates — review before official use.",
     "العمود A: الكود الداخلي (الرقم اللي قبله G زي G127409) | العمود B: الباركود. الأكواد الموجودة بالفعل مش هتتعدل ومش هتتضاف تاني حتى لو الباركود مختلف.": "Column A: internal code (the number after G, e.g. G127409) | Column B: barcode. Existing codes are neither modified nor re-added, even if the barcode differs.",
     "الملف لازم يكون الأعمدة: A = الكود • B = اسم الكود • C = وصف الكود • D = الرقم الضريبي للمورد • E = اسم المورد": "The file must have: A = code • B = code name • C = code description • D = supplier tax number • E = supplier name",
     "الملف لازم يكون فيه عمود A = Barcode وعمود D = Description Arabic (بترتيب الأعمدة)": "The file must have column A = Barcode and column D = Description Arabic (in this order)",
