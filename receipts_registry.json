@@ -2266,5 +2266,14 @@
     "upload_date": "2026-11-01T08:26:15.571608",
     "items_count": 5,
     "matched": 3
+  },
+  {
+    "receipt_number": "201011-06200084",
+    "receipt_date": "2026-11-01",
+    "receiver_name": "اشرف الشحات عوض عبد النبي",
+    "file_name": "201011-06200084_2026-11-01_اشرف الشحات عوض عبد النبي.xlsx",
+    "upload_date": "2026-11-01T10:13:19.993730",
+    "items_count": 4,
+    "matched": 3
   }
 ]
