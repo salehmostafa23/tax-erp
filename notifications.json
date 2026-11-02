@@ -287,6 +287,18 @@
       "title": "أضاف Template Portal / ريسيت",
       "detail": "255 ← 256 سجل — 201011-02198341",
       "page": "🛒 فواتير الماركت"
+    },
+    {
+      "id": "43f8394deaf3",
+      "ts": "2026-11-02T10:29:29",
+      "user": "Salma Refaat Ahmed",
+      "username": "salma",
+      "role": "user",
+      "kind": "receipts",
+      "action": "create",
+      "title": "أضاف Template Portal / ريسيت",
+      "detail": "256 ← 257 سجل — 501033-02186303",
+      "page": "🛒 فواتير الماركت"
     }
   ],
   "seen": {
