@@ -239,6 +239,18 @@
       "title": "أضاف Template Portal / ريسيت",
       "detail": "253 ← 254 سجل — 301011-02110546",
       "page": "🛒 فواتير الماركت"
+    },
+    {
+      "id": "49d582ba2876",
+      "ts": "2026-11-02T09:43:33",
+      "user": "Salma Refaat Ahmed",
+      "username": "salma",
+      "role": "user",
+      "kind": "login",
+      "action": "login",
+      "title": "سجل دخول للنظام",
+      "detail": "@salma",
+      "page": "تسجيل الدخول"
     }
   ],
   "seen": {
