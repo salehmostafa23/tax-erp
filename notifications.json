@@ -371,6 +371,18 @@
       "title": "سجل دخول للنظام",
       "detail": "@admin",
       "page": "تسجيل الدخول"
+    },
+    {
+      "id": "2ecf050e4e73",
+      "ts": "2026-11-03T08:54:17",
+      "user": "Salma Refaat Ahmed",
+      "username": "salma",
+      "role": "user",
+      "kind": "login",
+      "action": "login",
+      "title": "سجل دخول للنظام",
+      "detail": "@salma",
+      "page": "تسجيل الدخول"
     }
   ],
   "seen": {
