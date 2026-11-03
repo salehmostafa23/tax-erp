@@ -395,6 +395,18 @@
       "title": "أضاف Template Portal / ريسيت",
       "detail": "260 ← 261 سجل — 201011-03185992",
       "page": "🛒 فواتير الماركت"
+    },
+    {
+      "id": "c744888fbcba",
+      "ts": "2026-11-03T09:47:36",
+      "user": "المدير",
+      "username": "admin",
+      "role": "admin",
+      "kind": "login",
+      "action": "login",
+      "title": "سجل دخول للنظام",
+      "detail": "@admin",
+      "page": "تسجيل الدخول"
     }
   ],
   "seen": {
