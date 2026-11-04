@@ -5200,7 +5200,7 @@ elif page=="🔍 الاستعلام عن ممول":
                         s=str(v).strip()
                         if s.endswith('.0') and s[:-2].isdigit(): s=s[:-2]
                         dch=''.join(ch for ch in s if ch.isdigit())
-                        if len(dch)>=9 and dch not in sl_nums:
+                        if len(dch)>=9:
                             sl_nums.append(dch)
                 if not sl_nums:
                     st.warning("مفيش أرقام تسجيل صالحة في الملف (الأرقام لازم 9 خانات على الأقل)")
