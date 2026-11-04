@@ -575,6 +575,18 @@
       "title": "أنشأ Template مجمّع",
       "detail": "5 صنف أصلي — 4 بعد التجميع",
       "page": "🛒 فواتير الماركت"
+    },
+    {
+      "id": "c146d7913e35",
+      "ts": "2026-11-04T08:44:26",
+      "user": "المدير",
+      "username": "admin",
+      "role": "admin",
+      "kind": "receipts",
+      "action": "create",
+      "title": "أضاف Template Portal / ريسيت",
+      "detail": "273 ← 274 سجل — 201011-03186592",
+      "page": "🛒 فواتير الماركت"
     }
   ],
   "seen": {
