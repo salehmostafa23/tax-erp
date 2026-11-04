@@ -431,6 +431,18 @@
       "title": "سجل دخول للنظام",
       "detail": "@admin",
       "page": "تسجيل الدخول"
+    },
+    {
+      "id": "248ecf303fd8",
+      "ts": "2026-11-04T06:32:08",
+      "user": "المدير",
+      "username": "admin",
+      "role": "admin",
+      "kind": "receipts",
+      "action": "create",
+      "title": "أضاف Template Portal / ريسيت",
+      "detail": "262 ← 263 سجل — 301011-03131396",
+      "page": "🛒 فواتير الماركت"
     }
   ],
   "seen": {
