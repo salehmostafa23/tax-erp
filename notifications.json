@@ -479,6 +479,18 @@
       "title": "أضاف Template Portal / ريسيت",
       "detail": "265 ← 266 سجل — 301011-02113721",
       "page": "🛒 فواتير الماركت"
+    },
+    {
+      "id": "3a04c114e734",
+      "ts": "2026-11-04T07:05:28",
+      "user": "المدير",
+      "username": "admin",
+      "role": "admin",
+      "kind": "receipts",
+      "action": "create",
+      "title": "أضاف Template Portal / ريسيت",
+      "detail": "266 ← 267 سجل — 301011-02113721-1",
+      "page": "🛒 فواتير الماركت"
     }
   ],
   "seen": {
