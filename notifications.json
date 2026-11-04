@@ -563,6 +563,18 @@
       "title": "سجل دخول للنظام",
       "detail": "@admin",
       "page": "تسجيل الدخول"
+    },
+    {
+      "id": "0052b23b0104",
+      "ts": "2026-11-04T08:41:25",
+      "user": "المدير",
+      "username": "admin",
+      "role": "admin",
+      "kind": "template",
+      "action": "create",
+      "title": "أنشأ Template مجمّع",
+      "detail": "5 صنف أصلي — 4 بعد التجميع",
+      "page": "🛒 فواتير الماركت"
     }
   ],
   "seen": {
