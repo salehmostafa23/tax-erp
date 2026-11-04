@@ -2419,5 +2419,14 @@
     "upload_date": "2026-11-04T07:31:45.782059",
     "items_count": 18,
     "matched": 17
+  },
+  {
+    "receipt_number": "301011-02113792",
+    "receipt_date": "2026-11-03",
+    "receiver_name": "ادارة النوادي",
+    "file_name": "301011-02113792_2026-11-03_ادارة النوادي.xlsx",
+    "upload_date": "2026-11-04T07:34:49.205140",
+    "items_count": 9,
+    "matched": 8
   }
 ]
