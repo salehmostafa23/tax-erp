@@ -2410,5 +2410,14 @@
     "upload_date": "2026-11-04T07:07:52.430714",
     "items_count": 2,
     "matched": 1
+  },
+  {
+    "receipt_number": "301011-02113345",
+    "receipt_date": "2026-11-02",
+    "receiver_name": "جامعة الاسكندرية",
+    "file_name": "301011-02113345_2026-11-02_جامعة الاسكندرية.xlsx",
+    "upload_date": "2026-11-04T07:31:45.782059",
+    "items_count": 18,
+    "matched": 17
   }
 ]
