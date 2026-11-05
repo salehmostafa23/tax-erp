@@ -671,6 +671,18 @@
       "title": "أنشأ Template مجمّع",
       "detail": "71 صنف أصلي — 29 بعد التجميع",
       "page": "🛒 فواتير الماركت"
+    },
+    {
+      "id": "2e284b18bc72",
+      "ts": "2026-11-05T09:31:59",
+      "user": "المدير",
+      "username": "admin",
+      "role": "admin",
+      "kind": "login",
+      "action": "login",
+      "title": "سجل دخول للنظام",
+      "detail": "@admin",
+      "page": "تسجيل الدخول"
     }
   ],
   "seen": {
