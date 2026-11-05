@@ -623,6 +623,18 @@
       "title": "أضاف باركود",
       "detail": "39427 ← 39428 سجل — G162172",
       "page": "🛒 فواتير الماركت"
+    },
+    {
+      "id": "cbb86fca8e22",
+      "ts": "2026-11-05T07:12:02",
+      "user": "المدير",
+      "username": "admin",
+      "role": "admin",
+      "kind": "login",
+      "action": "login",
+      "title": "سجل دخول للنظام",
+      "detail": "@admin",
+      "page": "تسجيل الدخول"
     }
   ],
   "seen": {
