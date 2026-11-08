@@ -863,6 +863,18 @@
       "title": "أضاف نماذج 41",
       "detail": "13 ← 14 سجل",
       "page": "📋 نموذج 41"
+    },
+    {
+      "id": "ca82d8a7d513",
+      "ts": "2026-11-08T07:35:32",
+      "user": "المدير",
+      "username": "admin",
+      "role": "admin",
+      "kind": "form41",
+      "action": "create",
+      "title": "أضاف نماذج 41",
+      "detail": "14 ← 15 سجل",
+      "page": "📋 نموذج 41"
     }
   ],
   "seen": {
