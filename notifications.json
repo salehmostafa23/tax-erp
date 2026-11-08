@@ -839,6 +839,18 @@
       "title": "أضاف نماذج 41",
       "detail": "12 ← 13 سجل",
       "page": "📋 نموذج 41"
+    },
+    {
+      "id": "dbece66d8234",
+      "ts": "2026-11-08T07:32:06",
+      "user": "المدير",
+      "username": "admin",
+      "role": "admin",
+      "kind": "login",
+      "action": "login",
+      "title": "سجل دخول للنظام",
+      "detail": "@admin",
+      "page": "تسجيل الدخول"
     }
   ],
   "seen": {
