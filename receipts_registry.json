@@ -2473,5 +2473,14 @@
     "upload_date": "2026-11-04T08:46:22.375391",
     "items_count": 5,
     "matched": 3
+  },
+  {
+    "receipt_number": "202022-02189030",
+    "receipt_date": "2026-11-08",
+    "receiver_name": "المركز الطبي العلاجي",
+    "file_name": "202022-02189030_2026-11-08_المركز الطبي العلاجي.xlsx",
+    "upload_date": "2026-11-08T07:02:13.232601",
+    "items_count": 18,
+    "matched": 17
   }
 ]
