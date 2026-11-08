@@ -767,6 +767,18 @@
       "title": "حدّث باركود",
       "detail": "39428 سجل",
       "page": "🛒 فواتير الماركت"
+    },
+    {
+      "id": "1ae9480b1113",
+      "ts": "2026-11-08T06:57:05",
+      "user": "Salma Refaat Ahmed",
+      "username": "salma",
+      "role": "user",
+      "kind": "login",
+      "action": "login",
+      "title": "سجل دخول للنظام",
+      "detail": "@salma",
+      "page": "تسجيل الدخول"
     }
   ],
   "seen": {
