@@ -731,6 +731,18 @@
       "title": "حدّث باركود",
       "detail": "39428 سجل",
       "page": "🛒 فواتير الماركت"
+    },
+    {
+      "id": "57f924a606c5",
+      "ts": "2026-11-08T06:20:34",
+      "user": "المدير",
+      "username": "admin",
+      "role": "admin",
+      "kind": "barcodes",
+      "action": "update",
+      "title": "حدّث باركود",
+      "detail": "39428 سجل",
+      "page": "🛒 فواتير الماركت"
     }
   ],
   "seen": {
