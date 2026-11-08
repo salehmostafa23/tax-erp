@@ -815,6 +815,18 @@
       "title": "سجل دخول للنظام",
       "detail": "@admin",
       "page": "تسجيل الدخول"
+    },
+    {
+      "id": "ff86789f3df4",
+      "ts": "2026-11-08T07:22:57",
+      "user": "المدير",
+      "username": "admin",
+      "role": "admin",
+      "kind": "vat",
+      "action": "create",
+      "title": "أضاف بيانات القيمة المضافة",
+      "detail": "14 ← 15 سجل",
+      "page": "💰 القيمة المضافة"
     }
   ],
   "seen": {
