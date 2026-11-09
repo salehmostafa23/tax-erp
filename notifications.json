@@ -947,6 +947,18 @@
       "title": "سجل دخول للنظام",
       "detail": "@admin",
       "page": "تسجيل الدخول"
+    },
+    {
+      "id": "b40d277ec6ac",
+      "ts": "2026-11-09T07:14:04",
+      "user": "المدير",
+      "username": "admin",
+      "role": "admin",
+      "kind": "barcodes",
+      "action": "update",
+      "title": "حدّث باركود",
+      "detail": "39429 سجل",
+      "page": "🛒 فواتير الماركت"
     }
   ],
   "seen": {
