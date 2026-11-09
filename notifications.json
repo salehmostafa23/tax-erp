@@ -959,6 +959,18 @@
       "title": "حدّث باركود",
       "detail": "39429 سجل",
       "page": "🛒 فواتير الماركت"
+    },
+    {
+      "id": "ee60b039efde",
+      "ts": "2026-11-09T08:58:33",
+      "user": "المدير",
+      "username": "admin",
+      "role": "admin",
+      "kind": "login",
+      "action": "login",
+      "title": "سجل دخول للنظام",
+      "detail": "@admin",
+      "page": "تسجيل الدخول"
     }
   ],
   "seen": {
