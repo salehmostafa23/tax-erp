@@ -923,6 +923,18 @@
       "title": "أضاف Template Portal / ريسيت",
       "detail": "277 ← 278 سجل — 301011-02115850",
       "page": "🛒 فواتير الماركت"
+    },
+    {
+      "id": "21aab5433c9b",
+      "ts": "2026-11-09T07:05:36",
+      "user": "المدير",
+      "username": "admin",
+      "role": "admin",
+      "kind": "barcodes",
+      "action": "create",
+      "title": "أضاف باركود",
+      "detail": "39428 ← 39429 سجل — G162337",
+      "page": "🛒 فواتير الماركت"
     }
   ],
   "seen": {
