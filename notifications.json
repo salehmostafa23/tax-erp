@@ -995,6 +995,18 @@
       "title": "سجل دخول للنظام",
       "detail": "@salma",
       "page": "تسجيل الدخول"
+    },
+    {
+      "id": "7ea5b5fc2da6",
+      "ts": "2026-11-10T07:26:14",
+      "user": "Salma Refaat Ahmed",
+      "username": "salma",
+      "role": "user",
+      "kind": "receipts",
+      "action": "create",
+      "title": "أضاف Template Portal / ريسيت",
+      "detail": "278 ← 279 سجل — 201011-03189083",
+      "page": "🛒 فواتير الماركت"
     }
   ],
   "seen": {
