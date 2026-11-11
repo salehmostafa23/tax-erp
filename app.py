@@ -3107,7 +3107,7 @@ def _tc_ar(t):
     except Exception:
         return _s
 
-def tc_build_pdf(res,inputs,mode_label,user_name="",generated_at=None):
+def tc_build_pdf(res,inputs,mode_label,user_name="",generated_at=None,brief=False):
     from reportlab.lib.pagesizes import A4
     from reportlab.lib import colors
     from reportlab.lib.units import cm
@@ -3136,18 +3136,19 @@ def tc_build_pdf(res,inputs,mode_label,user_name="",generated_at=None):
     left=right=1.5*cm;top=1.3*cm;bottom=1.6*cm
     usable=A4[0]-left-right
     buf=BytesIO()
+    _title_txt="تقرير ضريبي مختصر" if brief else "كشف حساب ضريبي"
     doc=SimpleDocTemplate(buf,pagesize=A4,leftMargin=left,rightMargin=right,topMargin=top,bottomMargin=bottom,
-                          title=_tc_ar("كشف حساب ضريبي"),author=_tc_ar("نظام إدارة الضرائب"))
+                          title=_tc_ar(_title_txt),author=_tc_ar("نظام إدارة الضرائب"))
     def on_page(canv,_doc):
         canv.saveState()
         canv.setStrokeColor(BORDER);canv.setLineWidth(0.6)
         canv.line(left,1.25*cm,A4[0]-right,1.25*cm)
         canv.setFont(font_reg,7.5);canv.setFillColor(MUTED)
-        canv.drawString(left,0.85*cm,_tc_ar("نظام إدارة الضرائب — كشف حساب ضريبي"))
+        canv.drawString(left,0.85*cm,_tc_ar("نظام إدارة الضرائب — "+_title_txt))
         canv.drawRightString(A4[0]-right,0.85*cm,str(canv.getPageNumber()))
         canv.restoreState()
     story=[]
-    head=Table([[P("كشف حساب ضريبي",19,colors.white,True,TA_RIGHT,24),
+    head=Table([[P(_title_txt,19,colors.white,True,TA_RIGHT,24),
                  P("نظام إدارة الضرائب",9,colors.HexColor('#ded9ff'),False,TA_CENTER)]],
                colWidths=[usable*0.72,usable*0.28])
     head.setStyle(TableStyle([
@@ -3167,16 +3168,6 @@ def tc_build_pdf(res,inputs,mode_label,user_name="",generated_at=None):
         ('LEFTPADDING',(0,0),(-1,-1),8),('RIGHTPADDING',(0,0),(-1,-1),8),
     ]))
     story+=[meta,Spacer(1,12)]
-    story+=sec("بيانات الإدخال")
-    it=Table([[P(v,9),P(k,9,MUTED)] for k,v in inputs],colWidths=[usable*0.45,usable*0.55])
-    it.setStyle(TableStyle([
-        ('GRID',(0,0),(-1,-1),0.5,BORDER),('VALIGN',(0,0),(-1,-1),'MIDDLE'),
-        ('ROWBACKGROUNDS',(0,0),(-1,-1),[colors.white,LIGHT]),
-        ('TOPPADDING',(0,0),(-1,-1),5),('BOTTOMPADDING',(0,0),(-1,-1),5),
-        ('LEFTPADDING',(0,0),(-1,-1),8),('RIGHTPADDING',(0,0),(-1,-1),8),
-    ]))
-    story+=[it,Spacer(1,12)]
-    story+=sec("ملخص النتائج")
     cards=[("إجمالي الفاتورة",fmt(res["invoice_total"]),INK),
            ("إجمالي الأعباء الضريبية",fmt(res["tax_total"]),ORANGE),
            ("إجمالي الخصومات",fmt(res["deductions"]),RED),
@@ -3188,6 +3179,51 @@ def tc_build_pdf(res,inputs,mode_label,user_name="",generated_at=None):
         ('TOPPADDING',(0,0),(-1,-1),6),('BOTTOMPADDING',(0,0),(-1,-1),6),
         ('LEFTPADDING',(0,0),(-1,-1),8),('RIGHTPADDING',(0,0),(-1,-1),8),
     ]))
+    if brief:
+        _pri=(f"المبلغ الشامل المُدخل: {fmt(res['gross_input'])} ج.م" if rev else f"المبلغ الأساسي: {fmt(res['net'])} ج.م")
+        _pri+=" • "+(f"ضريبة الخصم والتحصيل {res['wht_rate']*100:g}%" if res["wht"] else "بدون ضريبة خصم وتحصيل")
+        story.append(P(_pri,8.5,MUTED))
+        story.append(Spacer(1,10))
+        story+=sec("ملخص النتائج")
+        story+=[sm,Spacer(1,12)]
+        story+=sec("الضرائب المطبقة")
+        _brows=[(P(fmt(res["net"]),9.2,INK,True),P("الأساس" if not rev else "الأساس المستخرج",9))]
+        if res["vat_on"]:
+            _brows.append((P(fmt(res["vat"]),9.2,INK,True),P("ضريبة القيمة المضافة 14%",9)))
+        _b20=res.get("vat20",0)+res.get("add_vat20",0)
+        if _b20:
+            _brows.append((P(fmt(_b20),9.2,RED,True),P("20% من ضريبة القيمة المضافة — "+("مضمّنة داخل المبلغ" if res.get("vat20") else "تُخصم من المستحق"),9)))
+        _bst=res.get("stamp",0)+res.get("add_stamp",0)
+        if _bst:
+            _brows.append((P(fmt(_bst),9.2,RED,True),P("ضريبة الدمغة النسبية — "+("مضمّنة داخل المبلغ" if res.get("stamp") else "تُخصم من المستحق"),9)))
+        if res["wht"]:
+            _brows.append((P(fmt(res["wht"]),9.2,RED,True),P(f"ضريبة الخصم والتحصيل {res['wht_rate']*100:g}% — تُخصم من المستحق",9)))
+        _brows.append((P(fmt(res["payable"]),10,GREEN,True),P("صافي المستحق للدفع",9)))
+        bt=Table([[P("المبلغ (ج.م)",8.3,PRIMARY,True),P("البند",8.3,PRIMARY,True)]]+[list(r) for r in _brows],
+                 colWidths=[usable*0.35,usable*0.65])
+        bt.setStyle(TableStyle([
+            ('BACKGROUND',(0,0),(-1,0),colors.HexColor('#ece9ff')),('LINEBELOW',(0,0),(-1,0),0.8,PRIMARY),
+            ('INNERGRID',(0,0),(-1,-1),0.4,BORDER),('BOX',(0,0),(-1,-1),0.7,BORDER),
+            ('VALIGN',(0,0),(-1,-1),'MIDDLE'),
+            ('ROWBACKGROUNDS',(0,1),(-1,-1),[colors.white,colors.HexColor('#fbfaff')]),
+            ('TOPPADDING',(0,0),(-1,-1),6),('BOTTOMPADDING',(0,0),(-1,-1),6),
+            ('LEFTPADDING',(0,0),(-1,-1),8),('RIGHTPADDING',(0,0),(-1,-1),8),
+        ]))
+        story+=[bt,Spacer(1,10)]
+        story.append(P("كل المبالغ بالجنيه المصري. الأرقام تقديرية وتُراجع قبل الاستخدام الرسمي.",7.6,MUTED,leading=11))
+        doc.build(story,onFirstPage=on_page,onLaterPages=on_page)
+        buf.seek(0)
+        return buf
+    story+=sec("بيانات الإدخال")
+    it=Table([[P(v,9),P(k,9,MUTED)] for k,v in inputs],colWidths=[usable*0.45,usable*0.55])
+    it.setStyle(TableStyle([
+        ('GRID',(0,0),(-1,-1),0.5,BORDER),('VALIGN',(0,0),(-1,-1),'MIDDLE'),
+        ('ROWBACKGROUNDS',(0,0),(-1,-1),[colors.white,LIGHT]),
+        ('TOPPADDING',(0,0),(-1,-1),5),('BOTTOMPADDING',(0,0),(-1,-1),5),
+        ('LEFTPADDING',(0,0),(-1,-1),8),('RIGHTPADDING',(0,0),(-1,-1),8),
+    ]))
+    story+=[it,Spacer(1,12)]
+    story+=sec("ملخص النتائج")
     story+=[sm,Spacer(1,12)]
     story+=sec("تفاصيل الحساب")
     def row(label,base,rate,amount,note,tone=""):
@@ -6628,22 +6664,27 @@ elif page == "🧮 حاسبة الضرائب":
                     ("خصم 20% من ض.ق.م من المستحق","نعم" if _tc_add_vat20 else "لا"),
                     ("خصم الدمغة من المستحق","نعم" if _tc_add_stamp else "لا")]
     _tc_sig=repr((_tc_sub,tuple(_tc_inputs),{_k:_tc_res.get(_k) for _k in ("net","vat","vat20","stamp","wht","add_vat20","add_stamp","invoice_total","tax_total","deductions","payable")}))
-    st.caption("الكشف بيشمل بيانات الإدخال وملخص النتائج وتفاصيل الحساب — جاهز للطباعة أو الحفظ.")
+    st.caption("اختار كشف تفصيلي (بيانات الإدخال + جدول الحساب الكامل) أو تقرير مختصر (أهم الأرقام والضرائب المطبقة) — الاتنين جاهزين للطباعة.")
     _tcp1,_tcp2=st.columns(2)
     with _tcp1:
-        _tc_gen=st.button("📄 إصدار كشف PDF",key="tc_pdf_btn",type="primary",use_container_width=True)
-    if _tc_gen:
+        _tc_gen=st.button("📄 كشف تفصيلي PDF",key="tc_pdf_btn",type="primary",use_container_width=True)
+    with _tcp2:
+        _tc_gen_brief=st.button("📝 تقرير مختصر PDF",key="tc_pdf_brief_btn",use_container_width=True)
+    _tc_kind="brief" if _tc_gen_brief else ("full" if _tc_gen else "")
+    if _tc_kind:
         try:
-            _tc_pdf=tc_build_pdf(_tc_res,_tc_inputs,_tc_sub,_tc_cur.get("display_name") or _tc_cur.get("username") or "")
-            st.session_state["tc_pdf_cache"]={"sig":_tc_sig,"data":_tc_pdf.getvalue(),
-                                              "name":f"كشف_حساب_ضريبي_{datetime.now():%Y%m%d_%H%M}.pdf"}
+            _tc_pdf=tc_build_pdf(_tc_res,_tc_inputs,_tc_sub,_tc_cur.get("display_name") or _tc_cur.get("username") or "",
+                                 brief=(_tc_kind=="brief"))
+            _tc_pref="تقرير_مختصر" if _tc_kind=="brief" else "كشف_حساب_ضريبي"
+            st.session_state["tc_pdf_cache"]={"sig":_tc_sig,"kind":_tc_kind,"data":_tc_pdf.getvalue(),
+                                              "name":f"{_tc_pref}_{datetime.now():%Y%m%d_%H%M}.pdf"}
         except Exception as _tc_pdf_err:
             st.session_state.pop("tc_pdf_cache",None)
-            st.error("تعذر إصدار كشف PDF: "+str(_tc_pdf_err))
+            st.error("تعذر إصدار PDF: "+str(_tc_pdf_err))
     _tc_pdf_cache=st.session_state.get("tc_pdf_cache")
     if _tc_pdf_cache and _tc_pdf_cache.get("sig")==_tc_sig:
-        with _tcp2:
-            st.download_button("⬇️ تحميل كشف PDF",data=_tc_pdf_cache["data"],file_name=_tc_pdf_cache["name"],
-                               mime="application/pdf",key="tc_pdf_dl",use_container_width=True)
+        st.download_button("⬇️ تحميل التقرير المختصر PDF" if _tc_pdf_cache.get("kind")=="brief" else "⬇️ تحميل الكشف PDF",
+                           data=_tc_pdf_cache["data"],file_name=_tc_pdf_cache["name"],
+                           mime="application/pdf",key="tc_pdf_dl",use_container_width=True)
     elif _tc_pdf_cache:
         st.session_state.pop("tc_pdf_cache",None)
