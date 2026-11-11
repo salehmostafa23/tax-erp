@@ -3077,6 +3077,164 @@ def tc_reverse(total,inc_vat=True,inc_stamp=False,inc_vat20=False,exempt=False,
             "stamp_on":bool(inc_stamp),"exempt":bool(exempt),
             "gross_input":tc_r2(total),"rounding_diff":tc_r2(total-net-_incl_all)}
 
+_TC_FONTS=None
+def _tc_fonts():
+    global _TC_FONTS
+    if _TC_FONTS: return _TC_FONTS
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    reg,bold="Helvetica","Helvetica-Bold"
+    base=os.path.dirname(os.path.abspath(__file__))
+    for _r,_b,_nm in ((os.path.join(base,"assets","Amiri-Regular.ttf"),os.path.join(base,"assets","Amiri-Bold.ttf"),("TcAr","TcArB")),
+                      ("C:/Windows/Fonts/arial.ttf","C:/Windows/Fonts/arialbd.ttf",("TcAr","TcArB"))):
+        try:
+            if not os.path.exists(_r): continue
+            pdfmetrics.registerFont(TTFont(_nm[0],_r));reg=_nm[0]
+            if os.path.exists(_b):
+                pdfmetrics.registerFont(TTFont(_nm[1],_b));bold=_nm[1]
+            break
+        except Exception:
+            continue
+    _TC_FONTS=(reg,bold)
+    return _TC_FONTS
+
+def _tc_ar(t):
+    _s="".join(ch for ch in str(t) if not (ord(ch)>0xFFFF or 0x2600<=ord(ch)<=0x27BF or 0x2B00<=ord(ch)<=0x2BFF or ord(ch) in (0xFE0F,0x200D,0x20E3))).strip()
+    try:
+        import arabic_reshaper
+        from bidi.algorithm import get_display
+        return get_display(arabic_reshaper.reshape(_s))
+    except Exception:
+        return _s
+
+def tc_build_pdf(res,inputs,mode_label,user_name="",generated_at=None):
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.lib.units import cm
+    from reportlab.lib.enums import TA_RIGHT, TA_CENTER
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.platypus.flowables import HRFlowable
+    from reportlab.lib.styles import ParagraphStyle
+    font_reg,font_bold=_tc_fonts()
+    PRIMARY=colors.HexColor('#5b4bd6');INK=colors.HexColor('#1b1e3a');MUTED=colors.HexColor('#6a6f92')
+    LIGHT=colors.HexColor('#f6f5ff');BORDER=colors.HexColor('#e2e0f4');GREEN=colors.HexColor('#0a8064')
+    RED=colors.HexColor('#c0392b');ORANGE=colors.HexColor('#a86207')
+    def P(txt,size=9,color=INK,bold=False,align=TA_RIGHT,leading=None):
+        st=ParagraphStyle('x',fontName=font_bold if bold else font_reg,fontSize=size,
+                          leading=leading or size*1.45,textColor=color,alignment=align)
+        return Paragraph(_tc_ar(txt),st)
+    def sec(title):
+        return [P(title,11.5,PRIMARY,True),HRFlowable(width="100%",thickness=0.8,color=BORDER,spaceBefore=3,spaceAfter=6)]
+    if generated_at is None:
+        try:
+            from zoneinfo import ZoneInfo
+            generated_at=datetime.now(ZoneInfo("Africa/Cairo")).replace(tzinfo=None)
+        except Exception:
+            generated_at=datetime.now()
+    when=generated_at.strftime("%Y-%m-%d  %H:%M")
+    rev=res.get("mode")=="reverse"
+    left=right=1.5*cm;top=1.3*cm;bottom=1.6*cm
+    usable=A4[0]-left-right
+    buf=BytesIO()
+    doc=SimpleDocTemplate(buf,pagesize=A4,leftMargin=left,rightMargin=right,topMargin=top,bottomMargin=bottom,
+                          title=_tc_ar("كشف حساب ضريبي"),author=_tc_ar("نظام إدارة الضرائب"))
+    def on_page(canv,_doc):
+        canv.saveState()
+        canv.setStrokeColor(BORDER);canv.setLineWidth(0.6)
+        canv.line(left,1.25*cm,A4[0]-right,1.25*cm)
+        canv.setFont(font_reg,7.5);canv.setFillColor(MUTED)
+        canv.drawString(left,0.85*cm,_tc_ar("نظام إدارة الضرائب — كشف حساب ضريبي"))
+        canv.drawRightString(A4[0]-right,0.85*cm,str(canv.getPageNumber()))
+        canv.restoreState()
+    story=[]
+    head=Table([[P("كشف حساب ضريبي",19,colors.white,True,TA_RIGHT,24),
+                 P("نظام إدارة الضرائب",9,colors.HexColor('#ded9ff'),False,TA_CENTER)]],
+               colWidths=[usable*0.72,usable*0.28])
+    head.setStyle(TableStyle([
+        ('BACKGROUND',(0,0),(-1,-1),PRIMARY),('VALIGN',(0,0),(-1,-1),'MIDDLE'),
+        ('LEFTPADDING',(0,0),(-1,-1),12),('RIGHTPADDING',(0,0),(-1,-1),12),
+        ('TOPPADDING',(0,0),(-1,-1),10),('BOTTOMPADDING',(0,0),(-1,-1),10),
+    ]))
+    story+=[head,Spacer(1,6)]
+    meta=Table([[P("أُعد بواسطة",7.2,MUTED,align=TA_CENTER),P("الوضع",7.2,MUTED,align=TA_CENTER),P("التاريخ",7.2,MUTED,align=TA_CENTER)],
+                [P(user_name or "—",9.5,INK,align=TA_CENTER),P(mode_label,9.5,INK,align=TA_CENTER),P(when,9.5,INK,align=TA_CENTER)]],
+               colWidths=[usable/3.0]*3)
+    meta.setStyle(TableStyle([
+        ('BACKGROUND',(0,0),(-1,-1),LIGHT),('BOX',(0,0),(-1,-1),0.6,BORDER),('LINEBELOW',(0,0),(-1,0),0.4,BORDER),
+        ('VALIGN',(0,0),(-1,-1),'MIDDLE'),
+        ('TOPPADDING',(0,0),(-1,0),5),('BOTTOMPADDING',(0,0),(-1,0),2),
+        ('TOPPADDING',(0,1),(-1,1),2),('BOTTOMPADDING',(0,1),(-1,1),6),
+        ('LEFTPADDING',(0,0),(-1,-1),8),('RIGHTPADDING',(0,0),(-1,-1),8),
+    ]))
+    story+=[meta,Spacer(1,12)]
+    story+=sec("بيانات الإدخال")
+    it=Table([[P(v,9),P(k,9,MUTED)] for k,v in inputs],colWidths=[usable*0.45,usable*0.55])
+    it.setStyle(TableStyle([
+        ('GRID',(0,0),(-1,-1),0.5,BORDER),('VALIGN',(0,0),(-1,-1),'MIDDLE'),
+        ('ROWBACKGROUNDS',(0,0),(-1,-1),[colors.white,LIGHT]),
+        ('TOPPADDING',(0,0),(-1,-1),5),('BOTTOMPADDING',(0,0),(-1,-1),5),
+        ('LEFTPADDING',(0,0),(-1,-1),8),('RIGHTPADDING',(0,0),(-1,-1),8),
+    ]))
+    story+=[it,Spacer(1,12)]
+    story+=sec("ملخص النتائج")
+    cards=[("إجمالي الفاتورة",fmt(res["invoice_total"]),INK),
+           ("إجمالي الأعباء الضريبية",fmt(res["tax_total"]),ORANGE),
+           ("إجمالي الخصومات",fmt(res["deductions"]),RED),
+           ("صافي المستحق للدفع",fmt(res["payable"]),GREEN)]
+    sm=Table([[P(lbl,8,MUTED) for lbl,_v,_c in cards],
+              [P(v,13,c,True,TA_RIGHT,18) for _l,v,c in cards]],colWidths=[usable/4.0]*4)
+    sm.setStyle(TableStyle([
+        ('BACKGROUND',(0,0),(-1,-1),LIGHT),('BOX',(0,0),(-1,-1),0.8,BORDER),('INNERGRID',(0,0),(-1,-1),0.5,BORDER),
+        ('TOPPADDING',(0,0),(-1,-1),6),('BOTTOMPADDING',(0,0),(-1,-1),6),
+        ('LEFTPADDING',(0,0),(-1,-1),8),('RIGHTPADDING',(0,0),(-1,-1),8),
+    ]))
+    story+=[sm,Spacer(1,12)]
+    story+=sec("تفاصيل الحساب")
+    def row(label,base,rate,amount,note,tone=""):
+        col={"ded":RED,"add":GREEN}.get(tone,INK)
+        return [P(note,7.6,MUTED),P(amount,9.2,col,True),P(rate,8.4,MUTED),P(base,8.4,MUTED),P(label,9)]
+    if rev:
+        rows=[row("المبلغ الشامل المُدخل","—","—",fmt(res["gross_input"]),"يدخل كامل ضمن المبلغ"),
+              row("الأساس المستخرج","—","—",fmt(res["net"]),"بعد استبعاد الضرائب المضمّنة"),
+              row("ضريبة القيمة المضافة",fmt(res["net"]),"14%",fmt(res["vat"]) if res["vat_on"] else "—","مضمّنة داخل المبلغ" if res["vat_on"] else "غير مطبقة")]
+        if res["vat20_on"]:
+            rows.append(row("20% من ضريبة القيمة المضافة",fmt(res["vat"]),"20% من ض.ق.م",fmt(res["vat20"]),"مضمّنة داخل المبلغ"))
+        if res["stamp_on"]:
+            rows.append(row("ضريبة الدمغة النسبية",fmt(res["net"]),f"{res['stamp_rate']*100:.1f}%" if res["stamp_rate"] else "—",fmt(res["stamp"]),res["stamp_note"]+" — مضمّنة"))
+        if res["add_vat20"]:
+            rows.append(row("20% من ضريبة القيمة المضافة (خصم)",fmt(res["vat"]),"20% من ض.ق.م",fmt(res["add_vat20"]),"تُخصم من صافي المستحق","ded"))
+        if res["add_stamp"]:
+            rows.append(row("ضريبة الدمغة النسبية (خصم)",fmt(res["net"]),f"{res['add_stamp_rate']*100:.1f}%" if res["add_stamp_rate"] else "—",fmt(res["add_stamp"]),"تُخصم من صافي المستحق","ded"))
+        rows.append(row("ضريبة الخصم والتحصيل تحت حساب الضريبة",fmt(res["net"]),f"{res['wht_rate']*100:g}%" if res["wht"] else "—",fmt(res["wht"]) if res["wht"] else "—","تُخصم من صافي المستحق" if res["wht"] else "غير مطبقة","ded"))
+        rows.append(row("إجمالي الأعباء الضريبية","—","—",fmt(res["tax_total"]),"ض.ق.م + دمغة + خصم وتحصيل"))
+        rows.append(row("إجمالي الفاتورة","—","—",fmt(res["invoice_total"]),"المبلغ الشامل كما هو"))
+        rows.append(row("إجمالي الخصومات","—","—",fmt(res["deductions"]),"البند ٢ — مبالغ تُخصم","ded"))
+        rows.append(row("صافي المستحق للدفع","—","—",fmt(res["payable"]),"المبلغ الشامل − إجمالي الخصومات"))
+    else:
+        rows=[row("ضريبة القيمة المضافة",fmt(res["net"]),"14%",fmt(res["vat"]) if res["vat_on"] else "—","داخل إجمالي الفاتورة" if res["vat_on"] else "غير مطبقة"),
+              row("20% من ضريبة القيمة المضافة (خصم)",fmt(res["vat"]) if res["vat_on"] else "—","20% من ض.ق.م",fmt(res["vat20"]) if res["vat20_on"] else "—","تُخصم من صافي المستحق" if res["vat20_on"] else "غير مطبقة","ded"),
+              row("ضريبة الدمغة النسبية (خصم)",fmt(res["net"]),f"{res['stamp_rate']*100:.1f}%" if res["stamp_rate"] else "—",fmt(res["stamp"]) if res["stamp_on"] else "—","تُخصم من صافي المستحق" if res["stamp_on"] else "غير مطبقة","ded"),
+              row("ضريبة الخصم والتحصيل تحت حساب الضريبة",fmt(res["net"]),f"{res['wht_rate']*100:g}%" if res["wht"] else "—",fmt(res["wht"]) if res["wht"] else "—","تُخصم من صافي المستحق" if res["wht"] else "غير مطبقة","ded"),
+              row("إجمالي الأعباء الضريبية","—","—",fmt(res["tax_total"]),"ض.ق.م + دمغة + خصم وتحصيل"),
+              row("إجمالي الفاتورة","—","—",fmt(res["invoice_total"]),"الأساس + ض.ق.م فقط"),
+              row("إجمالي الخصومات","—","—",fmt(res["deductions"]),"البند ٢ — مبالغ تُخصم","ded"),
+              row("صافي المستحق للدفع","—","—",fmt(res["payable"]),"إجمالي الفاتورة − إجمالي الخصومات")]
+    headers=[P("ملاحظات",8.3,PRIMARY,True),P("المبلغ (ج.م)",8.3,PRIMARY,True),P("النسبة",8.3,PRIMARY,True),P("الأساس",8.3,PRIMARY,True),P("البند",8.3,PRIMARY,True)]
+    dt=Table([headers]+rows,colWidths=[usable*0.24,usable*0.15,usable*0.13,usable*0.145,usable*0.335],repeatRows=1)
+    dt.setStyle(TableStyle([
+        ('BACKGROUND',(0,0),(-1,0),colors.HexColor('#ece9ff')),('LINEBELOW',(0,0),(-1,0),0.8,PRIMARY),
+        ('INNERGRID',(0,0),(-1,-1),0.4,BORDER),('BOX',(0,0),(-1,-1),0.7,BORDER),
+        ('VALIGN',(0,0),(-1,-1),'MIDDLE'),
+        ('ROWBACKGROUNDS',(0,1),(-1,-1),[colors.white,colors.HexColor('#fbfaff')]),
+        ('TOPPADDING',(0,0),(-1,-1),5.5),('BOTTOMPADDING',(0,0),(-1,-1),5.5),
+        ('LEFTPADDING',(0,0),(-1,-1),6),('RIGHTPADDING',(0,0),(-1,-1),6),
+    ]))
+    story+=[dt,Spacer(1,10)]
+    story.append(P("كل المبالغ بالجنيه المصري. الأرقام تقديرية وتُراجع قبل الاستخدام الرسمي — نسبة 20% من ض.ق.م داخلة أصلاً في ضريبة القيمة المضافة فلا تُضاف لإجمالي الأعباء الضريبية.",7.6,MUTED,leading=11))
+    doc.build(story,onFirstPage=on_page,onLaterPages=on_page)
+    buf.seek(0)
+    return buf
+
 def tc_render(res):
     _rev=res.get("mode")=="reverse"
     def _card(col,cls,label,value,sub):
@@ -6450,3 +6608,42 @@ elif page == "🧮 حاسبة الضرائب":
         st.caption(f"المبلغ الشامل المُدخل: {fmt(_tc_res['gross_input'])} ج.م"+(f" • فرق تقريب: {fmt(_tc_diff)} ج.م" if abs(_tc_diff)>=0.005 else ""))
     tc_render(_tc_res)
     st.caption("في وضع المبلغ الأساسي: إجمالي الفاتورة = الأساس + ض.ق.م 14% فقط، و(20% من ض.ق.م + الدمغة النسبية + الخصم والتحصيل) تُخصم من صافي المستحق للدفع. في وضع المبلغ الشامل: الشق الأول يستبعد الضرائب المضمّنة فقط (ض.ق.م 14%، و20% منها لو محددة، والدمغة لو محددة) لاستخراج الأساس، والشق الثاني يُحسب على الأساس المستخرج ويُخصم من صافي المستحق (صافي المستحق = المبلغ الشامل − إجمالي الخصومات). الـ20% من ض.ق.م داخلة أصلاً في ضريبة القيمة المضافة فلا تُضاف لإجمالي الأعباء الضريبية في كلا الوضعين. الدمغة النسبية تُحسب على (المبلغ − 50) بشرائح تصاعدية، وتُعفى الجهات الواردة في قائمة الدمغة النسبية الحكومية. الأرقام تقديرية وتُراجع قبل الاستخدام الرسمي.")
+    st.markdown('<div class="erp-section" style="margin-top:.6rem"><div class="erp-section-dot" style="background:#00cec9;"></div><h3>إصدار كشف PDF</h3></div>',unsafe_allow_html=True)
+    _tc_cur=get_current_user() or {}
+    _tc_wht_label=_tc_wht_sel if _tc_wht_sel!="بدون" else "بدون (غير مطبقة)"
+    if _tc_sub=="🧾 حساب على المبلغ الأساسي":
+        _tc_inputs=[("المبلغ قبل الضرائب (ج.م)",fmt(_tc_net_f)),
+                    ("ضريبة الخصم والتحصيل",_tc_wht_label),
+                    ("ضريبة القيمة المضافة 14%","مطبقة" if _tc_vat else "غير مطبقة"),
+                    ("20% من ض.ق.م","مطبقة — تُخصم من المستحق" if _tc_vat20 else "غير مطبقة"),
+                    ("ضريبة الدمغة النسبية","مطبقة" if _tc_stamp else "غير مطبقة"),
+                    ("إعفاء من الدمغة","نعم" if _tc_ex else "لا")]
+    else:
+        _tc_inputs=[("المبلغ الشامل للضرائب (ج.م)",fmt(float(_tc_gross))),
+                    ("ض.ق.م مضمّنة داخل المبلغ","نعم" if _tc_vat else "لا"),
+                    ("20% من ض.ق.م مضمّنة","نعم" if _tc_vat20 else "لا"),
+                    ("الدمغة النسبية مضمّنة","نعم" if _tc_stamp else "لا"),
+                    ("إعفاء من الدمغة","نعم" if _tc_ex else "لا"),
+                    ("ضريبة الخصم والتحصيل",_tc_wht_label),
+                    ("خصم 20% من ض.ق.م من المستحق","نعم" if _tc_add_vat20 else "لا"),
+                    ("خصم الدمغة من المستحق","نعم" if _tc_add_stamp else "لا")]
+    _tc_sig=repr((_tc_sub,tuple(_tc_inputs),{_k:_tc_res.get(_k) for _k in ("net","vat","vat20","stamp","wht","add_vat20","add_stamp","invoice_total","tax_total","deductions","payable")}))
+    st.caption("الكشف بيشمل بيانات الإدخال وملخص النتائج وتفاصيل الحساب — جاهز للطباعة أو الحفظ.")
+    _tcp1,_tcp2=st.columns(2)
+    with _tcp1:
+        _tc_gen=st.button("📄 إصدار كشف PDF",key="tc_pdf_btn",type="primary",use_container_width=True)
+    if _tc_gen:
+        try:
+            _tc_pdf=tc_build_pdf(_tc_res,_tc_inputs,_tc_sub,_tc_cur.get("display_name") or _tc_cur.get("username") or "")
+            st.session_state["tc_pdf_cache"]={"sig":_tc_sig,"data":_tc_pdf.getvalue(),
+                                              "name":f"كشف_حساب_ضريبي_{datetime.now():%Y%m%d_%H%M}.pdf"}
+        except Exception as _tc_pdf_err:
+            st.session_state.pop("tc_pdf_cache",None)
+            st.error("تعذر إصدار كشف PDF: "+str(_tc_pdf_err))
+    _tc_pdf_cache=st.session_state.get("tc_pdf_cache")
+    if _tc_pdf_cache and _tc_pdf_cache.get("sig")==_tc_sig:
+        with _tcp2:
+            st.download_button("⬇️ تحميل كشف PDF",data=_tc_pdf_cache["data"],file_name=_tc_pdf_cache["name"],
+                               mime="application/pdf",key="tc_pdf_dl",use_container_width=True)
+    elif _tc_pdf_cache:
+        st.session_state.pop("tc_pdf_cache",None)
