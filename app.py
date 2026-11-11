@@ -286,14 +286,17 @@ def eta_login(client_id, client_secret):
     encoded = base64.b64encode(cred.encode()).decode()
     headers = {"Authorization": f"Basic {encoded}", "Content-Type": "application/x-www-form-urlencoded"}
     data = {"grant_type": "client_credentials"}
-    r = http_requests.post(ETA_IDENTITY_URL, headers=headers, data=data, timeout=30, verify=False)
-    if r.status_code == 200:
-        return r.json().get("access_token"), None
     try:
-        err = r.json()
-        return None, err.get("error_description", err.get("error", r.text[:200]))
-    except:
-        return None, f"HTTP {r.status_code}: {r.text[:200]}"
+        r = http_requests.post(ETA_IDENTITY_URL, headers=headers, data=data, timeout=30, verify=False)
+        if r.status_code == 200:
+            return r.json().get("access_token"), None
+        try:
+            err = r.json()
+            return None, err.get("error_description", err.get("error", r.text[:200]))
+        except:
+            return None, f"HTTP {r.status_code}: {r.text[:200]}"
+    except Exception as e:
+        return None, f"تعذر الاتصال بسيرفر الضرائب: {e}"
 
 def eta_search_docs(token, direction, date_from, date_to, page_size=100):
     url = f"{ETA_API_BASE}/api/v1.0/documents/search"
@@ -419,7 +422,10 @@ def save_codes_db(data):
 def eta_get_document_details(token, uuid_val):
     url=f"{ETA_API_BASE}/api/v1.0/documents/{uuid_val}/details"
     headers={"Authorization":f"Bearer {token}"}
-    r=http_requests.get(url,headers=headers,timeout=30,verify=False)
+    try:
+        r=http_requests.get(url,headers=headers,timeout=30,verify=False)
+    except Exception as e:
+        return None,f"تعذر الاتصال بالبورتال: {e}"
     if r.status_code==200:
         data=r.json()
         try:
