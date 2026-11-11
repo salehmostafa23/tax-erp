@@ -1055,6 +1055,18 @@
       "title": "سجل دخول للنظام",
       "detail": "@admin",
       "page": "تسجيل الدخول"
+    },
+    {
+      "id": "d9c7e8c2a984",
+      "ts": "2026-11-11T06:17:39",
+      "user": "المدير",
+      "username": "admin",
+      "role": "admin",
+      "kind": "login",
+      "action": "login",
+      "title": "سجل دخول للنظام",
+      "detail": "@admin",
+      "page": "تسجيل الدخول"
     }
   ],
   "seen": {
