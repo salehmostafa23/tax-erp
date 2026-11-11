@@ -63,7 +63,7 @@ DATA_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # ====================== USERS ======================
 USERS_FILE=os.path.join(DATA_DIR,"users.json")
-ALL_PAGES=["🏠 الرئيسية","📋 نموذج 41","💰 القيمة المضافة","🛒 فواتير الماركت","📄 Portal الفواتير الإلكترونية","🔍 الاستعلام عن ممول","🏷️ الاستعلام عن الأكواد","📑 اقرار 10 قيمة مضافة","📦 فواتير مبيعات الجملة والإيجارات","📤 تحديث الفواتير","🧮 حاسبة الضرائب"]
+ALL_PAGES=["🏠 الرئيسية","📋 نموذج 41","💰 القيمة المضافة","🛒 فواتير الماركت","📄 Portal الفواتير الإلكترونية","🧾 الاستعلام عن الفواتير المصروفة","🔍 الاستعلام عن ممول","🏷️ الاستعلام عن الأكواد","📑 اقرار 10 قيمة مضافة","📦 فواتير مبيعات الجملة والإيجارات","📤 تحديث الفواتير","🧮 حاسبة الضرائب"]
 ADMIN_PAGE="👥 إدارة المستخدمين"
 SUB_PAGES={
  "📋 نموذج 41":["📤 رفع وربط البيانات","🔍 استعلام بالسجل الضريبي","📅 استعلام بالفترة"],
@@ -5199,6 +5199,193 @@ elif page=="📄 Portal الفواتير الإلكترونية":
                 <p style="color:var(--text2);">اضضغط تحديث لتحميل تصنيف Brick من GS1</p>
                 <p style="color:var(--text2);font-size:.78rem;margin-top:.5rem;">Segment → Family → Class — يدعم البحث بالعربي والإنجليزي</p>
             </div>""",unsafe_allow_html=True)
+
+# ====================== الاستعلام عن الفواتير المصروفة ======================
+elif page=="🧾 الاستعلام عن الفواتير المصروفة":
+    if not user_has_permission(page): st.error("لا تملك صلاحية الوصول");st.stop()
+
+    st.markdown(f"""<div class="erp-topbar"><div><h2>{page}</h2><p>ارفع شيت أرقام UUID للفواتير الصادرة واعرف من البورتال هل لسه سارية ولا تم إلغاؤها</p></div>
+<div class="erp-topbar-right"><span class="erp-badge">🧾 متابعة الفواتير</span></div></div>""", unsafe_allow_html=True)
+
+    _iss_uuid_re=re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
+    _iss_status_map={"valid":"سارية / صحيحة","cancelled":"ملغاة","invalid":"غير صحيحة",
+                     "rejected":"مرفوضة","submitted":"مرسلة (قيد المعالجة)"}
+
+    _iss_cid=os.environ.get("ETA_CLIENT_ID","") or st.session_state.get("eta_client_id","")
+    _iss_csec=os.environ.get("ETA_CLIENT_SECRET","") or st.session_state.get("eta_client_secret","")
+    if not _iss_cid:
+        try:
+            _iss_cid=st.secrets.get("ETA_CLIENT_ID","")
+            _iss_csec=st.secrets.get("ETA_CLIENT_SECRET","")
+        except Exception:
+            pass
+    if _iss_cid and not st.session_state.get("eta_token") and not st.session_state.get("issued_auto_tried"):
+        st.session_state["issued_auto_tried"]=True
+        _tk,_er=eta_login(_iss_cid,_iss_csec)
+        if _tk:
+            st.session_state["eta_token"]=_tk
+            st.session_state["eta_client_id"]=_iss_cid
+            st.session_state["eta_client_secret"]=_iss_csec
+        else:
+            st.session_state["issued_auto_err"]=str(_er)
+
+    st.markdown('<div class="erp-section"><div class="erp-section-dot"></div><h3>الاتصال بالبورتال</h3></div>',unsafe_allow_html=True)
+    _iss_token=st.session_state.get("eta_token","")
+    if _iss_token:
+        st.markdown('<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(85,239,196,.06);border:1px solid rgba(85,239,196,.15);color:#55efc4;font-size:.82rem;">✅ متصل بالبورتال — جاهز للاستعلام</div>',unsafe_allow_html=True)
+    else:
+        if st.session_state.get("issued_auto_err"):
+            st.warning("تعذر الاتصال التلقائي بالبورتال: "+str(st.session_state.get("issued_auto_err")))
+        st.markdown('<div style="padding:.5rem 1rem;border-radius:10px;background:rgba(253,203,110,.06);border:1px solid rgba(253,203,110,.15);color:#fdcb6e;font-size:.78rem;">💡 بيانات الربط بتتاخد من إعدادات النظام (ETA_CLIENT_ID / ETA_CLIENT_SECRET) أو تدخلها هنا يدوياً — مش بتتحفظ في الكود</div>',unsafe_allow_html=True)
+        _ic1,_ic2=st.columns(2)
+        with _ic1:
+            _iss_cid_in=st.text_input("Client ID",value=st.session_state.get("eta_client_id",""),key="issued_cid")
+        with _ic2:
+            _iss_csec_in=st.text_input("Client Secret",value=st.session_state.get("eta_client_secret",""),type="password",key="issued_csec")
+        if st.button("🔗 ربط الحساب",key="issued_login_btn",type="primary"):
+            if not _iss_cid_in or not _iss_csec_in:
+                st.warning("اكتب Client ID و Client Secret")
+            else:
+                _tk,_er=eta_login(_iss_cid_in,_iss_csec_in)
+                if _er:
+                    st.error("فشل الربط: "+str(_er))
+                else:
+                    st.session_state["eta_token"]=_tk
+                    st.session_state["eta_client_id"]=_iss_cid_in
+                    st.session_state["eta_client_secret"]=_iss_csec_in
+                    st.session_state.pop("issued_auto_err",None)
+                    st.success("تم الربط بنجاح")
+                    st.rerun()
+
+    st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot" style="background:#fdcb6e;"></div><h3>شيت الفواتير الصادرة</h3></div>',unsafe_allow_html=True)
+    st.markdown('<div style="padding:.5rem 1rem;border-radius:10px;background:rgba(116,185,255,.06);border:1px solid rgba(116,185,255,.15);color:#74b9ff;font-size:.78rem;">📌 الشيت ممكن يكون فيه UUID في أي عمود — النظام بيستخرج الأرقام تلقائياً ويشيل التكرار مع الحفاظ على الترتيب، وبعدين يستعلم من البورتال فاتورة فاتورة</div>',unsafe_allow_html=True)
+    _iss_file=st.file_uploader("ارفع شيت أرقام UUID",type=["xlsx","xls"],key="issued_uuid_file")
+    if _iss_file:
+        _iss_sheets=None
+        try:
+            _iss_file.seek(0)
+            _iss_sheets=pd.read_excel(_iss_file,sheet_name=None,header=None,dtype=str,engine="openpyxl")
+        except Exception:
+            st.error("تعذر قراءة الملف — لو الملف بصيغة .xls قديمة حوّله .xlsx الأول")
+        if _iss_sheets is not None:
+            _iss_uuids=[]
+            _seen_uu=set()
+            for _sh_df in _iss_sheets.values():
+                for _col in _sh_df.columns:
+                    for _v in _sh_df[_col].tolist():
+                        if _v is None or isinstance(_v,float): continue
+                        _s=str(_v).strip()
+                        if not _s: continue
+                        _ms=_iss_uuid_re.findall(_s)
+                        if not _ms:
+                            _h="".join(ch for ch in _s if ch.isalnum())
+                            if re.fullmatch(r"[0-9a-fA-F]{32}",_h):
+                                _ms=["-".join([_h[0:8],_h[8:12],_h[12:16],_h[16:20],_h[20:32]])]
+                        for _m in _ms:
+                            _mu=_m.lower()
+                            if _mu not in _seen_uu:
+                                _seen_uu.add(_mu); _iss_uuids.append(_mu)
+            if not _iss_uuids:
+                st.warning("مفيش أرقام UUID صالحة في الملف — تأكد إن الأرقام بصيغة 8-4-4-4-12")
+            else:
+                _iss_sig=hashlib.md5("\n".join(_iss_uuids).encode()).hexdigest()
+                st.markdown(f'<div style="padding:.5rem 1rem;border-radius:10px;background:rgba(0,206,201,.06);border:1px solid rgba(0,206,201,.15);color:#00cec9;font-size:.82rem;margin-top:.4rem;">✅ تم قراءة <strong>{len(_iss_uuids)}</strong> رقم UUID فريد</div>',unsafe_allow_html=True)
+                if not _iss_token:
+                    st.info("اربط البورتال الأول من الأعلى عشان تبدأ الاستعلام")
+                elif st.button(f"🔍 استعلام حالة {len(_iss_uuids)} فاتورة",key="issued_scan_btn",type="primary",use_container_width=True):
+                    def _iss_pick(_roots,_keys,_def=""):
+                        for _rt in _roots:
+                            for _k in _keys:
+                                _v=_rt.get(_k)
+                                if _v not in (None,""): return _v
+                        return _def
+                    def _iss_party(_roots,_side):
+                        for _rt in _roots:
+                            _nm=_rt.get(_side+"Name","");_id=_rt.get(_side+"Id","")
+                            _obj=_rt.get(_side)
+                            if isinstance(_obj,dict):
+                                _nm=_nm or _obj.get("name","")
+                                _id=_id or _obj.get("id","") or _obj.get("registrationNumber","")
+                            if _nm or _id: return str(_nm or ""),str(_id or "")
+                        return "",""
+                    def _iss_raw_status(_roots):
+                        for _rt in _roots:
+                            for _k in ("status","documentStatus","documentState"):
+                                _v=_rt.get(_k)
+                                if isinstance(_v,str) and _v.strip(): return _v.strip()
+                        return ""
+                    _iss_rows=[]
+                    _iss_prog=st.progress(0.0)
+                    _iss_ph=st.empty()
+                    for _i,_u in enumerate(_iss_uuids):
+                        _iss_ph.markdown(f"🔍 جاري الاستعلام عن الفاتورة <strong>{_i+1}/{len(_iss_uuids)}</strong> — <span style='color:#a29bfe;font-size:.75rem;'>{_u}</span>")
+                        _data,_err=eta_get_document_details(_iss_token,_u)
+                        if _err and "401" in str(_err):
+                            _tk2=_eta_refresh_token()
+                            if _tk2:
+                                _iss_token=_tk2
+                                _data,_err=eta_get_document_details(_iss_token,_u)
+                        _roots=[]
+                        if isinstance(_data,dict):
+                            _roots=[_data]
+                            for _rk in ("document","invoice","data","result"):
+                                _ro=_data.get(_rk)
+                                if isinstance(_ro,dict): _roots.append(_ro)
+                                elif isinstance(_ro,list) and _ro and isinstance(_ro[0],dict): _roots.append(_ro[0])
+                        elif isinstance(_data,list) and _data and isinstance(_data[0],dict):
+                            _roots=[_data[0]]
+                        _note="";_en=""
+                        if _err:
+                            if "404" in str(_err): _ar,_en,_note="غير موجودة في البورتال","Not Found",str(_err)
+                            else: _ar,_en,_note="تعذر الاستعلام","Error",str(_err)
+                        else:
+                            _raw=_iss_raw_status(_roots)
+                            if _raw:
+                                _ar=_iss_status_map.get(_raw.lower(),_raw);_en=_raw
+                            else:
+                                _ar,_en,_note="تم الجلب بدون حالة","","الاستجابة لا تحتوي حقل status"
+                        _iss_name,_iss_num=_iss_party(_roots,"issuer")
+                        _rec_name,_rec_num=_iss_party(_roots,"receiver")
+                        _dt_raw=str(_iss_pick(_roots,("documentType","typeName","type"),"") or "")
+                        _dt_label=ETA_DOC_TYPE_MAP.get(_dt_raw.lower(),_dt_raw)
+                        _issued=str(_iss_pick(_roots,("dateTimeIssued","issueDate"),"") or "")[:10]
+                        _iid=str(_iss_pick(_roots,("internalId","internalID","internal_id"),"") or "")
+                        try: _tot=round(float(_iss_pick(_roots,("totalAmount","total","totalWithTax"),0) or 0),2)
+                        except Exception: _tot=0.0
+                        _iss_rows.append({"UUID":_u,"الحالة":_ar,"حالة البورتال (EN)":_en,"نوع المستند":_dt_label,
+                                          "تاريخ الإصدار":_issued,"اسم المصدر":_iss_name,"رقم تسجيل المصدر":_iss_num,
+                                          "اسم المستلم":_rec_name,"رقم تسجيل المستلم":_rec_num,"الإجمالي":_tot,
+                                          "Internal ID":_iid,"ملاحظات":_note})
+                        time.sleep(0.25)
+                        _iss_prog.progress((_i+1)/len(_iss_uuids))
+                    _iss_ph.empty()
+                    st.session_state["issued_uuid_results"]={"sig":_iss_sig,"rows":_iss_rows}
+                    st.rerun()
+                _iss_cache=st.session_state.get("issued_uuid_results")
+                if _iss_cache and _iss_cache.get("sig")==_iss_sig:
+                    _rows=_iss_cache.get("rows",[])
+                    _n_valid=sum(1 for r in _rows if r["الحالة"].startswith("سارية"))
+                    _n_cancel=sum(1 for r in _rows if r["الحالة"]=="ملغاة")
+                    _n_bad=sum(1 for r in _rows if r["الحالة"] in ("مرفوضة","غير صحيحة"))
+                    _n_other=len(_rows)-_n_valid-_n_cancel-_n_bad
+                    st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot" style="background:#55efc4;"></div><h3>نتيجة الاستعلام</h3></div>',unsafe_allow_html=True)
+                    _s1,_s2,_s3,_s4=st.columns(4)
+                    for _ci,(_cl,_cn,_cc) in enumerate((("سارية / صحيحة",_n_valid,"#55efc4"),("ملغاة",_n_cancel,"#ff6b6b"),("مرفوضة / غير صحيحة",_n_bad,"#fdcb6e"),("تعذر / غير محدد",_n_other,"#a29bfe"))):
+                        with [_s1,_s2,_s3,_s4][_ci]:
+                            st.markdown(f'<div class="erp-card" style="text-align:center;padding:.8rem .4rem;"><div style="font-size:1.5rem;font-weight:800;color:{_cc};">{_cn}</div><div style="color:var(--text2);font-size:.72rem;">{_cl}</div></div>',unsafe_allow_html=True)
+                    if _n_cancel:
+                        st.markdown(f'<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(255,107,107,.06);border:1px solid rgba(255,107,107,.18);color:#ff6b6b;font-size:.82rem;margin:.6rem 0;">⚠️ يوجد <strong>{_n_cancel}</strong> فاتورة ملغاة من إجمالي <strong>{len(_rows)}</strong></div>',unsafe_allow_html=True)
+                    _iss_df=pd.DataFrame(_rows)
+                    st.dataframe(_iss_df,use_container_width=True,height=420,hide_index=True)
+                    _iss_xbuf=BytesIO()
+                    _iss_df.to_excel(_iss_xbuf,index=False,engine="xlsxwriter")
+                    _iss_xbuf.seek(0)
+                    st.download_button("📊 تحميل نتيجة الحالة (Excel)",data=_iss_xbuf.getvalue(),file_name=f"حالة_الفواتير_الصادرة_{datetime.now():%Y%m%d_%H%M}.xlsx",mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",key="issued_result_dl",use_container_width=True)
+                    if st.button("🗑️ مسح النتائج",key="issued_clear_btn"):
+                        st.session_state.pop("issued_uuid_results",None)
+                        st.rerun()
+                elif _iss_cache:
+                    st.session_state.pop("issued_uuid_results",None)
 
 # ====================== الاستعلام عن الأكواد ======================
 elif page=="🏷️ الاستعلام عن الأكواد":
