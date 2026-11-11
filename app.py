@@ -5264,7 +5264,7 @@ elif page=="🧾 الاستعلام عن الفواتير المصروفة":
                     st.rerun()
 
     st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot" style="background:#fdcb6e;"></div><h3>شيت الفواتير الصادرة</h3></div>',unsafe_allow_html=True)
-    st.markdown('<div style="padding:.5rem 1rem;border-radius:10px;background:rgba(116,185,255,.06);border:1px solid rgba(116,185,255,.15);color:#74b9ff;font-size:.78rem;">📌 الشيت ممكن يكون فيه UUID في أي عمود — النظام بيستخرج الأرقام تلقائياً ويشيل التكرار مع الحفاظ على الترتيب، وبعدين يستعلم من البورتال فاتورة فاتورة</div>',unsafe_allow_html=True)
+    st.markdown('<div style="padding:.5rem 1rem;border-radius:10px;background:rgba(116,185,255,.06);border:1px solid rgba(116,185,255,.15);color:#74b9ff;font-size:.78rem;">📌 حط أرقام UUID في أي عمود (8-4-4-4-12 أو 26 خانة زي JM0D3ZW0C615RJ8V2Y4DZG6M10) — النظام بيستخرجها تلقائياً ويشيل التكرار مع الحفاظ على الترتيب، وبعدين يستعلم من البورتال فاتورة فاتورة</div>',unsafe_allow_html=True)
     _iss_file=st.file_uploader("ارفع شيت أرقام UUID",type=["xlsx","xls"],key="issued_uuid_file")
     if _iss_file:
         _iss_sheets=None
@@ -5276,23 +5276,30 @@ elif page=="🧾 الاستعلام عن الفواتير المصروفة":
         if _iss_sheets is not None:
             _iss_uuids=[]
             _seen_uu=set()
+            _iss_samples=[]
             for _sh_df in _iss_sheets.values():
                 for _col in _sh_df.columns:
                     for _v in _sh_df[_col].tolist():
                         if _v is None or isinstance(_v,float): continue
                         _s=str(_v).strip()
                         if not _s: continue
-                        _ms=_iss_uuid_re.findall(_s)
-                        if not _ms:
+                        if len(_iss_samples)<6: _iss_samples.append(_s[:60])
+                        _cands=[]
+                        for _m in _iss_uuid_re.findall(_s):
+                            _cands.append(_m.lower())
+                        if not _cands:
                             _h="".join(ch for ch in _s if ch.isalnum())
                             if re.fullmatch(r"[0-9a-fA-F]{32}",_h):
-                                _ms=["-".join([_h[0:8],_h[8:12],_h[12:16],_h[16:20],_h[20:32]])]
-                        for _m in _ms:
-                            _mu=_m.lower()
-                            if _mu not in _seen_uu:
-                                _seen_uu.add(_mu); _iss_uuids.append(_mu)
+                                _cands.append("-".join([_h[0:8],_h[8:12],_h[12:16],_h[16:20],_h[20:32]]).lower())
+                            elif re.fullmatch(r"[0-9A-Za-z]{26}",_s):
+                                _cands.append(_s.upper())
+                        for _m in _cands:
+                            if _m not in _seen_uu:
+                                _seen_uu.add(_m); _iss_uuids.append(_m)
             if not _iss_uuids:
-                st.warning("مفيش أرقام UUID صالحة في الملف — تأكد إن الأرقام بصيغة 8-4-4-4-12")
+                st.warning("مفيش أرقام UUID صالحة في الملف — الصيغ المدعومة: 8-4-4-4-12 أو 32 خانة HEX أو 26 خانة زي JM0D3ZW0C615RJ8V2Y4DZG6M10")
+                if _iss_samples:
+                    st.caption("أمثلة من القيم اللي اتقرأت: "+" • ".join(_iss_samples))
             else:
                 _iss_sig=hashlib.md5("\n".join(_iss_uuids).encode()).hexdigest()
                 st.markdown(f'<div style="padding:.5rem 1rem;border-radius:10px;background:rgba(0,206,201,.06);border:1px solid rgba(0,206,201,.15);color:#00cec9;font-size:.82rem;margin-top:.4rem;">✅ تم قراءة <strong>{len(_iss_uuids)}</strong> رقم UUID فريد</div>',unsafe_allow_html=True)
