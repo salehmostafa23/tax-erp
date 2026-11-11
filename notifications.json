@@ -1067,6 +1067,18 @@
       "title": "سجل دخول للنظام",
       "detail": "@admin",
       "page": "تسجيل الدخول"
+    },
+    {
+      "id": "6f348cc8734a",
+      "ts": "2026-11-11T06:18:24",
+      "user": "المدير",
+      "username": "admin",
+      "role": "admin",
+      "kind": "requests",
+      "action": "create",
+      "title": "أضاف طلب نموذج",
+      "detail": "27 ← 28 سجل — 3393",
+      "page": "📋 نموذج 41"
     }
   ],
   "seen": {
