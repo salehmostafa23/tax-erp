@@ -5214,8 +5214,19 @@ elif page=="🧾 الاستعلام عن الفواتير المصروفة":
 <div class="erp-topbar-right"><span class="erp-badge">🧾 متابعة الفواتير</span></div></div>""", unsafe_allow_html=True)
 
     _iss_uuid_re=re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
-    _iss_status_map={"valid":"سارية / صحيحة","cancelled":"ملغاة","invalid":"غير صحيحة",
-                     "rejected":"مرفوضة","submitted":"مرسلة (قيد المعالجة)"}
+    _iss_status_map={"valid":"سارية / صحيحة","cancelled":"ملغاة","canceled":"ملغاة",
+                     "cancellationrequested":"طلب إلغاء قيد التنفيذ","cancelrequested":"طلب إلغاء قيد التنفيذ",
+                     "requesttocancel":"طلب إلغاء قيد التنفيذ","declined":"طلب الإلغاء مرفوض",
+                     "invalid":"غير صحيحة","rejected":"مرفوضة","submitted":"مرسلة (قيد المعالجة)"}
+    def _iss_norm_all(_s):
+        _out=[_m.lower() for _m in _iss_uuid_re.findall(_s)]
+        if not _out:
+            _h="".join(ch for ch in _s if ch.isalnum())
+            if re.fullmatch(r"[0-9a-fA-F]{32}",_h):
+                _out.append("-".join([_h[0:8],_h[8:12],_h[12:16],_h[16:20],_h[20:32]]).lower())
+            elif re.fullmatch(r"[0-9A-Za-z]{26}",_s):
+                _out.append(_s.upper())
+        return _out
 
     _iss_cid=os.environ.get("ETA_CLIENT_ID","") or st.session_state.get("eta_client_id","")
     _iss_csec=os.environ.get("ETA_CLIENT_SECRET","") or st.session_state.get("eta_client_secret","")
@@ -5264,7 +5275,7 @@ elif page=="🧾 الاستعلام عن الفواتير المصروفة":
                     st.rerun()
 
     st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot" style="background:#fdcb6e;"></div><h3>شيت الفواتير الصادرة</h3></div>',unsafe_allow_html=True)
-    st.markdown('<div style="padding:.5rem 1rem;border-radius:10px;background:rgba(116,185,255,.06);border:1px solid rgba(116,185,255,.15);color:#74b9ff;font-size:.78rem;">📌 حط أرقام UUID في أي عمود (8-4-4-4-12 أو 26 خانة زي JM0D3ZW0C615RJ8V2Y4DZG6M10) — النظام بيستخرجها تلقائياً ويشيل التكرار مع الحفاظ على الترتيب، وبعدين يستعلم من البورتال فاتورة فاتورة</div>',unsafe_allow_html=True)
+    st.markdown('<div style="padding:.5rem 1rem;border-radius:10px;background:rgba(116,185,255,.06);border:1px solid rgba(116,185,255,.15);color:#74b9ff;font-size:.78rem;">📌 حط أرقام UUID في أي عمود (8-4-4-4-12 أو 26 خانة زي JM0D3ZW0C615RJ8V2Y4DZG6M10) — النظام بيستخرجها تلقائياً ويشيل التكرار، وبعدين يستعلم من البورتال فاتورة فاتورة ويكتب حالة كل فاتورة في عمود جديد جنب عمود الـUUID</div>',unsafe_allow_html=True)
     _iss_file=st.file_uploader("ارفع شيت أرقام UUID",type=["xlsx","xls"],key="issued_uuid_file")
     if _iss_file:
         _iss_sheets=None
@@ -5277,23 +5288,23 @@ elif page=="🧾 الاستعلام عن الفواتير المصروفة":
             _iss_uuids=[]
             _seen_uu=set()
             _iss_samples=[]
-            for _sh_df in _iss_sheets.values():
-                for _col in _sh_df.columns:
-                    for _v in _sh_df[_col].tolist():
-                        if _v is None or isinstance(_v,float): continue
-                        _s=str(_v).strip()
+            _iss_grids={}
+            for _sh_name,_sh_df in _iss_sheets.items():
+                _grid=[]
+                for _ri in range(len(_sh_df.index)):
+                    _row=[]
+                    for _ci in range(len(_sh_df.columns)):
+                        _cell=_sh_df.iat[_ri,_ci]
+                        if _cell is None or (isinstance(_cell,float) and pd.isna(_cell)): _row.append("")
+                        else: _row.append(str(_cell))
+                    _grid.append(_row)
+                _iss_grids[_sh_name]=_grid
+                for _ri,_row in enumerate(_grid):
+                    for _ci,_s_raw in enumerate(_row):
+                        _s=_s_raw.strip()
                         if not _s: continue
                         if len(_iss_samples)<6: _iss_samples.append(_s[:60])
-                        _cands=[]
-                        for _m in _iss_uuid_re.findall(_s):
-                            _cands.append(_m.lower())
-                        if not _cands:
-                            _h="".join(ch for ch in _s if ch.isalnum())
-                            if re.fullmatch(r"[0-9a-fA-F]{32}",_h):
-                                _cands.append("-".join([_h[0:8],_h[8:12],_h[12:16],_h[16:20],_h[20:32]]).lower())
-                            elif re.fullmatch(r"[0-9A-Za-z]{26}",_s):
-                                _cands.append(_s.upper())
-                        for _m in _cands:
+                        for _m in _iss_norm_all(_s):
                             if _m not in _seen_uu:
                                 _seen_uu.add(_m); _iss_uuids.append(_m)
             if not _iss_uuids:
@@ -5355,6 +5366,12 @@ elif page=="🧾 الاستعلام عن الفواتير المصروفة":
                             _raw=_iss_raw_status(_roots)
                             if _raw:
                                 _ar=_iss_status_map.get(_raw.lower(),_raw);_en=_raw
+                                if _ar=="سارية / صحيحة":
+                                    if _iss_pick(_roots,("cancelRequestDate","cancelRequestDelayedDate"),""):
+                                        _ar="طلب إلغاء قيد التنفيذ"
+                                        _note="الفاتورة لسه سارية لكن فيه طلب إلغاء مسجل عليها — راجع البورتال"
+                                    elif _iss_pick(_roots,("declineCancelRequestDate",),"")!="":
+                                        _note="طلب إلغاء الفاتورة اترفض — الفاتورة سارية"
                             else:
                                 _ar,_en,_note="تم الجلب بدون حالة","","الاستجابة لا تحتوي حقل status"
                         _iss_name,_iss_num=_iss_party(_roots,"issuer")
@@ -5372,28 +5389,61 @@ elif page=="🧾 الاستعلام عن الفواتير المصروفة":
                         time.sleep(0.25)
                         _iss_prog.progress((_i+1)/len(_iss_uuids))
                     _iss_ph.empty()
-                    st.session_state["issued_uuid_results"]={"sig":_iss_sig,"rows":_iss_rows}
+                    st.session_state["issued_uuid_results"]={"sig":_iss_sig,"rows":_iss_rows,"pos":_iss_pos,"grids":_iss_grids}
                     st.rerun()
                 _iss_cache=st.session_state.get("issued_uuid_results")
                 if _iss_cache and _iss_cache.get("sig")==_iss_sig:
                     _rows=_iss_cache.get("rows",[])
                     _n_valid=sum(1 for r in _rows if r["الحالة"].startswith("سارية"))
                     _n_cancel=sum(1 for r in _rows if r["الحالة"]=="ملغاة")
+                    _n_req=sum(1 for r in _rows if r["الحالة"]=="طلب إلغاء قيد التنفيذ")
                     _n_bad=sum(1 for r in _rows if r["الحالة"] in ("مرفوضة","غير صحيحة"))
-                    _n_other=len(_rows)-_n_valid-_n_cancel-_n_bad
+                    _n_other=len(_rows)-_n_valid-_n_cancel-_n_req-_n_bad
                     st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot" style="background:#55efc4;"></div><h3>نتيجة الاستعلام</h3></div>',unsafe_allow_html=True)
-                    _s1,_s2,_s3,_s4=st.columns(4)
-                    for _ci,(_cl,_cn,_cc) in enumerate((("سارية / صحيحة",_n_valid,"#55efc4"),("ملغاة",_n_cancel,"#ff6b6b"),("مرفوضة / غير صحيحة",_n_bad,"#fdcb6e"),("تعذر / غير محدد",_n_other,"#a29bfe"))):
-                        with [_s1,_s2,_s3,_s4][_ci]:
+                    _s1,_s2,_s3,_s4,_s5=st.columns(5)
+                    for _ci,(_cl,_cn,_cc) in enumerate((("سارية / صحيحة",_n_valid,"#55efc4"),("ملغاة",_n_cancel,"#ff6b6b"),
+                                                       ("طلب إلغاء قيد التنفيذ",_n_req,"#e17055"),("مرفوضة / غير صحيحة",_n_bad,"#fdcb6e"),
+                                                       ("تعذر / غير محدد",_n_other,"#a29bfe"))):
+                        with [_s1,_s2,_s3,_s4,_s5][_ci]:
                             st.markdown(f'<div class="erp-card" style="text-align:center;padding:.8rem .4rem;"><div style="font-size:1.5rem;font-weight:800;color:{_cc};">{_cn}</div><div style="color:var(--text2);font-size:.72rem;">{_cl}</div></div>',unsafe_allow_html=True)
                     if _n_cancel:
                         st.markdown(f'<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(255,107,107,.06);border:1px solid rgba(255,107,107,.18);color:#ff6b6b;font-size:.82rem;margin:.6rem 0;">⚠️ يوجد <strong>{_n_cancel}</strong> فاتورة ملغاة من إجمالي <strong>{len(_rows)}</strong></div>',unsafe_allow_html=True)
+                    if _n_req:
+                        st.markdown(f'<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(225,112,85,.06);border:1px solid rgba(225,112,85,.2);color:#e17055;font-size:.82rem;margin:.6rem 0;">📌 يوجد <strong>{_n_req}</strong> فاتورة عليها طلب إلغاء قيد التنفيذ — لسه مش ملغاة نهائياً</div>',unsafe_allow_html=True)
                     _iss_df=pd.DataFrame(_rows)
                     st.dataframe(_iss_df,use_container_width=True,height=420,hide_index=True)
                     _iss_xbuf=BytesIO()
                     _iss_df.to_excel(_iss_xbuf,index=False,engine="xlsxwriter")
                     _iss_xbuf.seek(0)
                     st.download_button("📊 تحميل نتيجة الحالة (Excel)",data=_iss_xbuf.getvalue(),file_name=f"حالة_الفواتير_الصادرة_{datetime.now():%Y%m%d_%H%M}.xlsx",mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",key="issued_result_dl",use_container_width=True)
+                    _iss_grids=_iss_cache.get("grids") or {}
+                    if _iss_grids:
+                        _iss_by_u={str(r["UUID"]).lower():r["الحالة"] for r in _rows}
+                        _iss_wb=BytesIO()
+                        with pd.ExcelWriter(_iss_wb,engine="xlsxwriter") as _wr:
+                            for _sh_name,_grid in _iss_grids.items():
+                                _cols=set()
+                                for _row in _grid:
+                                    for _ci,_cell in enumerate(_row):
+                                        if _cell.strip() and any(_u in _iss_by_u for _u in _iss_norm_all(_cell.strip())):
+                                            _cols.add(_ci)
+                                _cols=sorted(_cols)
+                                if not _cols:
+                                    pd.DataFrame(_grid).to_excel(_wr,sheet_name=str(_sh_name)[:31],header=False,index=False)
+                                    continue
+                                _has_hdr=bool(_grid) and any(_grid[0][_c].strip() for _c in _cols) and not any(_iss_norm_all(_grid[0][_c].strip()) for _c in _cols)
+                                _new=[list(_r) for _r in _grid]
+                                for _nr in _new:
+                                    for _c in reversed(_cols): _nr.insert(_c+1,"")
+                                for _ci,_c in enumerate(_cols):
+                                    _addr=_c+1+_ci
+                                    if _has_hdr: _new[0][_addr]="حالة الفاتورة"
+                                    for _ri in range(1 if _has_hdr else 0,len(_grid)):
+                                        for _u in _iss_norm_all(_grid[_ri][_c].strip()):
+                                            if _u in _iss_by_u:
+                                                _new[_ri][_addr]=_iss_by_u[_u]; break
+                                pd.DataFrame(_new).to_excel(_wr,sheet_name=str(_sh_name)[:31],header=False,index=False)
+                        st.download_button("📥 تحميل الشيت بعد إضافة عمود «حالة الفاتورة» جنب UUID",data=_iss_wb.getvalue(),file_name=f"حالة_الفواتير_جنب_UUID_{datetime.now():%Y%m%d_%H%M}.xlsx",mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",key="issued_sheet_dl",use_container_width=True)
                     if st.button("🗑️ مسح النتائج",key="issued_clear_btn"):
                         st.session_state.pop("issued_uuid_results",None)
                         st.rerun()
