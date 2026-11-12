@@ -5389,7 +5389,7 @@ elif page=="🧾 الاستعلام عن الفواتير المصروفة":
                         time.sleep(0.25)
                         _iss_prog.progress((_i+1)/len(_iss_uuids))
                     _iss_ph.empty()
-                    st.session_state["issued_uuid_results"]={"sig":_iss_sig,"rows":_iss_rows,"pos":_iss_pos,"grids":_iss_grids}
+                    st.session_state["issued_uuid_results"]={"sig":_iss_sig,"rows":_iss_rows,"grids":_iss_grids}
                     st.rerun()
                 _iss_cache=st.session_state.get("issued_uuid_results")
                 if _iss_cache and _iss_cache.get("sig")==_iss_sig:
