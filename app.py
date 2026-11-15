@@ -70,7 +70,7 @@ SUB_PAGES={
  "💰 القيمة المضافة":["📤 رفع وربط البيانات","🔍 استعلام بالسجل الضريبي","📅 استعلام بالفترة"],
  "🛒 فواتير الماركت":["📝 إنشاء Template","🗂️ إنشاء أكثر من Template","📋 سجل الريسيتات","✏️ تعديل الأكواد","🧩 Template مجمع"],
  "📄 Portal الفواتير الإلكترونية":["🔗 الربط","📤 الصادرة","📥 الوارد","🏷️ أكواد","🔬 GPC Browser"],
- "🧾 الاستعلام عن الفواتير المصروفة":["🔍 الاستعلام عن الفواتير المصروفة","🔗 الفواتير المرتبطة"],
+ "🧾 الاستعلام عن الفواتير المصروفة":["🔍 الاستعلام عن الفواتير المصروفة","🔗 الفواتير المرتبطة","🔁 مطابقة الغاء الاشعار"],
  "🔍 الاستعلام عن ممول":["🔍 بحث بالسجل الضريبي","📝 بحث بالاسم","📁 رفع شيت أرقام تسجيل (استعلام من البورتال)"],
  "🏷️ الاستعلام عن الأكواد":["🔗 أكواد البورتال","🔬 GPC Browser","🏷️ أكواد GS1","🏷️ أكواد الموردين"],
  "📑 اقرار 10 قيمة مضافة":["📝 تحضيرات الاقرار","📋 الاقرار"],
@@ -3827,6 +3827,271 @@ def _issued_linked_tab(token,smap,norm_all):
     else:
         st.info("لسه مفيش فواتير مرتبطة — ارفع شيت فيه أرقام UUID واضغط ربط")
 
+# ====================== CREDIT NOTES MATCHING (مطابقة الإشعارات الدائنة) ======================
+CREDIT_NOTES_FILE=os.path.join(DATA_DIR,"credit_notes_registry.json")
+
+@st.cache_data(ttl=60,show_spinner=False)
+def load_credit_notes():
+    data=gh_read("credit_notes_registry.json")
+    if isinstance(data,list): data={"notes":data,"last_check":""}
+    if isinstance(data,dict) and isinstance(data.get("notes"),list):
+        data.setdefault("last_check","")
+        return data
+    if os.path.exists(CREDIT_NOTES_FILE):
+        try:
+            with open(CREDIT_NOTES_FILE,'r',encoding='utf-8') as f: d=json.load(f)
+            if isinstance(d,list): d={"notes":d,"last_check":""}
+            if isinstance(d,dict) and isinstance(d.get("notes"),list):
+                d.setdefault("last_check","")
+                return d
+        except Exception: pass
+    return {"notes":[],"last_check":""}
+
+def save_credit_notes(data):
+    gh_write("credit_notes_registry.json",data)
+    with open(CREDIT_NOTES_FILE,'w',encoding='utf-8') as f: json.dump(data,f,ensure_ascii=False,indent=2)
+    load_credit_notes.clear()
+
+_CN_GUID_RE=re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
+_CN_REF_KEYS={"references","referencedocumentuuids","referencedocuments","referenceuuid","referencedocumentuuid","invoicereference","referenceid"}
+
+def _cn_norm_u(s):
+    s=str(s).strip()
+    if _CN_GUID_RE.fullmatch(s): return s.lower()
+    h="".join(ch for ch in s if ch.isalnum())
+    if re.fullmatch(r"[0-9a-fA-F]{32}",h): return "-".join([h[:8],h[8:12],h[12:16],h[16:20],h[20:32]]).lower()
+    if re.fullmatch(r"[0-9A-Za-z]{26}",s): return s.upper()
+    return ""
+
+def _cn_refs(obj,out):
+    if isinstance(obj,dict):
+        for k,v in obj.items():
+            if str(k).lower() in _CN_REF_KEYS:
+                for s in (v if isinstance(v,list) else [v]):
+                    if isinstance(s,str):
+                        for m in _CN_GUID_RE.findall(s): out.add(m.lower())
+                        _n=_cn_norm_u(s)
+                        if _n: out.add(_n)
+            _cn_refs(v,out)
+    elif isinstance(obj,list):
+        for v in obj: _cn_refs(v,out)
+
+def _cn_amount(roots):
+    try: return round(float(_lnk_pick(roots,("totalAmount","total","totalWithTax"),0) or 0),2)
+    except Exception: return 0.0
+
+def _cn_issuer(roots):
+    for rt in roots:
+        v=str(rt.get("issuerId") or rt.get("issuerRegistrationNumber") or rt.get("issuerTin") or "").strip()
+        if v: return v
+        io=rt.get("issuer")
+        if isinstance(io,dict):
+            v=str(io.get("id") or io.get("registrationNumber") or io.get("taxId") or "").strip()
+            if v: return v
+    return ""
+
+def _cn_fetch(token,u,smap):
+    data,err=eta_get_document_details(token,u)
+    if err and "401" in str(err):
+        _tk=_eta_refresh_token()
+        if _tk: data,err=eta_get_document_details(_tk,u)
+    if err: return None,err
+    roots=_lnk_roots(data)
+    raw=""
+    for rt in roots:
+        for k in ("status","documentStatus","documentState"):
+            v=rt.get(k)
+            if isinstance(v,str) and v.strip(): raw=v.strip(); break
+        if raw: break
+    ar=smap.get(raw.lower(),raw) if raw else ""
+    refs=set();_cn_refs(roots,refs);refs.discard(u.lower())
+    return {"uuid":u,"amount":_cn_amount(roots),"issuer_id":_cn_issuer(roots),
+            "issued":str(_lnk_pick(roots,("dateTimeIssued","issueDate"),"") or "")[:10],
+            "status":ar or "تم الجلب بدون حالة","status_en":raw,"refs":sorted(refs)},None
+
+def _cn_invoice_meta(token,u):
+    data,err=eta_get_document_details(token,u)
+    if err and "401" in str(err):
+        _tk=_eta_refresh_token()
+        if _tk: data,err=eta_get_document_details(_tk,u)
+    if err: return None,err
+    roots=_lnk_roots(data)
+    return {"invoice_total":_cn_amount(roots),"issuer_id":_cn_issuer(roots),
+            "issued_date":str(_lnk_pick(roots,("dateTimeIssued","issueDate"),"") or "")[:10]},None
+
+_CN_MATCH_LABEL={"auto":"تلقائي (بمرجع الإشعار)","manual":"مؤكد يدوياً","suggested":"مقترح — يحتاج تأكيد","none":"غير مربوط"}
+
+def _issued_match_tab(token,smap,norm_all):
+    linked=load_linked_invoices();invoices=linked.get("invoices",[])
+    cn_data=load_credit_notes();notes=cn_data.get("notes",[])
+    st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot" style="background:#fd79a8;"></div><h3>مطابقة الإشعارات الدائنة مع الفواتير</h3></div>',unsafe_allow_html=True)
+    st.markdown('<div style="padding:.5rem 1rem;border-radius:10px;background:rgba(253,121,168,.06);border:1px solid rgba(253,121,168,.18);color:#fd79a8;font-size:.78rem;">📌 البورتال بيسيب الفاتورة «سارية» حتى لو المورد أصدر عليها إشعار دائن بكامل القيمة — التاب ده بيجلب الإشعارات الدائنة من مستندات الوارد ويطابقها مع الفواتير المرتبطة: تغطية كاملة يبقى أحمر، تغطية جزئية يبقى برتقالي. الإشعار مش بيتحسب لو حالته «ملغاة».</div>',unsafe_allow_html=True)
+    if not invoices:
+        st.info("لسه مفيش فواتير مرتبطة — اربطها الأول من تاب «🔗 الفواتير المرتبطة» وبعدين ارجع هنا")
+        return
+    if not token:
+        st.markdown('<div style="padding:.5rem 1rem;border-radius:10px;background:rgba(253,203,110,.06);border:1px solid rgba(253,203,110,.15);color:#fdcb6e;font-size:.78rem;margin-top:.5rem;">💡 اربط البورتال الأول من فوق عشان تقدر تفحص الإشعارات</div>',unsafe_allow_html=True)
+    _m1,_m2=st.columns([1,2])
+    with _m1:
+        _months=st.selectbox("فترة الفحص",[6,12,24,36],index=1,format_func=lambda m:f"آخر {m} شهر",key="cn_months")
+    with _m2:
+        st.caption("الفحص بيجلب إشعارات الوارد من البورتال ويطابقها بالمرجع، ولو مفيش مرجع بيقترح المطابقة بنفس المورد ونفس المبلغ بعد تأكيدك")
+    _scan=st.button("🔄 فحص الإشعارات الدائنة من البورتال",key="cn_scan_btn",type="primary",use_container_width=True,disabled=not bool(token))
+    _last=str(cn_data.get("last_check","") or "")
+    st.markdown(f'<div style="padding:.5rem 1rem;border-radius:10px;background:rgba(162,155,254,.06);border:1px solid rgba(162,155,254,.15);color:#a29bfe;font-size:.82rem;margin:.4rem 0;">🗓️ آخر فحص: <strong>{_last or "لسه ما اتعملش فحص"}</strong></div>',unsafe_allow_html=True)
+    if _scan:
+        _from=datetime.now()-timedelta(days=int(_months)*30)
+        with st.spinner("جاري جلب مستندات الوارد من البورتال..."):
+            _docs,_err=eta_search_docs(token,"Received",_from,datetime.now())
+            if _err and "401" in str(_err):
+                _tk=_eta_refresh_token()
+                if _tk: _docs,_err=eta_search_docs(_tk,"Received",_from,datetime.now())
+        if _err:
+            st.error("تعذر جلب الوارد من البورتال: "+str(_err))
+        else:
+            _cn_docs=[d for d in (_docs or []) if str(d.get("typeName","") or d.get("documentType","")).strip().lower() in ("c","ec")]
+            _existing={str(n.get("uuid","")).lower():n for n in notes}
+            _new=0
+            _prog=st.progress(0.0)
+            for _i,_d in enumerate(_cn_docs):
+                _u=str(_d.get("uuid","")).strip()
+                if _u:
+                    _rec=_existing.get(_u.lower())
+                    if _rec:
+                        _raw=str(_d.get("status","") or "")
+                        if _raw:
+                            _rec["status"]=smap.get(_raw.lower(),_raw);_rec["status_en"]=_raw
+                    else:
+                        _note,_e=_cn_fetch(token,_u,smap)
+                        if _note is None:
+                            _note={"uuid":_u,"amount":round(float(_d.get("total",0) or 0),2),"issuer_id":str(_d.get("issuerId","") or ""),
+                                   "issued":str(_d.get("dateTimeIssued","") or "")[:10],"status":"تعذر جلب التفاصيل","status_en":"","refs":[]}
+                        _note["issuer_name"]=str(_d.get("issuerName","") or "")
+                        _note["match"]="none";_note["invoice"]=""
+                        _note["checked_at"]=datetime.now().strftime("%Y-%m-%d %H:%M")
+                        notes.append(_note);_new+=1
+                _prog.progress((_i+1)/max(1,len(_cn_docs)))
+            _prog.empty()
+            _need=[inv for inv in invoices if not inv.get("invoice_total")]
+            if _need:
+                _ph=st.empty();_prog2=st.progress(0.0)
+                for _j,inv in enumerate(_need):
+                    _ph.markdown(f"📄 جاري جلب بيانات الفاتورة {_j+1}/{len(_need)}")
+                    _meta,_e=_cn_invoice_meta(token,str(inv.get("uuid","")).strip())
+                    if _meta:
+                        if _meta.get("invoice_total"): inv["invoice_total"]=float(_meta["invoice_total"])
+                        if _meta.get("issuer_id"): inv["issuer_id"]=_meta["issuer_id"]
+                        if _meta.get("issued_date"): inv["issued_date"]=_meta["issued_date"]
+                        inv["meta_checked"]=datetime.now().strftime("%Y-%m-%d %H:%M")
+                    _prog2.progress((_j+1)/len(_need))
+                _ph.empty()
+                linked["invoices"]=invoices
+                save_linked_invoices(linked)
+            _by_u={str(inv.get("uuid","")).strip().lower():inv for inv in invoices}
+            for n in notes:
+                if n.get("match") in ("auto","manual"): continue
+                _hit=""
+                for r in (n.get("refs") or []):
+                    if str(r).strip().lower() in _by_u: _hit=str(r).strip().lower();break
+                if _hit:
+                    n["match"]="auto";n["invoice"]=_by_u[_hit].get("uuid","")
+                    continue
+                _amt=float(n.get("amount") or 0)
+                _cands=[]
+                if _amt>0 and n.get("issuer_id"):
+                    for inv in invoices:
+                        if not inv.get("invoice_total"): continue
+                        if str(inv.get("issuer_id","")).strip() and str(inv.get("issuer_id","")).strip()!=str(n.get("issuer_id","")).strip(): continue
+                        if abs(float(inv.get("invoice_total") or 0)-_amt)>0.5: continue
+                        if n.get("issued") and inv.get("issued_date") and n.get("issued")<inv.get("issued_date"): continue
+                        _cands.append(inv)
+                if len(_cands)==1:
+                    n["match"]="suggested";n["invoice"]=_cands[0].get("uuid","")
+                else:
+                    n["match"]="none";n["invoice"]=""
+            cn_data["notes"]=notes
+            cn_data["last_check"]=datetime.now().strftime("%Y-%m-%d %H:%M")
+            save_credit_notes(cn_data)
+            st.rerun()
+
+    _cn_by={}
+    for n in notes:
+        if str(n.get("status",""))=="ملغاة": continue
+        if n.get("match") not in ("auto","manual"): continue
+        _iu=str(n.get("invoice","") or "").strip().lower()
+        if _iu: _cn_by.setdefault(_iu,[]).append(n)
+    _inv_rows=[]
+    for inv in invoices:
+        _u=str(inv.get("uuid","")).strip()
+        _total=float(inv.get("invoice_total") or 0)
+        _cns=_cn_by.get(_u.lower(),[])
+        _cov=round(sum(float(n.get("amount") or 0) for n in _cns),2)
+        _net=round(_total-_cov,2)
+        if _cns and _total>0 and _cov>=_total-0.5: _state="مغطاة كلياً"
+        elif _cov>0: _state="تغطية جزئية"
+        elif _total>0: _state="سليمة"
+        else: _state="بيانات ناقصة"
+        _inv_rows.append({"UUID":_u,"إجمالي الفاتورة":_total,"الإشعارات الدائنة":_cov,"المتبقي":_net,
+                          "نسبة التغطية":f"{min(100,round(_cov/_total*100,1)) if _total>0 else 0}%",
+                          "عدد الإشعارات":len(_cns),"الحالة":_state,
+                          "إشعارات دائنة":", ".join(str(n.get("uuid","")) for n in _cns)})
+    _full=[r for r in _inv_rows if r["الحالة"]=="مغطاة كلياً"]
+    _part=[r for r in _inv_rows if r["الحالة"]=="تغطية جزئية"]
+    _suggested=[n for n in notes if n.get("match")=="suggested"]
+    _unmatched=[n for n in notes if n.get("match")=="none"]
+    if notes:
+        _k1,_k2,_k3,_k4=st.columns(4)
+        for _ci,(_cl,_cn,_cc) in enumerate((("مغطاة كلياً (أحمر)",len(_full),"#ff6b6b"),("تغطية جزئية (برتقالي)",len(_part),"#e17055"),("إشعارات مقترحة",len(_suggested),"#fdcb6e"),("إشعارات غير مربوطة",len(_unmatched),"#a29bfe"))):
+            with [_k1,_k2,_k3,_k4][_ci]:
+                st.markdown(f'<div class="erp-card" style="text-align:center;padding:.8rem .4rem;"><div style="font-size:1.5rem;font-weight:800;color:{_cc};">{_cn}</div><div style="color:var(--text2);font-size:.72rem;">{_cl}</div></div>',unsafe_allow_html=True)
+        if _full:
+            _lines=[]
+            for r in _full:
+                _lines.append(f"<div style='margin-top:.35rem;'>🚨 <strong>{r['UUID']}</strong> — قيمة الفاتورة {r['إجمالي الفاتورة']:,.2f} — إشعارات دائنة بقيمة {r['الإشعارات الدائنة']:,.2f} — المتبقي {r['المتبقي']:,.2f}</div>")
+            st.markdown('<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(255,107,107,.08);border:1px solid rgba(255,107,107,.22);color:#ff6b6b;font-size:.82rem;margin:.6rem 0;"><strong>فواتير اتغطت بالكامل بإشعارات دائنة — اقتصادياً كأنها ملغاة:</strong>'+''.join(_lines)+'</div>',unsafe_allow_html=True)
+        if _part:
+            _lines=[]
+            for r in _part:
+                _lines.append(f"<div style='margin-top:.35rem;'>⚠️ <strong>{r['UUID']}</strong> — تغطية {r['نسبة التغطية']} — إشعارات {r['الإشعارات الدائنة']:,.2f} — المتبقي {r['المتبقي']:,.2f}</div>")
+            st.markdown('<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(225,112,85,.07);border:1px solid rgba(225,112,85,.22);color:#e17055;font-size:.82rem;margin:.6rem 0;"><strong>فواتير عليها تغطية جزئية بإشعارات دائنة:</strong>'+''.join(_lines)+'</div>',unsafe_allow_html=True)
+        st.dataframe(pd.DataFrame(_inv_rows),use_container_width=True,height=300,hide_index=True)
+        _un=[n for n in notes if n.get("match") in ("suggested","none")]
+        if _un:
+            with st.expander(f"🔗 إشعارات محتاجة تأكيد الربط ({len(_un)})",expanded=bool(_suggested)):
+                st.dataframe(pd.DataFrame([{"UUID":n.get("uuid",""),"المورد":n.get("issuer_name",""),"المبلغ":float(n.get("amount") or 0),
+                                            "تاريخ الإصدار":n.get("issued",""),"الحالة":n.get("status",""),
+                                            "نوع المطابقة":_CN_MATCH_LABEL.get(n.get("match",""),""),"الفاتورة المقترحة":n.get("invoice","")} for n in _un]),use_container_width=True,hide_index=True)
+                _note_opts={f"{n.get('uuid','')} — {float(n.get('amount') or 0):,.2f} — {n.get('issuer_name','')}":n.get("uuid","") for n in _un}
+                _inv_opts=[f"{inv.get('uuid','')} — {float(inv.get('invoice_total') or 0):,.2f}" for inv in invoices]
+                with st.form("cn_confirm_form"):
+                    _c1,_c2=st.columns(2)
+                    with _c1: _sel_n=st.selectbox("الإشعار الدائن",list(_note_opts.keys()),key="cn_sel_note")
+                    with _c2: _sel_i=st.selectbox("الفاتورة",_inv_opts,key="cn_sel_inv")
+                    _ok=st.form_submit_button("✅ تأكيد الربط",type="primary",use_container_width=True)
+                if _ok and _sel_n and _sel_i:
+                    _nu=str(_note_opts.get(_sel_n,"")).strip().lower()
+                    _iu=_sel_i.split(" — ")[0].strip().lower()
+                    for n in notes:
+                        if str(n.get("uuid","")).strip().lower()==_nu:
+                            n["match"]="manual";n["invoice"]=_iu;break
+                    cn_data["notes"]=notes
+                    save_credit_notes(cn_data)
+                    st.rerun()
+        _nrows=[{"UUID":n.get("uuid",""),"المورد":n.get("issuer_name",""),"رقم تسجيل المورد":n.get("issuer_id",""),
+                 "المبلغ":float(n.get("amount") or 0),"تاريخ الإصدار":n.get("issued",""),"الحالة":n.get("status",""),
+                 "حالة البورتال (EN)":n.get("status_en",""),"نوع المطابقة":_CN_MATCH_LABEL.get(n.get("match",""),""),
+                 "الفاتورة":"", "المرجع":", ".join(n.get("refs") or []),"آخر فحص":n.get("checked_at","")} for n in notes]
+        for _row,_n in zip(_nrows,notes):
+            _row["الفاتورة"]=_n.get("invoice","") if _n.get("match") in ("auto","manual","suggested") else ""
+        st.dataframe(pd.DataFrame(_nrows),use_container_width=True,height=300,hide_index=True)
+        _xb=BytesIO()
+        with pd.ExcelWriter(_xb,engine="xlsxwriter") as _wr:
+            pd.DataFrame(_inv_rows).to_excel(_wr,sheet_name="الفواتير",index=False)
+            pd.DataFrame(_nrows).to_excel(_wr,sheet_name="الإشعارات الدائنة",index=False)
+        st.download_button("📊 تحميل نتيجة المطابقة (Excel)",data=_xb.getvalue(),file_name=f"مطابقة_الإشعارات_الدائنة_{datetime.now():%Y%m%d_%H%M}.xlsx",mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",key="cn_dl",use_container_width=True)
+    else:
+        st.info("لسه ما اتعملش فحص — اضغط «فحص الإشعارات الدائنة من البورتال» فوق")
+
 # ====================== HOME ======================
 if page == "🏠 الرئيسية":
     st.markdown('<style>a[href*="manage"],a[data-testid="stManageApp"],section[data-testid="stSidebar"]+div>a,a[title="Manage app"],div[data-testid="stStatusWidget"]{display:none!important;} div[data-testid="stDecoration"]{display:none!important;}</style>',unsafe_allow_html=True)
@@ -5605,6 +5870,9 @@ elif page=="🧾 الاستعلام عن الفواتير المصروفة":
     _iss_sub=st.session_state.get(_sub_key(page),"🔍 الاستعلام عن الفواتير المصروفة")
     if _iss_sub.startswith("🔗"):
         _issued_linked_tab(_iss_token,_iss_status_map,_iss_norm_all)
+        st.stop()
+    elif _iss_sub.startswith("🔁"):
+        _issued_match_tab(_iss_token,_iss_status_map,_iss_norm_all)
         st.stop()
 
     st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot" style="background:#fdcb6e;"></div><h3>شيت الفواتير الصادرة</h3></div>',unsafe_allow_html=True)
