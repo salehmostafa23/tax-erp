@@ -4150,23 +4150,24 @@ elif page=="🛒 فواتير الماركت":
                             st.markdown('</div>',unsafe_allow_html=True);st.rerun()
                 except Exception as e: st.error(f"خطأ: {e}")
             if barcodes_db:
-                st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot" style="background:#00cec9;"></div><h3>الأكواد المحفوظة ({})</h3></div>'.format(len(barcodes_db)),unsafe_allow_html=True)
-                bmap_df=pd.DataFrame(barcodes_db,columns=['internal_code','barcode'])
-                st.dataframe(bmap_df,use_container_width=True,height=250)
-                st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot" style="background:#fdcb6e;"></div><h3>تعديل كود</h3></div>',unsafe_allow_html=True)
-                ec_cols=[str(b.get('internal_code','')).strip() for b in barcodes_db]
-                edit_ic=st.selectbox("اختر الكود الداخلي",options=ec_cols,key="bc_edit_ic")
-                if edit_ic:
-                    current_bc=next((b.get('barcode','') for b in barcodes_db if str(b.get('internal_code','')).strip()==edit_ic),'')
-                    new_bc=st.text_input("الباركود الجديد",value=current_bc,key="bc_edit_val")
-                    if st.button("💾 حفظ التعديل",key="bc_save_edit",type="primary"):
-                        for b in barcodes_db:
-                            if str(b.get('internal_code','')).strip()==edit_ic:
-                                b['barcode']=new_bc.strip();break
-                        save_barcodes(barcodes_db)
-                        st.success("تم حفظ التعديل!")
-                        st.markdown('</div>',unsafe_allow_html=True);st.rerun()
                 st.session_state['barcode_map']=barcodes_map
+                st.markdown(f'<div style="margin-top:1rem;padding:.5rem 1rem;border-radius:10px;background:rgba(0,206,201,.06);border:1px solid rgba(0,206,201,.15);color:#00cec9;font-size:.8rem;">📚 الأكواد المحفوظة: <strong>{len(barcodes_map):,}</strong> كود — للتعديل استخدم تاب «✏️ تعديل الأكواد»</div>',unsafe_allow_html=True)
+                if st.toggle(f"عرض الأكواد المحفوظة ({len(barcodes_map):,})",key="bc_show_saved"):
+                    bmap_df=pd.DataFrame(barcodes_db,columns=['internal_code','barcode'])
+                    st.dataframe(bmap_df,use_container_width=True,height=250)
+                    st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot" style="background:#fdcb6e;"></div><h3>تعديل كود</h3></div>',unsafe_allow_html=True)
+                    ec_cols=[str(b.get('internal_code','')).strip() for b in barcodes_db]
+                    edit_ic=st.selectbox("اختر الكود الداخلي",options=ec_cols,key="bc_edit_ic")
+                    if edit_ic:
+                        current_bc=next((b.get('barcode','') for b in barcodes_db if str(b.get('internal_code','')).strip()==edit_ic),'')
+                        new_bc=st.text_input("الباركود الجديد",value=current_bc,key="bc_edit_val")
+                        if st.button("💾 حفظ التعديل",key="bc_save_edit",type="primary"):
+                            for b in barcodes_db:
+                                if str(b.get('internal_code','')).strip()==edit_ic:
+                                    b['barcode']=new_bc.strip();break
+                            save_barcodes(barcodes_db)
+                            st.success("تم حفظ التعديل!")
+                            st.markdown('</div>',unsafe_allow_html=True);st.rerun()
             else:
                 st.session_state['barcode_map']={}
             c1,c2=st.columns(2)
