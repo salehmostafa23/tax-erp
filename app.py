@@ -68,7 +68,7 @@ ADMIN_PAGE="👥 إدارة المستخدمين"
 SUB_PAGES={
  "📋 نموذج 41":["📤 رفع وربط البيانات","🔍 استعلام بالسجل الضريبي","📅 استعلام بالفترة"],
  "💰 القيمة المضافة":["📤 رفع وربط البيانات","🔍 استعلام بالسجل الضريبي","📅 استعلام بالفترة"],
- "🛒 فواتير الماركت":["📝 إنشاء Template","📋 سجل الريسيتات","✏️ تعديل الأكواد","🧩 Template مجمع"],
+ "🛒 فواتير الماركت":["📝 إنشاء Template","🗂️ إنشاء أكثر من Template","📋 سجل الريسيتات","✏️ تعديل الأكواد","🧩 Template مجمع"],
  "📄 Portal الفواتير الإلكترونية":["🔗 الربط","📤 الصادرة","📥 الوارد","🏷️ أكواد","🔬 GPC Browser"],
  "🔍 الاستعلام عن ممول":["🔍 بحث بالسجل الضريبي","📝 بحث بالاسم","📁 رفع شيت أرقام تسجيل (استعلام من البورتال)"],
  "🏷️ الاستعلام عن الأكواد":["🔗 أكواد البورتال","🔬 GPC Browser","🏷️ أكواد GS1","🏷️ أكواد الموردين"],
@@ -4259,6 +4259,134 @@ elif page=="🛒 فواتير الماركت":
                 st.markdown(f'<div class="erp-empty"><div class="erp-empty-icon">⏳</div><h3>بانتظار إكمال الخطوات</h3><p>يرجى رفع: {" + ".join(miss)}</p></div>',unsafe_allow_html=True)
                 if st.button("← السابق",key="prev3b"):
                     st.session_state['mkt_step']=2;st.rerun()
+
+    elif _mkt_sub=="🗂️ إنشاء أكثر من Template":
+        st.markdown('<div class="erp-section"><div class="erp-section-dot" style="background:#fd79a8;"></div><h3>فواتير الماركت — إنشاء أكثر من Template</h3></div>',unsafe_allow_html=True)
+        if 'mt_step' not in st.session_state: st.session_state['mt_step']=1
+        _mt_cs=st.session_state['mt_step']
+        _mt_lbl={1:"1️⃣ رفع ملفات Detailed Receipt",2:"2️⃣ رفع Barcodes",3:"3️⃣ الريسيتات وإنشاء الملفات"}
+        _mt_bar='<div style="display:flex;gap:.5rem;margin-bottom:1.2rem;flex-wrap:wrap;">'
+        for _si,_sl in _mt_lbl.items():
+            if _si<_mt_cs: _mc,_mb,_mk="#55efc4","rgba(0,184,148,.35)","✓ "
+            elif _si==_mt_cs: _mc,_mb,_mk="#fff","rgba(108,92,231,.55)",""
+            else: _mc,_mb,_mk="rgba(255,255,255,.3)","rgba(255,255,255,.08)",""
+            _mt_bar+=f'<div style="padding:.35rem .8rem;border-radius:20px;border:1px solid {_mb};color:{_mc};font-size:.78rem;font-weight:600;background:rgba(255,255,255,.02);">{_mk}{_sl}</div>'
+        _mt_bar+='</div>'
+        st.markdown(_mt_bar,unsafe_allow_html=True)
+
+        if _mt_cs==1:
+            st.markdown('<div class="erp-card">',unsafe_allow_html=True)
+            st.markdown('<p style="color:var(--text2);font-size:.8rem;margin:.2rem 0 .6rem;">ارفع كل شيتات Detailed Receipt مرة واحدة — كل ملف هيتحول Template بنفسه، وهتطلعلك كل الملفات في ملف مضغوط واحد.</p>',unsafe_allow_html=True)
+            _mt_ups=st.file_uploader("ارفع ملفات Detailed Receipt",type=['xlsx','xls'],accept_multiple_files=True,key="mt_det_up")
+            if _mt_ups:
+                _mt_parsed=[];_mt_bad=[]
+                for _f in _mt_ups:
+                    try:
+                        _d=read_detailed_receipt(_f)
+                        if _d is None or _d.empty: _mt_bad.append(f"{_f.name}: الملف فارغ")
+                        else: _mt_parsed.append({"file":_f.name,"df":_d})
+                    except Exception as _e: _mt_bad.append(f"{_f.name}: {str(_e)[:120]}")
+                if _mt_bad: st.error(" • ".join(_mt_bad))
+                if _mt_parsed:
+                    st.markdown(f'<div style="margin:.5rem 0;padding:.6rem 1rem;border-radius:10px;background:rgba(0,184,148,.08);border:1px solid rgba(0,184,148,.15);color:#55efc4;font-size:.82rem;">✓ {len(_mt_parsed)} ملف — إجمالي {sum(len(p["df"]) for p in _mt_parsed)} صنف</div>',unsafe_allow_html=True)
+                    st.dataframe(pd.concat([p["df"].assign(الملف=p["file"]) for p in _mt_parsed],ignore_index=True),use_container_width=True,height=320)
+                    if st.button("التالي ←",key="mt_next1",type="primary"):
+                        st.session_state['mt_items']=_mt_parsed
+                        st.session_state.pop('mt_zip',None)
+                        st.session_state['mt_step']=2
+                        st.rerun()
+            st.markdown('</div>',unsafe_allow_html=True)
+        elif _mt_cs==2:
+            if not st.session_state.get('mt_items'):
+                st.warning("ارفع ملفات Detailed Receipt الأول")
+                if st.button("← الخطوة 1",key="mt_back0"):
+                    st.session_state['mt_step']=1;st.rerun()
+            else:
+                st.markdown('<div class="erp-card">',unsafe_allow_html=True)
+                barcodes_db=load_barcodes()
+                barcodes_map={str(b.get('internal_code','')).strip():str(b.get('barcode','')).strip() for b in barcodes_db if str(b.get('internal_code','')).strip()}
+                st.caption(f"الأكواد المحفوظة في القاعدة: {len(barcodes_map)}")
+                up=st.file_uploader("ارفع Barcodes",type=['xlsx','xls'],key="mt_bc_up",label_visibility="collapsed")
+                mt_bmap={}
+                if up:
+                    try:
+                        mt_bmap=read_barcodes(up)
+                        if not mt_bmap: st.error("لا توجد بيانات في ملف الباركود")
+                        else:
+                            st.markdown(f'<div style="margin:.5rem 0;padding:.6rem 1rem;border-radius:10px;background:rgba(0,184,148,.08);border:1px solid rgba(0,184,148,.15);color:#55efc4;font-size:.82rem;">✓ {len(mt_bmap)} صنف مرتبط من الملف</div>',unsafe_allow_html=True)
+                            st.dataframe(pd.DataFrame(list(mt_bmap.items())[:10],columns=['الكود الداخلي','الباركود']),use_container_width=True)
+                    except Exception as e: st.error(f"خطأ: {e}")
+                st.markdown('</div>',unsafe_allow_html=True)
+                c1,c2=st.columns(2)
+                with c1:
+                    if st.button("← السابق",key="mt_prev2"):
+                        st.session_state['mt_step']=1;st.rerun()
+                with c2:
+                    if st.button("التالي ←",key="mt_next2",type="primary"):
+                        merged={**barcodes_map,**mt_bmap}
+                        if merged:
+                            st.session_state['mt_bmap']=merged
+                            st.session_state['mt_step']=3
+                            st.rerun()
+                        else:
+                            st.error("مفيش أكواد باركود — ارفع ملف أو احفظ أكواد من تاب إنشاء Template الأول")
+        else:
+            _mt_items=st.session_state.get('mt_items',[])
+            _mt_bmap=st.session_state.get('mt_bmap',{})
+            if not _mt_items or not _mt_bmap:
+                st.markdown('<div class="erp-empty"><div class="erp-empty-icon">⏳</div><h3>بانتظار إكمال الخطوات</h3><p>ارجع للخطوة 1 و2 الأول</p></div>',unsafe_allow_html=True)
+                if st.button("← السابق",key="mt_prev3b"):
+                    st.session_state['mt_step']=2;st.rerun()
+            else:
+                receipts_list=load_receipts()
+                existing_nums=[str(r.get('receipt_number','')).strip() for r in receipts_list]
+                st.markdown('<div class="erp-section" style="margin-top:.6rem"><div class="erp-section-dot" style="background:#fdcb6e;"></div><h3>بيانات الريسيت لكل ملف</h3></div>',unsafe_allow_html=True)
+                _mt_inputs=[]
+                for _mi,_it in enumerate(_mt_items):
+                    _md=_it["df"]
+                    _mm=sum(1 for _,_r in _md.iterrows() if str(_r['internal_code']).strip() in _mt_bmap)
+                    st.markdown(f'<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot" style="background:#74b9ff;"></div><h3>{_mi+1}. {_it["file"]}</h3></div>',unsafe_allow_html=True)
+                    _a,_b,_c=st.columns(3)
+                    with _a: st.markdown(f'<div class="erp-stat s-blue"><div class="erp-stat-label">إجمالي الأصناف</div><div class="erp-stat-value">{len(_md)}</div></div>',unsafe_allow_html=True)
+                    with _b: st.markdown(f'<div class="erp-stat s-green"><div class="erp-stat-label">مرتبطة بالباركود</div><div class="erp-stat-value">{_mm}</div></div>',unsafe_allow_html=True)
+                    with _c: st.markdown(f'<div class="erp-stat s-red"><div class="erp-stat-label">غير مرتبطه</div><div class="erp-stat-value">{len(_md)-_mm}</div></div>',unsafe_allow_html=True)
+                    _q1,_q2,_q3=st.columns(3)
+                    with _q1: _rn=st.text_input("رقم الريسيت *",key=f"mt_rn_{_mi}",placeholder="رقم الريسيت...")
+                    with _q2: _rm=st.text_input("اسم المستلم *",key=f"mt_rcv_{_mi}",placeholder="اسم المستلم...")
+                    with _q3: _rd=st.date_input("تاريخ الريسيت *",key=f"mt_dt_{_mi}")
+                    _mt_inputs.append({"rn":(_rn or '').strip(),"rm":(_rm or '').strip(),"rd":str(_rd)})
+                if st.button(f"🚀 إنشاء {len(_mt_items)} Template في ملف مضغوط",key="mt_gen",type="primary",use_container_width=True):
+                    _mt_errs=[];_mt_seen=set()
+                    for _mi,_inp in enumerate(_mt_inputs):
+                        if not _inp["rn"] or not _inp["rm"]: _mt_errs.append(f"ملف {_mi+1}: لازم رقم الريسيت واسم المستلم")
+                        elif _inp["rn"] in existing_nums: _mt_errs.append(f"ملف {_mi+1}: رقم الريسيت {_inp['rn']} موجود مسبقاً")
+                        elif _inp["rn"] in _mt_seen: _mt_errs.append(f"ملف {_mi+1}: رقم الريسيت {_inp['rn']} مكرر بين الملفات")
+                        else: _mt_seen.add(_inp["rn"])
+                    if _mt_errs:
+                        st.error(" • ".join(_mt_errs))
+                    else:
+                        try:
+                            import zipfile
+                            _zbuf=BytesIO();_made=[]
+                            with zipfile.ZipFile(_zbuf,"w",zipfile.ZIP_DEFLATED) as _zf:
+                                for _mi,_it in enumerate(_mt_items):
+                                    _inp=_mt_inputs[_mi]
+                                    _out=gen_template(_it["df"],_mt_bmap)
+                                    _fn=f"{_inp['rn']}_{_inp['rd']}_{_inp['rm']}.xlsx".replace("/","-").replace("\\","-")
+                                    _zf.writestr(_fn,_out.getvalue())
+                                    _mm=sum(1 for _,_r in _it["df"].iterrows() if str(_r['internal_code']).strip() in _mt_bmap)
+                                    _made.append({'receipt_number':_inp["rn"],'receipt_date':_inp["rd"],'receiver_name':_inp["rm"],'file_name':_fn,'upload_date':datetime.now().isoformat(),'items_count':len(_it["df"]),'matched':_mm})
+                            receipts_list.extend(_made)
+                            save_receipts(receipts_list)
+                            st.session_state['mt_zip']=_zbuf.getvalue()
+                            st.success(f"تم إنشاء {len(_made)} ملف وتسجيلهم في سجل الريسيتات")
+                        except Exception as _e: st.error(f"خطأ: {str(_e)[:200]}")
+                if st.session_state.get('mt_zip'):
+                    st.download_button("📥 تحميل الملف المضغوط (ZIP)",data=st.session_state['mt_zip'],file_name=f"Templates_{datetime.now():%Y%m%d_%H%M}.zip",mime="application/zip",type="primary",key="mt_dl",use_container_width=True)
+                    if st.button("🗑️ مسح الملفات المُنشأة",key="mt_clear_zip"):
+                        st.session_state.pop('mt_zip',None);st.rerun()
+                if st.button("← السابق",key="mt_prev3"):
+                    st.session_state['mt_step']=2;st.rerun()
 
     elif _mkt_sub=="📋 سجل الريسيتات":
         st.markdown('<div class="erp-section"><div class="erp-section-dot" style="background:#fdcb6e;"></div><h3>📋 سجل الريسيتات</h3></div>',unsafe_allow_html=True)
