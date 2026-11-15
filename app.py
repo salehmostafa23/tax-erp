@@ -80,6 +80,12 @@ SUB_PAGES={
 }
 def _sub_key(p): return f"subsel|{p}"
 
+def _nav_set_page(p):
+    st.session_state['selected_page']=p
+
+def _nav_set_sub(p,s):
+    st.session_state[_sub_key(p)]=s
+
 # ====================== UI PREFERENCES (theme / language) ======================
 def _ui_lang():
     return 'en' if st.session_state.get('ui_lang')=='en' else 'ar'
@@ -2483,17 +2489,15 @@ with st.sidebar:
         _sel=(st.session_state['selected_page']==_np)
         _nav_lbl=_page_label(_np)
         if _np==NOTIF_PAGE and _unread_n: _nav_lbl=f"{_nav_lbl} · {_unread_n}"
-        if st.button(_nav_lbl,key=f"navbtn_{_np}",use_container_width=True,type="primary" if _sel else "secondary"):
-            st.session_state['selected_page']=_np
-            st.rerun()
+        st.button(_nav_lbl,key=f"navbtn_{_np}",use_container_width=True,type="primary" if _sel else "secondary",
+                  on_click=_nav_set_page,args=(_np,))
         if _sel and _np in SUB_PAGES:
             _subs=SUB_PAGES[_np]
             _cur=st.session_state.setdefault(_sub_key(_np),_subs[0])
             with st.container(key=f"submenu_{_i}"):
                 for _si,_sl in enumerate(_subs):
-                    if st.button(_sl,key=f"subbtn_{_i}_{_si}",use_container_width=True,type="primary" if _cur==_sl else "secondary"):
-                        st.session_state[_sub_key(_np)]=_sl
-                        st.rerun()
+                    st.button(_sl,key=f"subbtn_{_i}_{_si}",use_container_width=True,type="primary" if _cur==_sl else "secondary",
+                              on_click=_nav_set_sub,args=(_np,_sl))
     page=st.session_state['selected_page']
     st.markdown("<div style='height:1px;background:linear-gradient(90deg,transparent,rgba(108,92,231,.1),transparent);margin:1.2rem .8rem;'></div>", unsafe_allow_html=True)
     st.markdown(f"""<div style="padding:.7rem 1rem;border-radius:14px;background:rgba(108,92,231,.04);border:1px solid rgba(108,92,231,.06);margin:0 .5rem;text-align:center;">
@@ -2570,6 +2574,7 @@ def save_data(f,d):
     with open(f,'w',encoding='utf-8') as fh: json.dump(d,fh,ensure_ascii=False,indent=2,default=str)
     gh_write(_gh_key(f),d)
     load_data.clear()
+    if f in (PORTAL_OUT_FILE,PORTAL_IN_FILE): _home_portal_summary.clear()
     _lbl,_knd=_DATA_LABELS.get(_gh_key(f),(_gh_key(f),"other"))
     if _lbl!=_gh_key(f):
         _notify_change(_lbl,_knd,_old,d,names=("internal_id","civ","uuid","invoice_number","documentNumber","tax_number"))
@@ -3055,6 +3060,16 @@ def _home_n_records(data):
 def _home_n_portal(data):
     try: return sum((r.get('records_count',len(r.get('records',[]))) if isinstance(r,dict) else 0) for r in data)
     except: return 0
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def _home_portal_summary():
+    def _one(f):
+        try:
+            d=load_data(f)
+            return sum((r.get('records_count',len(r.get('records',[]))) if isinstance(r,dict) else 0) for r in d),len(d)
+        except Exception: return 0,0
+    _o=_one(PORTAL_OUT_FILE);_i=_one(PORTAL_IN_FILE)
+    return _o[0],_o[1],_i[0],_i[1]
 
 # ====================== TAX CALCULATOR (حاسبة الضرائب) ======================
 from decimal import Decimal as _TcDecimal, ROUND_HALF_UP as _TcHalfUp
@@ -4257,9 +4272,7 @@ if page == "🏠 الرئيسية":
     f41=_home_data(FORM41_FILE); vat=_home_data(VAT_FILE)
     f41_n=_home_n_records(f41)
     vat_n=_home_n_records(vat)
-    portal_out=_home_data(PORTAL_OUT_FILE); portal_in=_home_data(PORTAL_IN_FILE)
-    portal_out_n=_home_n_portal(portal_out)
-    portal_in_n=_home_n_portal(portal_in)
+    portal_out_n,portal_out_c,portal_in_n,portal_in_c=_home_portal_summary()
 
     st.markdown(f"""<div class="erp-topbar"><div><h2>{page}</h2><p>مرحباً بك في لوحة التحكم</p></div>
 <div class="erp-topbar-right"><span class="erp-badge">📊 Dashboard</span><a href="https://invoicing.eta.gov.eg/" target="_blank" style="background:rgba(0,206,201,.12);border:1px solid rgba(0,206,201,.3);border-radius:10px;padding:.35rem .9rem;color:#00cec9;font-size:.72rem;font-weight:600;text-decoration:none;cursor:pointer;transition:all .3s;">portal الفواتير الإلكترونية</a></div></div>""", unsafe_allow_html=True)
@@ -4268,8 +4281,8 @@ if page == "🏠 الرئيسية":
     c1,c2,c3,c4,c5=st.columns(5)
     with c1: st.markdown(f'<div class="erp-stat s-blue"><div class="erp-stat-label">نموذج 41</div><div class="erp-stat-value">{f41_n}</div><div class="erp-stat-sub">{len(f41)} رفع</div></div>', unsafe_allow_html=True)
     with c2: st.markdown(f'<div class="erp-stat s-cyan"><div class="erp-stat-label">القيمة المضافة</div><div class="erp-stat-value">{vat_n}</div><div class="erp-stat-sub">{len(vat)} رفع</div></div>', unsafe_allow_html=True)
-    with c3: st.markdown(f'<div class="erp-stat s-orange"><div class="erp-stat-label">فواتير صادرة</div><div class="erp-stat-value">{portal_out_n}</div><div class="erp-stat-sub">{len(portal_out)} رفع</div></div>', unsafe_allow_html=True)
-    with c4: st.markdown(f'<div class="erp-stat s-pink"><div class="erp-stat-label">فواتير واردة</div><div class="erp-stat-value">{portal_in_n}</div><div class="erp-stat-sub">{len(portal_in)} رفع</div></div>', unsafe_allow_html=True)
+    with c3: st.markdown(f'<div class="erp-stat s-orange"><div class="erp-stat-label">فواتير صادرة</div><div class="erp-stat-value">{portal_out_n}</div><div class="erp-stat-sub">{portal_out_c} رفع</div></div>', unsafe_allow_html=True)
+    with c4: st.markdown(f'<div class="erp-stat s-pink"><div class="erp-stat-label">فواتير واردة</div><div class="erp-stat-value">{portal_in_n}</div><div class="erp-stat-sub">{portal_in_c} رفع</div></div>', unsafe_allow_html=True)
     with c5: st.markdown(f'<div class="erp-stat s-green"><div class="erp-stat-label">الإجمالي</div><div class="erp-stat-value">{f41_n+vat_n+portal_out_n+portal_in_n}</div><div class="erp-stat-sub">سجل</div></div>', unsafe_allow_html=True)
 
     # F41 batches
