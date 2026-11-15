@@ -2624,7 +2624,7 @@ def merge_g_items(df):
         bykey[key]=row
         out.append(row)
     return pd.DataFrame(out,columns=['internal_code','item_name','price','quantity','discount','tax'])
-def gen_template(ddf,bmap):
+def gen_template(ddf,bmap,_with_rows=False):
     tp=os.path.join(DATA_DIR,'Template_Portal.xlsx')
     if os.path.exists(tp): wb=openpyxl.load_workbook(tp)
     else:
@@ -2634,6 +2634,7 @@ def gen_template(ddf,bmap):
         wb.save(tp)
     ws=wb.active
     for ri in range(ws.max_row,1,-1): ws.delete_rows(ri)
+    _prev=[]
     for idx,(_,r) in enumerate(ddf.iterrows()):
         i=idx+2;ic=str(r['internal_code']).strip();bc=bmap.get(ic,'')
         p=float(r['price']) if r['price'] else 0;q=float(r['quantity']) if r['quantity'] else 0
@@ -2645,7 +2646,17 @@ def gen_template(ddf,bmap):
         ws.cell(row=i,column=4,value='EA');ws.cell(row=i,column=5,value=math.ceil(p*100000)/100000 if p>0 else 0);ws.cell(row=i,column=6,value=q)
         ws.cell(row=i,column=7,value=-math.ceil(d*100000)/100000 if d>0 else '');ws.cell(row=i,column=8,value='')
         ws.cell(row=i,column=9,value=tc);ws.cell(row=i,column=10,value=tr)
+        if _with_rows:
+            _prev.append({'كود الصنف':bc,'الكود الداخلي':ic,'الوصف':r['item_name'],'كود الوحدة':'EA',
+                          'السعر':math.ceil(p*100000)/100000 if p>0 else 0,'الكمية':q,
+                          'الخصم':-math.ceil(d*100000)/100000 if d>0 else None,'خصم الأصناف':None,
+                          'كود ضريبة 1':tc or None,'نسبة الضريبة 1':tr or None,'كود ضريبة 2':None,'نسبة الضريبة 2':None,
+                          'كود ضريبة 3':None,'نسبة الضريبة 3':None,'كود ضريبة 4':None,'نسبة الضريبة 4':None,
+                          'كود ضريبة 5':None,'نسبة الضريبة 5':None,'كود ضريبة 6':None,'نسبة الضريبة 6':None,
+                          'العملة':None,'سعر العملة':None,'عرض الأكواد':None})
     out=BytesIO();wb.save(out);out.seek(0);wb.close()
+    if _with_rows:
+        return out,pd.DataFrame(_prev,columns=['كود الصنف','الكود الداخلي','الوصف','كود الوحدة','السعر','الكمية','الخصم','خصم الأصناف','كود ضريبة 1','نسبة الضريبة 1','كود ضريبة 2','نسبة الضريبة 2','كود ضريبة 3','نسبة الضريبة 3','كود ضريبة 4','نسبة الضريبة 4','كود ضريبة 5','نسبة الضريبة 5','كود ضريبة 6','نسبة الضريبة 6','العملة','سعر العملة','عرض الأكواد'])
     return out
 def fmt(n):
     try: return f"{float(n):,.2f}"
@@ -4560,10 +4571,10 @@ elif page=="🛒 فواتير الماركت":
     elif _mkt_sub=="🧩 Template مجمع":
         st.markdown('<div class="erp-section"><div class="erp-section-dot" style="background:#fd79a8;"></div><h3>🧩 إنشاء Template مجمع</h3></div>',unsafe_allow_html=True)
         st.caption("ارفع أكثر من شيت Detailed Receipt بنفس الصيغة المعتادة، واختار طريقة التصدير. الباركود بييجي تلقائياً من الأكواد المحفوظة.")
-        cm_bd=load_barcodes()
-        cm_bm={str(b.get('internal_code','')).strip():str(b.get('barcode','')).strip() for b in cm_bd if str(b.get('internal_code','')).strip()}
         cm_files=st.file_uploader("ارفع عدة شيتات Detailed Receipt (ممكن كذا ملف مرة واحدة)",type=['xlsx','xls'],accept_multiple_files=True,key="comb_files")
         if cm_files:
+            cm_bd=load_barcodes()
+            cm_bm={str(b.get('internal_code','')).strip():str(b.get('barcode','')).strip() for b in cm_bd if str(b.get('internal_code','')).strip()}
             cm_mode=st.radio("اختر طريقة التصدير:",["📄 كل الأصناف كما هي (من غير تجميع)","🧮 تجميع الأصناف المتكررة اللي تبدأ بحرف G في سطر واحد (الأصناف غير G مش هتتضمن)"],horizontal=True,key="comb_mode")
             st.markdown(f'<div style="padding:.5rem 1rem;border-radius:10px;background:rgba(162,155,254,.06);border:1px solid rgba(162,155,254,.15);color:#a29bfe;font-size:.82rem;">📂 عدد الملفات المرفوعة: <strong>{len(cm_files)}</strong> — الأكواد المحفوظة: <strong>{len(cm_bm)}</strong></div>',unsafe_allow_html=True)
             if st.button("🚀 إنشاء Template مجمع",key="comb_gen",type="primary",use_container_width=True):
@@ -4577,13 +4588,12 @@ elif page=="🛒 فواتير الماركت":
                         cm_npn=len(cm_all)
                         cm_merge=cm_mode.startswith("🧮")
                         cm_out=merge_g_items(cm_all) if cm_merge else cm_all.copy()
-                        cm_buf=gen_template(cm_out,cm_bm)
+                        cm_buf,cm_prev=gen_template(cm_out,cm_bm,_with_rows=True)
                         _notify("أنشأ Template مجمّع",f"{cm_npn} صنف أصلي — {len(cm_out)} بعد التجميع",kind="template")
                         cm_miss=[str(c).strip() for c in cm_out['internal_code'] if str(cm_bm.get(str(c).strip(),'')).strip()=='']
                         st.success(f"تم إنشاء Template بنجاح: {cm_npn} صنف أصلي" + (f" — بعد التجميع {len(cm_out)} صنف ({cm_npn-len(cm_out)} مدمج)" if cm_merge else ""))
                         st.dataframe(cm_out,use_container_width=True,height=300)
-                        cm_buf.seek(0)
-                        st.dataframe(pd.read_excel(cm_buf,engine='openpyxl'),use_container_width=True,height=350)
+                        st.dataframe(cm_prev,use_container_width=True,height=350)
                         cm_buf.seek(0)
                         if cm_miss:
                             st.warning(f"⚠️ {len(cm_miss)} كود من غير باركود محفوظ (هيظهر الباركود فاضي) — أمثلة: {', '.join(cm_miss[:5])}")
