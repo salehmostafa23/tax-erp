@@ -448,6 +448,68 @@ def _eta_refresh_token():
         return token
     return None
 
+# ====================== SAVED ETA CREDENTIALS (ثابتة لكل التابات والجلسات) ======================
+SETTINGS_FILE=os.path.join(DATA_DIR,"app_settings.json")
+
+@st.cache_data(ttl=300,show_spinner=False)
+def load_app_settings():
+    data=gh_read("app_settings.json")
+    if isinstance(data,dict): return data
+    if os.path.exists(SETTINGS_FILE):
+        try:
+            with open(SETTINGS_FILE,'r',encoding='utf-8') as f: d=json.load(f)
+            if isinstance(d,dict): return d
+        except Exception: pass
+    return {}
+
+def save_app_settings(data):
+    gh_write("app_settings.json",data)
+    with open(SETTINGS_FILE,'w',encoding='utf-8') as f: json.dump(data,f,ensure_ascii=False,indent=2)
+    load_app_settings.clear()
+
+def load_eta_credentials():
+    s=load_app_settings().get("eta_credentials") or {}
+    return _pw_unseal(s.get("client_id","")),_pw_unseal(s.get("client_secret",""))
+
+def save_eta_credentials(cid,csec):
+    if not cid or not csec: return
+    s=load_app_settings()
+    s["eta_credentials"]={"client_id":_pw_seal(cid),"client_secret":_pw_seal(csec),
+                           "saved_at":datetime.now().isoformat(timespec="seconds")}
+    save_app_settings(s)
+
+def _eta_env_credentials():
+    cid=os.environ.get("ETA_CLIENT_ID","") or ""
+    csec=os.environ.get("ETA_CLIENT_SECRET","") or ""
+    if not cid:
+        try:
+            cid=str(st.secrets.get("ETA_CLIENT_ID","") or "")
+            csec=str(st.secrets.get("ETA_CLIENT_SECRET","") or "") or csec
+        except Exception: pass
+    return cid,csec
+
+def _eta_bootstrap():
+    if not st.session_state.get("current_user"): return
+    if st.session_state.get("eta_token"):
+        st.session_state["_eta_boot_done"]=True
+        cid=str(st.session_state.get("eta_client_id","") or "")
+        csec=str(st.session_state.get("eta_client_secret","") or "")
+        if cid and csec and load_eta_credentials()!=(cid,csec):
+            save_eta_credentials(cid,csec)
+        return
+    if st.session_state.get("_eta_boot_done"): return
+    st.session_state["_eta_boot_done"]=True
+    cid,csec=load_eta_credentials()
+    if not cid:
+        cid,csec=_eta_env_credentials()
+    if not cid or not csec: return
+    st.session_state["eta_client_id"]=cid
+    st.session_state["eta_client_secret"]=csec
+    _tk,_er=eta_login(cid,csec)
+    if _tk: st.session_state["eta_token"]=_tk
+    else: st.session_state["_eta_boot_err"]=str(_er)
+
+
 def eta_submit_invoice(token, document):
     url=f"{ETA_API_BASE}/api/v1.0/documentsubmissions"
     headers={"Authorization":f"Bearer {token}","Content-Type":"application/json; charset=utf-8"}
@@ -2446,6 +2508,8 @@ with st.sidebar:
             <p style="color:rgba(255,255,255,.5);font-size:.62rem;margin:0;font-weight:500;">متصل</p>
         </div>
         <p style="color:rgba(255,255,255,.22);font-size:.55rem;margin:0;letter-spacing:1px;">v1.1.2 • Tax Management System</p></div>""", unsafe_allow_html=True)
+
+_eta_bootstrap()
 
 # ====================== DATA ======================
 RECEIPTS_FILE=os.path.join(DATA_DIR,"receipts_registry.json")
@@ -5271,7 +5335,7 @@ elif page=="📄 Portal الفواتير الإلكترونية":
                 st.rerun()
 
         st.markdown("""<div style="padding:.8rem 1rem;border-radius:10px;background:rgba(253,203,110,.06);border:1px solid rgba(253,203,110,.15);margin-top:.5rem;font-size:.78rem;color:#fdcb6e;">
-            💡 أدخل بيانات الاتصال يدوياً من البورتال (أو اتركها لتستخدم الإعدادات المحفوظة تلقائياً)
+            💡 أدخل البيانات مرة واحدة — بتتحفظ مشفّرة وبتتستخدم تلقائياً في كل التابات وبعد إعادة الدخول للسيستم
         </div>""",unsafe_allow_html=True)
         with st.form("eta_credentials_form"):
             c1,c2=st.columns(2)
