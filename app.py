@@ -6681,7 +6681,219 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
     _ws_sub=st.session_state.get(_sub_key("📦 فواتير مبيعات الجملة والإيجارات"),"📦 مبيعات الجملة")
 
     if _ws_sub=="📦 مبيعات الجملة":
-        st.info("تاب مبيعات الجملة قيد التطوير - جارٍ التحضير")
+        import re as _ws_re
+        from html.parser import HTMLParser as _ws_HP
+
+        def _ws_decode(raw):
+            for _enc in ("utf-8","cp1256","windows-1256"):
+                try: return raw.decode(_enc)
+                except Exception: continue
+            return raw.decode("utf-8",errors="replace")
+
+        class _WsHtml(_ws_HP):
+            def __init__(self):
+                _ws_HP.__init__(self,convert_charrefs=True)
+                self.tables=[];self.rows=None;self.row=None;self.cell=None
+            def handle_starttag(self,tag,attrs):
+                t=tag.lower()
+                if t=='table': self.rows=[];self.tables.append(self.rows)
+                elif t=='tr' and self.rows is not None: self.row=[];self.rows.append(self.row)
+                elif t in ('td','th') and self.row is not None: self.cell=[];self.row.append(self.cell)
+            def handle_data(self,data):
+                if self.cell is not None: self.cell.append(data)
+            def handle_endtag(self,tag):
+                t=tag.lower()
+                if t in ('td','th'): self.cell=None
+                elif t=='tr': self.row=None
+                elif t=='table': self.rows=None
+
+        def _ws_cells(row):
+            out=[]
+            for c in row: out.append(' '.join(''.join(c).split()) if isinstance(c,list) else '')
+            return out
+
+        def _ws_tables(html):
+            p=_WsHtml()
+            try: p.feed(html);p.close()
+            except Exception: pass
+            out=[]
+            for tb in p.tables:
+                rows=[_ws_cells(r) for r in tb]
+                rows=[r for r in rows if any(x for x in r)]
+                if rows: out.append(rows)
+            return out
+
+        def _ws_norm(x): return str(x).replace('ه','ة').replace('ى','ي').strip()
+
+        def _ws_f(s):
+            s=str(s).replace(',','').strip()
+            if not s or s in ('-','—'): return 0.0
+            try: return float(s)
+            except Exception: return 0.0
+
+        _WS_HDR={'amount':'المبلغ','discount':'الخصم','tax':'الضريبة','price':'سعر الوحدة','unit':'الوحدة','qty':'الكمية','name':'اسم الصنف','code':'رقم الصنف'}
+        _WS_CODE=_ws_re.compile(r'^G\d{5,}$')
+
+        def _ws_cols(row):
+            cols={}
+            for i,x in enumerate(row):
+                nx=_ws_norm(x)
+                if not nx: continue
+                for k,v in _WS_HDR.items():
+                    if k in cols: continue
+                    if k=='unit' and 'سعر' in nx: continue
+                    if v in nx: cols[k]=i
+            return cols
+
+        def _ws_items(html):
+            for tb in _ws_tables(html):
+                hdr=None
+                for ri,row in enumerate(tb):
+                    cols=_ws_cols(row)
+                    if 'code' in cols and 'price' in cols:
+                        hdr=(ri,cols);break
+                if not hdr: continue
+                ri,cols=hdr
+                items=[]
+                for row in tb[ri+1:]:
+                    ci=cols['code']
+                    if ci>=len(row): continue
+                    code=row[ci].strip()
+                    if not _WS_CODE.match(code): continue
+                    def _g(k):
+                        i=cols.get(k)
+                        return row[i] if i is not None and i<len(row) else ''
+                    qty=_ws_f(_g('qty'));price=_ws_f(_g('price'));amount=_ws_f(_g('amount'))
+                    if price<=0 and qty>0 and amount>0: price=amount/qty
+                    items.append({'line':row[-1].strip() if row and row[-1].strip().isdigit() else str(len(items)+1),
+                                  'code':code,'name':_g('name'),'unit':_g('unit'),'qty':qty,'price':price,
+                                  'amount':amount,'tax':_ws_f(_g('tax')),'discount':_ws_f(_g('discount'))})
+                if items: return items
+            for tb in _ws_tables(html):
+                got=[]
+                for row in tb:
+                    ci=next((i for i,x in enumerate(row) if _WS_CODE.match(x.strip())),None)
+                    if ci is None: continue
+                    def _at(off):
+                        j=ci+off
+                        return row[j] if 0<=j<len(row) else ''
+                    qty=_ws_f(_at(-2));price=_ws_f(_at(-4));amount=_ws_f(_at(-7))
+                    if price<=0 and qty>0 and amount>0: price=amount/qty
+                    got.append({'line':row[-1].strip() if row and row[-1].strip().isdigit() else str(len(got)+1),
+                                'code':row[ci].strip(),'name':_at(-1),'unit':_at(-3),'qty':qty,'price':price,
+                                'amount':amount,'tax':_ws_f(_at(-5)),'discount':_ws_f(_at(-6))})
+                if got: return got
+            return []
+
+        def _ws_collapse(html):
+            txt=_ws_re.sub(r'</(td|th|tr|p|div|li|span|br|strong|b|h\d)>','\n',html,flags=_ws_re.I)
+            txt=_ws_re.sub(r'<br\s*/?>','\n',txt,flags=_ws_re.I)
+            txt=_ws_re.sub(r'<[^>]+>',' ',txt)
+            txt=txt.replace('&nbsp;',' ')
+            ls=[_ws_re.sub(r'[ \t]+',' ',l).strip() for l in txt.split('\n')]
+            return [l for l in ls if l]
+
+        def _ws_meta(html):
+            ls=_ws_collapse(html);text='\n'.join(ls);info={'civ':'','so':'','date':'','customer':'','tax_no':'','tax_total':0.0}
+            m=_ws_re.search(r'CIV-\d+',text)
+            if m: info['civ']=m.group(0)
+            m=_ws_re.search(r'SO-\d+',text)
+            if m: info['so']=m.group(0)
+            m=_ws_re.search(r'20\d{2}/\d{1,2}/\d{1,2}',text)
+            if m: info['date']=m.group(0)
+            for i,l in enumerate(ls):
+                if 'اسم العميل' in l and not info['customer']:
+                    for k in range(i-1,max(-1,i-5),-1):
+                        c=ls[k]
+                        if _ws_re.search(r'[\u0621-\u064A]',c) and not c.startswith(':') and not _ws_re.search(r'\d{4,}',c):
+                            info['customer']=c;break
+                if ('الرقم الضريبي' in l or 'الرقم الضريبى' in l) and not info['tax_no']:
+                    for k in range(i-1,max(-1,i-4),-1):
+                        if _ws_re.fullmatch(r'\d{9,15}',ls[k].replace(',','')):
+                            info['tax_no']=ls[k].replace(',','');break
+            for i,l in enumerate(ls):
+                if 'ضريبه المبيعات' in l or 'ضريبة المبيعات' in l:
+                    for k in range(i-1,max(-1,i-4),-1):
+                        v=_ws_f(ls[k])
+                        if v>0: info['tax_total']=v;break
+                    break
+            return info
+
+        st.markdown('<div class="erp-section"><div class="erp-section-dot" style="background:#6c5ce7;"></div><h3>فواتير مبيعات الجملة — من HTML إلى Template Portal</h3></div>',unsafe_allow_html=True)
+        st.caption("ارفع ملف HTML لفاتورة مبيعات الجملة: السيستم هيقرأ الأصناف، هيجيب الباركود المربوط بكل كود G من قاعدة الباركود، وبعد ما تختار الأصناف اللي عليها ضريبة مبيعات 14% هيطلعلك Template جاهز للبورتال.")
+        _ws_up=st.file_uploader("ارفع ملف HTML لفاتورة مبيعات الجملة",type=["html","htm"],key="ws_html_upload")
+        if _ws_up:
+            _ws_html=_ws_decode(_ws_up.getvalue())
+            _ws_items_l=_ws_items(_ws_html)
+            if not _ws_items_l:
+                st.error("مفيش أصناف بأكواد G اتقرأت من الملف — اتأكد إن ده ملف فاتورة مبيعات جملة (ATOS Sales Invoice).")
+            else:
+                _ws_meta_l=_ws_meta(_ws_html)
+                _ws_bmap={str(b.get('internal_code','')).strip():str(b.get('barcode','')).strip() for b in load_barcodes() if str(b.get('internal_code','')).strip()}
+                for _it in _ws_items_l: _it['barcode']=_ws_bmap.get(_it['code'],'')
+                _ws_missing=[_it['code'] for _it in _ws_items_l if not _it['barcode']]
+                _ws_taxed_file=sum(1 for _it in _ws_items_l if _it['tax']>0)
+                _ws_file_amount=sum(_it['amount'] or _it['price']*_it['qty'] for _it in _ws_items_l)
+
+                _ws_meta_bits=[x for x in [_ws_meta_l['customer'],("ضريبي: "+_ws_meta_l['tax_no']) if _ws_meta_l['tax_no'] else '',
+                                           _ws_meta_l['so'],_ws_meta_l['civ'],_ws_meta_l['date']] if x]
+                if _ws_meta_bits:
+                    st.markdown('<div style="padding:.6rem 1rem;border-radius:12px;background:rgba(108,92,231,.06);border:1px solid rgba(108,92,231,.15);color:#a29bfe;font-size:.8rem;margin-bottom:.8rem;">📄 '+ ' • '.join(_ws_meta_bits) +'</div>',unsafe_allow_html=True)
+                s1,s2,s3,s4=st.columns(4)
+                with s1: st.markdown(f'<div class="erp-stat s-blue"><div class="erp-stat-label">الأصناف</div><div class="erp-stat-value">{len(_ws_items_l)}</div></div>',unsafe_allow_html=True)
+                with s2: st.markdown(f'<div class="erp-stat s-cyan"><div class="erp-stat-label">إجمالي الملف</div><div class="erp-stat-value">{fmt(_ws_file_amount)}</div></div>',unsafe_allow_html=True)
+                with s3: st.markdown(f'<div class="erp-stat s-orange"><div class="erp-stat-label">ضريبة الملف</div><div class="erp-stat-value">{fmt(_ws_meta_l["tax_total"])}</div></div>',unsafe_allow_html=True)
+                with s4: st.markdown(f'<div class="erp-stat s-green"><div class="erp-stat-label">عليها ضريبة بالملف</div><div class="erp-stat-value">{_ws_taxed_file}</div></div>',unsafe_allow_html=True)
+                if _ws_missing:
+                    st.warning("أكواد G ملهاش باركود في قاعدة الأكواد: "+" • ".join(_ws_missing[:15])+(" ..." if len(_ws_missing)>15 else ""))
+
+                _ws_df=pd.DataFrame([{'م':_it['line'],'رقم الصنف':_it['code'],'الباركود':_it['barcode'] or '—','اسم الصنف':_it['name'],
+                                      'الكمية':_it['qty'],'سعر الوحدة':_it['price'],'المبلغ':_it['amount'],'ضريبة الملف':_it['tax']} for _it in _ws_items_l])
+                st.dataframe(_ws_df,use_container_width=True,height=320)
+
+                _ws_opts={f"{i+1} | {_it['code']} | {_it['name']}":_it for i,_it in enumerate(_ws_items_l)}
+                _ws_default=[k for k,_it in _ws_opts.items() if _it['tax']>0]
+                st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot" style="background:#fdcb6e;"></div><h3>اختيار ضريبة المبيعات قبل التصدير</h3></div>',unsafe_allow_html=True)
+                st.caption("ملف HTML ساعات بيبقى فيه إجمالي ضريبة مبيعات بس من غير تحديد الصنف — علّم هنا الأصناف اللي عليها ضريبة 14% (اللي كانت عليها ضريبة بالملف محددة تلقائياً).")
+                _ws_sel=st.multiselect("الأصناف الخاضعة لضريبة مبيعات 14%",list(_ws_opts.keys()),default=_ws_default,key="ws_tax_sel")
+                _ws_sel_set=set(_ws_sel)
+
+                _ws_calc=[]
+                for _k,_it in _ws_opts.items():
+                    _gross=_it['amount'] or _it['price']*_it['qty']
+                    _taxable=_k in _ws_sel_set
+                    _net=_gross/1.14 if _taxable else _gross
+                    _tax=_gross-_net if _taxable else 0.0
+                    _ws_calc.append({'م':_it['line'],'رقم الصنف':_it['code'],'الباركود':_it['barcode'] or '—','اسم الصنف':_it['name'],
+                                     'الكمية':_it['qty'],'ضريبة': '14%' if _taxable else '0%','قبل الضريبة':round(_net,2),'الضريبة':round(_tax,2),'الإجمالي':round(_gross,2)})
+                _ws_pnet=sum(c['قبل الضريبة'] for c in _ws_calc);_ws_ptax=sum(c['الضريبة'] for c in _ws_calc);_ws_pgross=sum(c['الإجمالي'] for c in _ws_calc)
+                p1,p2,p3=st.columns(3)
+                with p1: st.markdown(f'<div class="erp-stat s-blue"><div class="erp-stat-label">إجمالي قبل الضريبة</div><div class="erp-stat-value">{fmt(_ws_pnet)}</div></div>',unsafe_allow_html=True)
+                with p2: st.markdown(f'<div class="erp-stat s-orange"><div class="erp-stat-label">الضريبة المختارة</div><div class="erp-stat-value">{fmt(_ws_ptax)}</div></div>',unsafe_allow_html=True)
+                with p3: st.markdown(f'<div class="erp-stat s-green"><div class="erp-stat-label">الإجمالي</div><div class="erp-stat-value">{fmt(_ws_pgross)}</div></div>',unsafe_allow_html=True)
+                if _ws_meta_l['tax_total']>0:
+                    if abs(_ws_ptax-_ws_meta_l['tax_total'])<=0.05:
+                        st.success(f"✅ ضريبة الاختيار مطابقة لضريبة الملف ({fmt(_ws_meta_l['tax_total'])})")
+                    else:
+                        st.info(f"ضريبة الملف: {fmt(_ws_meta_l['tax_total'])} — ضريبة الاختيار الحالي: {fmt(_ws_ptax)}")
+                st.dataframe(pd.DataFrame(_ws_calc),use_container_width=True,height=320)
+
+                if st.button("🚀 إنشاء Template Portal",key="ws_gen",type="primary",use_container_width=True):
+                    _rows=[]
+                    for _k,_it in _ws_opts.items():
+                        _rows.append({'internal_code':_it['code'],'item_name':_it['name'],'price':_it['price'],'quantity':_it['qty'],
+                                      'discount':_it['discount'],'tax':14 if _k in _ws_sel_set else 0})
+                    try:
+                        out=gen_template(pd.DataFrame(_rows),_ws_bmap)
+                        st.success("✅ تم إنشاء Template — نزّله من الزرار تحت")
+                        st.dataframe(pd.read_excel(out,engine='openpyxl'),use_container_width=True,height=320)
+                        out.seek(0)
+                        _ws_part=(_ws_meta_l['so'] or _ws_meta_l['civ'] or 'WS').replace('/','-')
+                        _ws_day=(_ws_meta_l['date'] or datetime.now().strftime('%Y-%m-%d')).replace('/','-')
+                        st.download_button("📥 تحميل Template",data=out,file_name=f"Template_{_ws_part}_{_ws_day}.xlsx",
+                                           mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",type="primary",key="ws_dl")
+                    except Exception as _e:
+                        st.error(f"خطأ: {_e}")
 
     elif _ws_sub=="🏢 فواتير الإيجارات":
         _tab_rent,_tab_xl=st.tabs(["✍️ التوقيع مباشر","📊 تحويل الفاتورة لأكسيل"])
