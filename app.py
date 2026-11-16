@@ -6746,44 +6746,46 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
             return cols
 
         def _ws_items(html):
+            all_items=[]
             for tb in _ws_tables(html):
                 hdr=None
                 for ri,row in enumerate(tb):
                     cols=_ws_cols(row)
                     if 'code' in cols and 'price' in cols:
                         hdr=(ri,cols);break
-                if not hdr: continue
-                ri,cols=hdr
-                items=[]
-                for row in tb[ri+1:]:
-                    ci=cols['code']
-                    if ci>=len(row): continue
-                    code=row[ci].strip()
-                    if not _WS_CODE.match(code): continue
-                    def _g(k):
-                        i=cols.get(k)
-                        return row[i] if i is not None and i<len(row) else ''
-                    qty=_ws_f(_g('qty'));price=_ws_f(_g('price'));amount=_ws_f(_g('amount'))
-                    if price<=0 and qty>0 and amount>0: price=amount/qty
-                    items.append({'line':row[-1].strip() if row and row[-1].strip().isdigit() else str(len(items)+1),
-                                  'code':code,'name':_g('name'),'unit':_g('unit'),'qty':qty,'price':price,
-                                  'amount':amount,'tax':_ws_f(_g('tax')),'discount':_ws_f(_g('discount'))})
-                if items: return items
-            for tb in _ws_tables(html):
-                got=[]
-                for row in tb:
-                    ci=next((i for i,x in enumerate(row) if _WS_CODE.match(x.strip())),None)
-                    if ci is None: continue
-                    def _at(off):
-                        j=ci+off
-                        return row[j] if 0<=j<len(row) else ''
-                    qty=_ws_f(_at(-2));price=_ws_f(_at(-4));amount=_ws_f(_at(-7))
-                    if price<=0 and qty>0 and amount>0: price=amount/qty
-                    got.append({'line':row[-1].strip() if row and row[-1].strip().isdigit() else str(len(got)+1),
-                                'code':row[ci].strip(),'name':_at(-1),'unit':_at(-3),'qty':qty,'price':price,
-                                'amount':amount,'tax':_ws_f(_at(-5)),'discount':_ws_f(_at(-6))})
-                if got: return got
-            return []
+                if hdr:
+                    ri,cols=hdr
+                    for row in tb[ri+1:]:
+                        ci=cols['code']
+                        if ci>=len(row): continue
+                        code=row[ci].strip()
+                        if not _WS_CODE.match(code): continue
+                        def _g(k):
+                            i=cols.get(k)
+                            return row[i] if i is not None and i<len(row) else ''
+                        qty=_ws_f(_g('qty'));price=_ws_f(_g('price'));amount=_ws_f(_g('amount'))
+                        if price<=0 and qty>0 and amount>0: price=amount/qty
+                        all_items.append({'line':row[-1].strip() if row and row[-1].strip().isdigit() else str(len(all_items)+1),
+                                          'code':code,'name':_g('name'),'unit':_g('unit'),'qty':qty,'price':price,
+                                          'amount':amount,'tax':_ws_f(_g('tax')),'discount':_ws_f(_g('discount'))})
+                else:
+                    for row in tb:
+                        ci=next((i for i,x in enumerate(row) if _WS_CODE.match(x.strip())),None)
+                        if ci is None: continue
+                        def _at(off):
+                            j=ci+off
+                            return row[j] if 0<=j<len(row) else ''
+                        qty=_ws_f(_at(-2));price=_ws_f(_at(-4));amount=_ws_f(_at(-7))
+                        if price<=0 and qty>0 and amount>0: price=amount/qty
+                        all_items.append({'line':row[-1].strip() if row and row[-1].strip().isdigit() else str(len(all_items)+1),
+                                          'code':row[ci].strip(),'name':_at(-1),'unit':_at(-3),'qty':qty,'price':price,
+                                          'amount':amount,'tax':_ws_f(_at(-5)),'discount':_ws_f(_at(-6))})
+            items=[];seen=set()
+            for _it in all_items:
+                _key=(_it['line'],_it['code'],_it['qty'],_it['price'],_it['amount'])
+                if _key in seen: continue
+                seen.add(_key);items.append(_it)
+            return items
 
         def _ws_collapse(html):
             txt=_ws_re.sub(r'</(td|th|tr|p|div|li|span|br|strong|b|h\d)>','\n',html,flags=_ws_re.I)
