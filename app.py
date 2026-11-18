@@ -3739,9 +3739,35 @@ def load_linked_invoices():
     return {"invoices":[],"last_check":""}
 
 def save_linked_invoices(data):
-    gh_write("linked_invoices.json",data)
-    with open(LINKED_FILE,'w',encoding='utf-8') as f: json.dump(data,f,ensure_ascii=False,indent=2)
+    _ok=gh_write("linked_invoices.json",data)
+    try:
+        with open(LINKED_FILE,'w',encoding='utf-8') as f: json.dump(data,f,ensure_ascii=False,indent=2)
+    except Exception: pass
     load_linked_invoices.clear()
+    try: st.session_state["lnk_save_failed"]=not _ok
+    except Exception: pass
+    return _ok
+
+def _lnk_age_days(iso):
+    if not iso: return None
+    try: return max(0,(datetime.now()-datetime.fromisoformat(str(iso))).days)
+    except Exception: return None
+
+def _lnk_folders(linked,invoices):
+    _fl=[f for f in (linked.get("folders") or []) if isinstance(f,dict) and str(f.get("name","")).strip()]
+    _names={str(f["name"]).strip() for f in _fl}
+    for _v in invoices:
+        _fn=str(_v.get("folder","") or "").strip()
+        if not _fn:
+            _src=str(_v.get("file","") or "شيت")
+            _d=str(_v.get("linked_at","") or "")[:10]
+            _fn=f"{_src} — {_d}" if _d else _src
+            _v["folder"]=_fn
+        if _fn not in _names:
+            _fl.append({"name":_fn,"created_at":str(_v.get("linked_at","") or ""),"file":str(_v.get("file","") or "")})
+            _names.add(_fn)
+    linked["folders"]=_fl
+    return _fl
 
 def _lnk_pick(roots,keys,defv=""):
     for rt in roots:
@@ -3797,11 +3823,19 @@ def _lnk_status(token,u,smap):
 def _issued_linked_tab(token,smap,norm_all):
     linked=load_linked_invoices()
     invoices=linked.get("invoices",[])
+    folders=_lnk_folders(linked,invoices)
     st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot" style="background:#00cec9;"></div><h3>ربط الفواتير المصروفة ومتابعتها</h3></div>',unsafe_allow_html=True)
-    st.markdown('<div style="padding:.5rem 1rem;border-radius:10px;background:rgba(0,206,201,.06);border:1px solid rgba(0,206,201,.15);color:#00cec9;font-size:.78rem;">📌 ارفع شيت فيه أرقام UUID الفواتير الصادرة — النظام بيحفظهم هنا، وكل ما تضغط «استعلام عن الفواتير المرتبطة» بيجيب الحالة الحالية لكل فاتورة. لو فاتورة اتلغت هيظهرلك تنبيه، وعندك مدة 7 أيام من تاريخ الإلغاء تقدم فيها طلب إلغاء الإلغاء من البورتال.</div>',unsafe_allow_html=True)
+    if st.session_state.get("lnk_save_failed"):
+        st.markdown('<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(255,107,107,.1);border:1px solid rgba(255,107,107,.35);color:#ff6b6b;font-size:.8rem;margin:.4rem 0;">⚠️ آخر حفظ على GitHub فشل — البيانات اتحفظت مؤقتاً على نسخة التطبيق الحالية بس ويمكن تضيع بعد أي تحديث. لازم تحدّث <strong>GITHUB_TOKEN</strong> في Secrets بتاع Streamlit Cloud بتوكن جديد صلاحيته كتابة على الريبو.</div>',unsafe_allow_html=True)
+    st.markdown('<div style="padding:.5rem 1rem;border-radius:10px;background:rgba(0,206,201,.06);border:1px solid rgba(0,206,201,.15);color:#00cec9;font-size:.78rem;">📌 كل شيت بترفعه بيتحفظ جوه <strong>مجلد</strong> بتسميه بنفسك (مثلاً «فواتير أكتوبر 2026»). تقدر تفتح أي مجلد في أي وقت وتعمل منه استعلام لوحده. لو فاتورة اتلغت هيظهرلك تنبيه، وعندك 7 أيام من تاريخ الإلغاء. وبعد ما يعدي 7 أيام من إنشاء المجلد تقدر تمسحه من هنا.</div>',unsafe_allow_html=True)
     if not token:
         st.markdown('<div style="padding:.5rem 1rem;border-radius:10px;background:rgba(253,203,110,.06);border:1px solid rgba(253,203,110,.15);color:#fdcb6e;font-size:.78rem;margin-top:.5rem;">💡 اربط البورتال الأول من فوق عشان تقدر تستعلم عن حالة الفواتير</div>',unsafe_allow_html=True)
-    _lf=st.file_uploader("ارفع شيت الفواتير الصادرة للربط",type=["xlsx","xls"],key="linked_file")
+    st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot" style="background:#6c5ce7;"></div><h3>📁 إنشاء مجلد فواتير جديد</h3></div>',unsafe_allow_html=True)
+    _fc1,_fc2=st.columns([1,1])
+    with _fc1:
+        _fname=st.text_input("اسم المجلد (فترة الفواتير)",key="lnk_folder_name",placeholder="مثال: فواتير أكتوبر 2026").strip()
+    with _fc2:
+        _lf=st.file_uploader("ارفع شيت فيه أرقام UUID الفواتير",type=["xlsx","xls"],key="linked_file")
     if _lf:
         _lnk_new=[];_lnk_sheets=None
         try:
@@ -3826,122 +3860,155 @@ def _issued_linked_tab(token,smap,norm_all):
                 if _samples: st.caption("أمثلة من القيم اللي اتقرأت: "+" • ".join(_samples))
             else:
                 st.markdown(f'<div style="padding:.5rem 1rem;border-radius:10px;background:rgba(0,206,201,.06);border:1px solid rgba(0,206,201,.15);color:#00cec9;font-size:.82rem;">✅ تم قراءة <strong>{len(_lnk_new)}</strong> رقم UUID فريد من الملف</div>',unsafe_allow_html=True)
-                if st.button(f"🔗 ربط {len(_lnk_new)} فاتورة بالقائمة",key="linked_add_btn",type="primary",use_container_width=True):
+                if not _fname: st.caption("✍️ اكتب اسم المجلد فوق الأول، وبعدين اضغط الربط")
+                if st.button(f"📁 ربط {len(_lnk_new)} فاتورة في مجلد «{_fname or '—'}»",key="folder_add_btn",type="primary",use_container_width=True,disabled=not bool(_fname)):
                     _exist={str(v.get("uuid","")).strip().lower() for v in invoices}
                     _now_iso=datetime.now().isoformat(timespec="seconds")
-                    _added=0
+                    _added=0;_skipped=0
                     for _u in _lnk_new:
-                        if _u.strip().lower() in _exist: continue
+                        if _u.strip().lower() in _exist: _skipped+=1; continue
                         _exist.add(_u.strip().lower());_added+=1
-                        invoices.append({"uuid":_u,"file":_lf.name,"linked_at":_now_iso,"last_status":"","last_status_en":"","last_notes":"","last_cancel_date":"","last_days_left":"","last_checked":""})
+                        invoices.append({"uuid":_u,"file":_lf.name,"linked_at":_now_iso,"folder":_fname,"last_status":"","last_status_en":"","last_notes":"","last_cancel_date":"","last_days_left":"","last_checked":""})
                     if _added:
+                        _fold0=next((f for f in folders if str(f.get("name",""))==_fname),None)
+                        if _fold0 is None:
+                            folders.append({"name":_fname,"created_at":_now_iso,"file":_lf.name})
+                        else:
+                            _fold0["file"]=_lf.name
                         linked["invoices"]=invoices
+                        linked["folders"]=folders
                         save_linked_invoices(linked)
-                        st.success(f"تم ربط {_added} فاتورة — إجمالي الفواتير المرتبطة: {len(invoices)}")
+                        st.success(f"تم ربط {_added} فاتورة داخل مجلد «{_fname}»"+(f" — {_skipped} فاتورة كانت مربوطة قبل كده واتخطت" if _skipped else ""))
                         st.rerun()
                     else:
                         st.info("كل الفواتير دي مربوطة بالفعل")
     if invoices:
-        st.markdown(f'<div style="padding:.5rem 1rem;border-radius:10px;background:rgba(108,92,231,.06);border:1px solid rgba(108,92,231,.18);color:#a29bfe;font-size:.82rem;margin-top:.6rem;">🔗 إجمالي الفواتير المرتبطة: <strong>{len(invoices)}</strong></div>',unsafe_allow_html=True)
-        _lnk_batches={}
-        for _v in invoices:
-            _bk=(str(_v.get("file","") or "شيت قديم"),str(_v.get("linked_at","") or ""))
-            _lnk_batches.setdefault(_bk,[]).append(_v)
-        st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot" style="background:#fdcb6e;"></div><h3>📂 الشيتات المحفوظة</h3></div>',unsafe_allow_html=True)
-        st.caption("كل شيت بترفعه بيتحفظ لوحده هنا وبيفضل في السيستم — تقدر تعمل استعلام في أي وقت. عمر الشيت بيتحسب من تاريخ الربط، وبعد ما يعدي 7 أيام تقدر تمسحه من هنا.")
-        for _bk,_binv in sorted(_lnk_batches.items(),key=lambda x:x[0][1],reverse=True):
-            _bfile,_blink=_bk
-            _bdate=_blink[:16].replace("T"," ") if _blink else "بدون تاريخ"
-            _bage=None
-            if _blink:
-                try: _bage=(datetime.now()-datetime.fromisoformat(_blink)).days
-                except Exception: _bage=None
-            if isinstance(_bage,int):
-                _bstate=f"عمره {_bage} يوم — تقدر تمسحه" if _bage>=7 else f"باقي {7-_bage} يوم على 7 أيام الربط"
-            else: _bstate=""
-            _bchk=[x for x in _binv if str(x.get("last_status","")).strip()]
-            _bcanc=sum(1 for x in _bchk if x.get("last_status")=="ملغاة")
-            _breq=sum(1 for x in _bchk if x.get("last_status")=="طلب إلغاء قيد التنفيذ")
-            _bvalid=sum(1 for x in _bchk if str(x.get("last_status","")).startswith("سارية"))
-            _blbl=f"📄 {_bfile} — {_bdate} — {len(_binv)} فاتورة"+(f" — {_bstate}" if _bstate else "")
-            with st.expander(_blbl):
+        _fmap={}
+        for _v in invoices: _fmap.setdefault(str(_v.get("folder","") or "بدون مجلد"),[]).append(_v)
+        st.markdown(f'<div style="padding:.5rem 1rem;border-radius:10px;background:rgba(108,92,231,.06);border:1px solid rgba(108,92,231,.18);color:#a29bfe;font-size:.82rem;margin-top:.6rem;">📁 <strong>{len(folders)}</strong> مجلد — إجمالي <strong>{len(invoices)}</strong> فاتورة مرتبطة</div>',unsafe_allow_html=True)
+        st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot" style="background:#fdcb6e;"></div><h3>📁 المجلدات المحفوظة</h3></div>',unsafe_allow_html=True)
+        st.caption("افتح أي مجلد عشان تشوف فواتيره وتعمل استعلام عليه لوحده. عمر المجلد بيتحسب من تاريخ إنشائه، والمسح بيتفتح بعد 7 أيام.")
+        for _fold in sorted(folders,key=lambda x:str(x.get("created_at","")),reverse=True):
+            _fname2=str(_fold.get("name","")).strip() or "بدون اسم"
+            _finv=_fmap.get(_fname2,[])
+            _fage=_lnk_age_days(_fold.get("created_at"))
+            _fdate=str(_fold.get("created_at","") or "")[:16].replace("T"," ") or "بدون تاريخ"
+            if isinstance(_fage,int):
+                _fstate=f"عمره {_fage} يوم — تقدر تمسحه" if _fage>=7 else f"باقي {7-_fage} يوم على تفعيل المسح"
+            else: _fstate=""
+            _fchk=[x for x in _finv if str(x.get("last_status","")).strip()]
+            _fcanc=sum(1 for x in _fchk if x.get("last_status")=="ملغاة")
+            _freq=sum(1 for x in _fchk if x.get("last_status")=="طلب إلغاء قيد التنفيذ")
+            _fvalid=sum(1 for x in _fchk if str(x.get("last_status","")).startswith("سارية"))
+            _flbl=f"📁 {_fname2} — {len(_finv)} فاتورة"+(f" — {_fstate}" if _fstate else "")
+            with st.expander(_flbl):
+                st.markdown(f'<div style="color:var(--text2);font-size:.74rem;margin-bottom:.4rem;">📅 إنشاء المجلد: {_fdate} — 🗂️ ملف المصدر: {_fold.get("file","") or "—"}</div>',unsafe_allow_html=True)
                 _b1,_b2,_b3,_b4=st.columns(4)
-                with _b1: st.markdown(f'<div class="erp-card" style="text-align:center;padding:.6rem .3rem;"><div style="font-size:1.3rem;font-weight:800;color:#a29bfe;">{len(_binv)}</div><div style="color:var(--text2);font-size:.7rem;">إجمالي الشيت</div></div>',unsafe_allow_html=True)
-                with _b2: st.markdown(f'<div class="erp-card" style="text-align:center;padding:.6rem .3rem;"><div style="font-size:1.3rem;font-weight:800;color:#55efc4;">{_bvalid}</div><div style="color:var(--text2);font-size:.7rem;">سارية</div></div>',unsafe_allow_html=True)
-                with _b3: st.markdown(f'<div class="erp-card" style="text-align:center;padding:.6rem .3rem;"><div style="font-size:1.3rem;font-weight:800;color:#ff6b6b;">{_bcanc}</div><div style="color:var(--text2);font-size:.7rem;">ملغاة</div></div>',unsafe_allow_html=True)
-                with _b4: st.markdown(f'<div class="erp-card" style="text-align:center;padding:.6rem .3rem;"><div style="font-size:1.3rem;font-weight:800;color:#e17055;">{_breq}</div><div style="color:var(--text2);font-size:.7rem;">طلب إلغاء</div></div>',unsafe_allow_html=True)
+                with _b1: st.markdown(f'<div class="erp-card" style="text-align:center;padding:.6rem .3rem;"><div style="font-size:1.3rem;font-weight:800;color:#a29bfe;">{len(_finv)}</div><div style="color:var(--text2);font-size:.7rem;">إجمالي المجلد</div></div>',unsafe_allow_html=True)
+                with _b2: st.markdown(f'<div class="erp-card" style="text-align:center;padding:.6rem .3rem;"><div style="font-size:1.3rem;font-weight:800;color:#55efc4;">{_fvalid}</div><div style="color:var(--text2);font-size:.7rem;">سارية</div></div>',unsafe_allow_html=True)
+                with _b3: st.markdown(f'<div class="erp-card" style="text-align:center;padding:.6rem .3rem;"><div style="font-size:1.3rem;font-weight:800;color:#ff6b6b;">{_fcanc}</div><div style="color:var(--text2);font-size:.7rem;">ملغاة</div></div>',unsafe_allow_html=True)
+                with _b4: st.markdown(f'<div class="erp-card" style="text-align:center;padding:.6rem .3rem;"><div style="font-size:1.3rem;font-weight:800;color:#e17055;">{_freq}</div><div style="color:var(--text2);font-size:.7rem;">طلب إلغاء</div></div>',unsafe_allow_html=True)
                 _brows=[{"UUID":v.get("uuid",""),"الحالة":v.get("last_status","") or "لسه ما اتستعلمش","تاريخ الإلغاء":v.get("last_cancel_date",""),
-                         "باقي أيام (7)":v.get("last_days_left",""),"آخر استعلام":v.get("last_checked","")} for v in _binv]
+                         "باقي أيام (7)":v.get("last_days_left",""),"آخر استعلام":v.get("last_checked","")} for v in _finv]
                 st.dataframe(pd.DataFrame(_brows),use_container_width=True,height=min(320,80+len(_brows)*32),hide_index=True)
-                _bsig=f"{_bfile}|{_blink}"
-                _bok=st.checkbox("أنا متأكد إن الشيت ده خلص ومش محتاج متابعته",key=f"lnk_delok_{_bsig}")
-                if st.button(f"🗑️ مسح الشيت من السيستم ({len(_binv)} فاتورة)",key=f"lnk_del_{_bsig}",use_container_width=True,disabled=not _bok):
-                    linked["invoices"]=[x for x in invoices if (str(x.get("file","") or "شيت قديم"),str(x.get("linked_at","") or ""))!=_bk]
+                if st.button(f"🔍 استعلام عن فواتير المجلد ({len(_finv)})",key=f"lnk_fscan_{_fname2}",type="primary",use_container_width=True,disabled=not bool(token) or not bool(_finv)):
+                    _prog=st.progress(0.0);_ph=st.empty()
+                    for _i,_inv in enumerate(_finv):
+                        _u=str(_inv.get("uuid","")).strip()
+                        _ph.markdown(f"🔍 جاري الاستعلام عن الفاتورة <strong>{_i+1}/{len(_finv)}</strong> — <span style='color:#a29bfe;font-size:.75rem;'>{_u}</span>")
+                        try:
+                            _ar,_en,_note,_cd,_dl=_lnk_status(token,_u,smap)
+                        except Exception as _ex:
+                            _ar,_en,_note,_cd,_dl="تعذر الاستعلام","Error",str(_ex),"",""
+                        _inv["last_status"]=_ar
+                        _inv["last_status_en"]=_en
+                        _inv["last_notes"]=_note
+                        _inv["last_cancel_date"]=_cd
+                        _inv["last_days_left"]="" if _dl=="" else str(_dl)
+                        _inv["last_checked"]=datetime.now().strftime("%Y-%m-%d %H:%M")
+                        time.sleep(0.2)
+                        _prog.progress((_i+1)/len(_finv))
+                    _ph.empty()
+                    _fold["last_check"]=datetime.now().strftime("%Y-%m-%d %H:%M")
+                    linked["invoices"]=invoices
+                    linked["folders"]=folders
                     save_linked_invoices(linked)
-                    st.success(f"تم مسح شيت «{_bfile}» — باقي {len(linked['invoices'])} فاتورة مرتبطة")
                     st.rerun()
-        _do_scan=st.button(f"🔍 استعلام عن الفواتير المرتبطة ({len(invoices)})",key="linked_scan_btn",type="primary",use_container_width=True,disabled=not bool(token))
-        _last=str(linked.get("last_check","") or "")
-        st.markdown(f'<div style="padding:.5rem 1rem;border-radius:10px;background:rgba(162,155,254,.06);border:1px solid rgba(162,155,254,.15);color:#a29bfe;font-size:.82rem;margin:.4rem 0;">🗓️ آخر استعلام: <strong>{_last or "لسه ما اتعملش استعلام"}</strong></div>',unsafe_allow_html=True)
-        if _do_scan:
-            _prog=st.progress(0.0);_ph=st.empty()
-            for _i,_inv in enumerate(invoices):
-                _u=str(_inv.get("uuid","")).strip()
-                _ph.markdown(f"🔍 جاري الاستعلام عن الفاتورة <strong>{_i+1}/{len(invoices)}</strong> — <span style='color:#a29bfe;font-size:.75rem;'>{_u}</span>")
-                try:
-                    _ar,_en,_note,_cd,_dl=_lnk_status(token,_u,smap)
-                except Exception as _ex:
-                    _ar,_en,_note,_cd,_dl="تعذر الاستعلام","Error",str(_ex),"",""
-                _inv["last_status"]=_ar
-                _inv["last_status_en"]=_en
-                _inv["last_notes"]=_note
-                _inv["last_cancel_date"]=_cd
-                _inv["last_days_left"]="" if _dl=="" else str(_dl)
-                _inv["last_checked"]=datetime.now().strftime("%Y-%m-%d %H:%M")
-                time.sleep(0.2)
-                _prog.progress((_i+1)/len(invoices))
-            _ph.empty()
-            linked["invoices"]=invoices
-            linked["last_check"]=datetime.now().strftime("%Y-%m-%d %H:%M")
-            save_linked_invoices(linked)
-            st.rerun()
-        _checked=[v for v in invoices if str(v.get("last_status","")).strip()]
-        if _checked:
-            _nc=sum(1 for v in _checked if v.get("last_status")=="ملغاة")
-            _nr=sum(1 for v in _checked if v.get("last_status")=="طلب إلغاء قيد التنفيذ")
-            _nv=sum(1 for v in _checked if str(v.get("last_status","")).startswith("سارية"))
-            _no=len(_checked)-_nc-_nr-_nv
-            _k1,_k2,_k3,_k4=st.columns(4)
-            for _ci,(_cl,_cn,_cc) in enumerate((("سارية / صحيحة",_nv,"#55efc4"),("ملغاة",_nc,"#ff6b6b"),("طلب إلغاء قيد التنفيذ",_nr,"#e17055"),("أخرى / تعذر",_no,"#a29bfe"))):
-                with [_k1,_k2,_k3,_k4][_ci]:
-                    st.markdown(f'<div class="erp-card" style="text-align:center;padding:.8rem .4rem;"><div style="font-size:1.5rem;font-weight:800;color:{_cc};">{_cn}</div><div style="color:var(--text2);font-size:.72rem;">{_cl}</div></div>',unsafe_allow_html=True)
-            _canc=[v for v in _checked if v.get("last_status")=="ملغاة"]
-            if _canc:
-                _lines=[]
-                for v in _canc:
-                    _extra=""
-                    if v.get("last_cancel_date"):
-                        _extra=f" — تاريخ الإلغاء: {v.get('last_cancel_date')}"
-                        _dl=str(v.get("last_days_left","") or "")
-                        if _dl.isdigit(): _extra+=f" — باقي {_dl} يوم من مدة الـ7 أيام"
-                    _lines.append(f"<div style='margin-top:.3rem;'>🚨 <strong>{v.get('uuid','')}</strong>{_extra}</div>")
-                st.markdown('<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(255,107,107,.08);border:1px solid rgba(255,107,107,.22);color:#ff6b6b;font-size:.82rem;margin:.6rem 0;"><strong>يوجد فواتير ملغاة — الحق راجعها قبل انتهاء المدة القانونية (7 أيام من تاريخ الإلغاء):</strong>'+''.join(_lines)+'</div>',unsafe_allow_html=True)
-            if _nr:
-                st.markdown(f'<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(225,112,85,.06);border:1px solid rgba(225,112,85,.2);color:#e17055;font-size:.82rem;margin:.6rem 0;">📌 يوجد <strong>{_nr}</strong> فاتورة عليها طلب إلغاء قيد التنفيذ — لسه مش ملغاة نهائياً</div>',unsafe_allow_html=True)
-            _lnk_rows=[{"UUID":v.get("uuid",""),"الحالة":v.get("last_status",""),"حالة البورتال (EN)":v.get("last_status_en",""),
-                        "تاريخ الإلغاء":v.get("last_cancel_date",""),"باقي أيام (7)":v.get("last_days_left",""),
-                        "ملاحظات":v.get("last_notes",""),"آخر استعلام":v.get("last_checked",""),
-                        "تاريخ الربط":str(v.get("linked_at",""))[:16].replace("T"," "),"ملف المصدر":v.get("file","")} for v in invoices]
-            _ldf=pd.DataFrame(_lnk_rows)
-            st.dataframe(_ldf,use_container_width=True,height=420,hide_index=True)
-            _lbuf=BytesIO()
-            _ldf.to_excel(_lbuf,index=False,engine="xlsxwriter")
-            _lbuf.seek(0)
-            st.download_button("📊 تحميل حالة الفواتير المرتبطة (Excel)",data=_lbuf.getvalue(),file_name=f"حالة_الفواتير_المرتبطة_{datetime.now():%Y%m%d_%H%M}.xlsx",mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",key="linked_dl",use_container_width=True)
-        else:
-            st.info("اضغط «استعلام عن الفواتير المرتبطة» فوق عشان تجيب حالة كل فاتورة")
+                _flast=str(_fold.get("last_check","") or "")
+                st.markdown(f'<div style="padding:.45rem 1rem;border-radius:10px;background:rgba(162,155,254,.06);border:1px solid rgba(162,155,254,.15);color:#a29bfe;font-size:.78rem;margin:.4rem 0;">🗓️ آخر استعلام على المجلد: <strong>{_flast or "لسه ما اتعملش"}</strong></div>',unsafe_allow_html=True)
+                if isinstance(_fage,int) and _fage<7:
+                    st.caption(f"🔒 المسح بيتفتح بعد 7 أيام من إنشاء المجلد — باقي {7-_fage} يوم")
+                else:
+                    _fok=st.checkbox("أنا متأكد إن المجلد ده خلص ومش محتاج متابعته",key=f"lnk_fdelok_{_fname2}")
+                    if st.button(f"🗑️ مسح المجلد من السيستم ({len(_finv)} فاتورة)",key=f"lnk_fdel_{_fname2}",use_container_width=True,disabled=not _fok):
+                        linked["invoices"]=[x for x in invoices if str(x.get("folder",""))!=_fname2]
+                        linked["folders"]=[f for f in folders if str(f.get("name",""))!=_fname2]
+                        save_linked_invoices(linked)
+                        st.success(f"تم مسح مجلد «{_fname2}» — باقي {len(linked['invoices'])} فاتورة مرتبطة")
+                        st.rerun()
+        with st.expander(f"📊 ملخص كل الفواتير في كل المجلدات ({len(invoices)})"):
+            _do_scan=st.button(f"🔍 استعلام عن كل الفواتير ({len(invoices)})",key="linked_scan_btn",type="primary",use_container_width=True,disabled=not bool(token))
+            _last=str(linked.get("last_check","") or "")
+            st.markdown(f'<div style="padding:.5rem 1rem;border-radius:10px;background:rgba(162,155,254,.06);border:1px solid rgba(162,155,254,.15);color:#a29bfe;font-size:.82rem;margin:.4rem 0;">🗓️ آخر استعلام شامل: <strong>{_last or "لسه ما اتعملش استعلام"}</strong></div>',unsafe_allow_html=True)
+            if _do_scan:
+                _prog=st.progress(0.0);_ph=st.empty()
+                for _i,_inv in enumerate(invoices):
+                    _u=str(_inv.get("uuid","")).strip()
+                    _ph.markdown(f"🔍 جاري الاستعلام عن الفاتورة <strong>{_i+1}/{len(invoices)}</strong> — <span style='color:#a29bfe;font-size:.75rem;'>{_u}</span>")
+                    try:
+                        _ar,_en,_note,_cd,_dl=_lnk_status(token,_u,smap)
+                    except Exception as _ex:
+                        _ar,_en,_note,_cd,_dl="تعذر الاستعلام","Error",str(_ex),"",""
+                    _inv["last_status"]=_ar
+                    _inv["last_status_en"]=_en
+                    _inv["last_notes"]=_note
+                    _inv["last_cancel_date"]=_cd
+                    _inv["last_days_left"]="" if _dl=="" else str(_dl)
+                    _inv["last_checked"]=datetime.now().strftime("%Y-%m-%d %H:%M")
+                    time.sleep(0.2)
+                    _prog.progress((_i+1)/len(invoices))
+                _ph.empty()
+                linked["invoices"]=invoices
+                linked["last_check"]=datetime.now().strftime("%Y-%m-%d %H:%M")
+                save_linked_invoices(linked)
+                st.rerun()
+            _checked=[v for v in invoices if str(v.get("last_status","")).strip()]
+            if _checked:
+                _nc=sum(1 for v in _checked if v.get("last_status")=="ملغاة")
+                _nr=sum(1 for v in _checked if v.get("last_status")=="طلب إلغاء قيد التنفيذ")
+                _nv=sum(1 for v in _checked if str(v.get("last_status","")).startswith("سارية"))
+                _no=len(_checked)-_nc-_nr-_nv
+                _k1,_k2,_k3,_k4=st.columns(4)
+                for _ci,(_cl,_cn,_cc) in enumerate((("سارية / صحيحة",_nv,"#55efc4"),("ملغاة",_nc,"#ff6b6b"),("طلب إلغاء قيد التنفيذ",_nr,"#e17055"),("أخرى / تعذر",_no,"#a29bfe"))):
+                    with [_k1,_k2,_k3,_k4][_ci]:
+                        st.markdown(f'<div class="erp-card" style="text-align:center;padding:.8rem .4rem;"><div style="font-size:1.5rem;font-weight:800;color:{_cc};">{_cn}</div><div style="color:var(--text2);font-size:.72rem;">{_cl}</div></div>',unsafe_allow_html=True)
+                _canc=[v for v in _checked if v.get("last_status")=="ملغاة"]
+                if _canc:
+                    _lines=[]
+                    for v in _canc:
+                        _extra=""
+                        if v.get("last_cancel_date"):
+                            _extra=f" — تاريخ الإلغاء: {v.get('last_cancel_date')}"
+                            _dl=str(v.get("last_days_left","") or "")
+                            if _dl.isdigit(): _extra+=f" — باقي {_dl} يوم من مدة الـ7 أيام"
+                        _lines.append(f"<div style='margin-top:.3rem;'>🚨 <strong>{v.get('uuid','')}</strong>{_extra}</div>")
+                    st.markdown('<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(255,107,107,.08);border:1px solid rgba(255,107,107,.22);color:#ff6b6b;font-size:.82rem;margin:.6rem 0;"><strong>يوجد فواتير ملغاة — الحق راجعها قبل انتهاء المدة القانونية (7 أيام من تاريخ الإلغاء):</strong>'+''.join(_lines)+'</div>',unsafe_allow_html=True)
+                if _nr:
+                    st.markdown(f'<div style="padding:.6rem 1rem;border-radius:10px;background:rgba(225,112,85,.06);border:1px solid rgba(225,112,85,.2);color:#e17055;font-size:.82rem;margin:.6rem 0;">📌 يوجد <strong>{_nr}</strong> فاتورة عليها طلب إلغاء قيد التنفيذ — لسه مش ملغاة نهائياً</div>',unsafe_allow_html=True)
+                _lnk_rows=[{"UUID":v.get("uuid",""),"الحالة":v.get("last_status",""),"حالة البورتال (EN)":v.get("last_status_en",""),
+                            "تاريخ الإلغاء":v.get("last_cancel_date",""),"باقي أيام (7)":v.get("last_days_left",""),
+                            "ملاحظات":v.get("last_notes",""),"آخر استعلام":v.get("last_checked",""),
+                            "تاريخ الربط":str(v.get("linked_at",""))[:16].replace("T"," "),"ملف المصدر":v.get("file","")} for v in invoices]
+                _ldf=pd.DataFrame(_lnk_rows)
+                st.dataframe(_ldf,use_container_width=True,height=420,hide_index=True)
+                _lbuf=BytesIO()
+                _ldf.to_excel(_lbuf,index=False,engine="xlsxwriter")
+                _lbuf.seek(0)
+                st.download_button("📊 تحميل حالة الفواتير المرتبطة (Excel)",data=_lbuf.getvalue(),file_name=f"حالة_الفواتير_المرتبطة_{datetime.now():%Y%m%d_%H%M}.xlsx",mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",key="linked_dl",use_container_width=True)
+            else:
+                st.info("اضغط «استعلام عن كل الفواتير» فوق عشان تجيب حالة كل فاتورة")
     else:
-        st.info("لسه مفيش فواتير مرتبطة — ارفع شيت فيه أرقام UUID واضغط ربط")
+        st.info("لسه مفيش فواتير مرتبطة — اعمل مجلد جديد فوق وارفع فيه شيت أرقام UUID")
 
 # ====================== CREDIT NOTES MATCHING (مطابقة الإشعارات الدائنة) ======================
 CREDIT_NOTES_FILE=os.path.join(DATA_DIR,"credit_notes_registry.json")
