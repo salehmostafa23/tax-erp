@@ -4104,106 +4104,14 @@ def _cn_invoice_meta(token,u):
 
 _CN_MATCH_LABEL={"auto":"تلقائي (بمرجع الإشعار)","manual":"مؤكد يدوياً","suggested":"مقترح — يحتاج تأكيد","none":"غير مربوط"}
 
-def _issued_match_tab(token,smap,norm_all):
-    linked=load_linked_invoices();invoices=linked.get("invoices",[])
-    cn_data=load_credit_notes();notes=cn_data.get("notes",[])
-    st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot" style="background:#fd79a8;"></div><h3>مطابقة الإشعارات الدائنة مع الفواتير</h3></div>',unsafe_allow_html=True)
-    st.markdown('<div style="padding:.5rem 1rem;border-radius:10px;background:rgba(253,121,168,.06);border:1px solid rgba(253,121,168,.18);color:#fd79a8;font-size:.78rem;">📌 البورتال بيسيب الفاتورة «سارية» حتى لو المورد أصدر عليها إشعار دائن بكامل القيمة — التاب ده بيجلب الإشعارات الدائنة من مستندات الوارد ويطابقها مع الفواتير المرتبطة: تغطية كاملة يبقى أحمر، تغطية جزئية يبقى برتقالي. الإشعار مش بيتحسب لو حالته «ملغاة».</div>',unsafe_allow_html=True)
-    if not invoices:
-        st.info("لسه مفيش فواتير مرتبطة — اربطها الأول من تاب «🔗 الفواتير المرتبطة» وبعدين ارجع هنا")
-        return
-    if not token:
-        st.markdown('<div style="padding:.5rem 1rem;border-radius:10px;background:rgba(253,203,110,.06);border:1px solid rgba(253,203,110,.15);color:#fdcb6e;font-size:.78rem;margin-top:.5rem;">💡 اربط البورتال الأول من فوق عشان تقدر تفحص الإشعارات</div>',unsafe_allow_html=True)
-    _m1,_m2=st.columns([1,2])
-    with _m1:
-        _months=st.selectbox("فترة الفحص",[6,12,24,36],index=1,format_func=lambda m:f"آخر {m} شهر",key="cn_months")
-    with _m2:
-        st.caption("الفحص بيجلب إشعارات الوارد من البورتال ويطابقها بالمرجع، ولو مفيش مرجع بيقترح المطابقة بنفس المورد ونفس المبلغ بعد تأكيدك")
-    _scan=st.button("🔄 فحص الإشعارات الدائنة من البورتال",key="cn_scan_btn",type="primary",use_container_width=True,disabled=not bool(token))
-    _last=str(cn_data.get("last_check","") or "")
-    st.markdown(f'<div style="padding:.5rem 1rem;border-radius:10px;background:rgba(162,155,254,.06);border:1px solid rgba(162,155,254,.15);color:#a29bfe;font-size:.82rem;margin:.4rem 0;">🗓️ آخر فحص: <strong>{_last or "لسه ما اتعملش فحص"}</strong></div>',unsafe_allow_html=True)
-    if _scan:
-        _from=datetime.now()-timedelta(days=int(_months)*30)
-        with st.spinner("جاري جلب مستندات الوارد من البورتال..."):
-            _docs,_err=eta_search_docs(token,"Received",_from,datetime.now())
-            if _err and "401" in str(_err):
-                _tk=_eta_refresh_token()
-                if _tk: _docs,_err=eta_search_docs(_tk,"Received",_from,datetime.now())
-        if _err:
-            st.error("تعذر جلب الوارد من البورتال: "+str(_err))
-        else:
-            _cn_docs=[d for d in (_docs or []) if str(d.get("typeName","") or d.get("documentType","")).strip().lower() in ("c","ec")]
-            _existing={str(n.get("uuid","")).lower():n for n in notes}
-            _new=0
-            _prog=st.progress(0.0)
-            for _i,_d in enumerate(_cn_docs):
-                _u=str(_d.get("uuid","")).strip()
-                if _u:
-                    _rec=_existing.get(_u.lower())
-                    if _rec:
-                        _raw=str(_d.get("status","") or "")
-                        if _raw:
-                            _rec["status"]=smap.get(_raw.lower(),_raw);_rec["status_en"]=_raw
-                    else:
-                        _note,_e=_cn_fetch(token,_u,smap)
-                        if _note is None:
-                            _note={"uuid":_u,"amount":round(float(_d.get("total",0) or 0),2),"issuer_id":str(_d.get("issuerId","") or ""),
-                                   "issued":str(_d.get("dateTimeIssued","") or "")[:10],"status":"تعذر جلب التفاصيل","status_en":"","refs":[]}
-                        _note["issuer_name"]=str(_d.get("issuerName","") or "")
-                        _note["match"]="none";_note["invoice"]=""
-                        _note["checked_at"]=datetime.now().strftime("%Y-%m-%d %H:%M")
-                        notes.append(_note);_new+=1
-                _prog.progress((_i+1)/max(1,len(_cn_docs)))
-            _prog.empty()
-            _need=[inv for inv in invoices if not inv.get("invoice_total")]
-            if _need:
-                _ph=st.empty();_prog2=st.progress(0.0)
-                for _j,inv in enumerate(_need):
-                    _ph.markdown(f"📄 جاري جلب بيانات الفاتورة {_j+1}/{len(_need)}")
-                    _meta,_e=_cn_invoice_meta(token,str(inv.get("uuid","")).strip())
-                    if _meta:
-                        if _meta.get("invoice_total"): inv["invoice_total"]=float(_meta["invoice_total"])
-                        if _meta.get("issuer_id"): inv["issuer_id"]=_meta["issuer_id"]
-                        if _meta.get("issued_date"): inv["issued_date"]=_meta["issued_date"]
-                        inv["meta_checked"]=datetime.now().strftime("%Y-%m-%d %H:%M")
-                    _prog2.progress((_j+1)/len(_need))
-                _ph.empty()
-                linked["invoices"]=invoices
-                save_linked_invoices(linked)
-            _by_u={str(inv.get("uuid","")).strip().lower():inv for inv in invoices}
-            for n in notes:
-                if n.get("match") in ("auto","manual"): continue
-                _hit=""
-                for r in (n.get("refs") or []):
-                    if str(r).strip().lower() in _by_u: _hit=str(r).strip().lower();break
-                if _hit:
-                    n["match"]="auto";n["invoice"]=_by_u[_hit].get("uuid","")
-                    continue
-                _amt=float(n.get("amount") or 0)
-                _cands=[]
-                if _amt>0 and n.get("issuer_id"):
-                    for inv in invoices:
-                        if not inv.get("invoice_total"): continue
-                        if str(inv.get("issuer_id","")).strip() and str(inv.get("issuer_id","")).strip()!=str(n.get("issuer_id","")).strip(): continue
-                        if abs(float(inv.get("invoice_total") or 0)-_amt)>0.5: continue
-                        if n.get("issued") and inv.get("issued_date") and n.get("issued")<inv.get("issued_date"): continue
-                        _cands.append(inv)
-                if len(_cands)==1:
-                    n["match"]="suggested";n["invoice"]=_cands[0].get("uuid","")
-                else:
-                    n["match"]="none";n["invoice"]=""
-            cn_data["notes"]=notes
-            cn_data["last_check"]=datetime.now().strftime("%Y-%m-%d %H:%M")
-            save_credit_notes(cn_data)
-            st.rerun()
-
+def _cn_inv_rows(invoices,notes):
     _cn_by={}
     for n in notes:
         if str(n.get("status",""))=="ملغاة": continue
         if n.get("match") not in ("auto","manual"): continue
         _iu=str(n.get("invoice","") or "").strip().lower()
         if _iu: _cn_by.setdefault(_iu,[]).append(n)
-    _inv_rows=[]
+    rows=[]
     for inv in invoices:
         _u=str(inv.get("uuid","")).strip()
         _total=float(inv.get("invoice_total") or 0)
@@ -4214,10 +4122,182 @@ def _issued_match_tab(token,smap,norm_all):
         elif _cov>0: _state="تغطية جزئية"
         elif _total>0: _state="سليمة"
         else: _state="بيانات ناقصة"
-        _inv_rows.append({"UUID":_u,"إجمالي الفاتورة":_total,"الإشعارات الدائنة":_cov,"المتبقي":_net,
-                          "نسبة التغطية":f"{min(100,round(_cov/_total*100,1)) if _total>0 else 0}%",
-                          "عدد الإشعارات":len(_cns),"الحالة":_state,
-                          "إشعارات دائنة":", ".join(str(n.get("uuid","")) for n in _cns)})
+        rows.append({"UUID":_u,"إجمالي الفاتورة":_total,"الإشعارات الدائنة":_cov,"المتبقي":_net,
+                     "نسبة التغطية":f"{min(100,round(_cov/_total*100,1)) if _total>0 else 0}%",
+                     "عدد الإشعارات":len(_cns),"الحالة":_state,
+                     "إشعارات دائنة":", ".join(str(n.get("uuid","")) for n in _cns)})
+    return rows
+
+def _cn_scan_portal(token,smap,months,invoices,notes,linked,cn_data,scope=None):
+    _from=datetime.now()-timedelta(days=int(months)*30)
+    with st.spinner("جاري جلب مستندات الوارد من البورتال..."):
+        _docs,_err=eta_search_docs(token,"Received",_from,datetime.now())
+        if _err and "401" in str(_err):
+            _tk=_eta_refresh_token()
+            if _tk: _docs,_err=eta_search_docs(_tk,"Received",_from,datetime.now())
+    if _err:
+        st.error("تعذر جلب الوارد من البورتال: "+str(_err))
+        return False
+    _cn_docs=[d for d in (_docs or []) if str(d.get("typeName","") or d.get("documentType","")).strip().lower() in ("c","ec")]
+    _existing={str(n.get("uuid","")).lower():n for n in notes}
+    _prog=st.progress(0.0)
+    for _i,_d in enumerate(_cn_docs):
+        _u=str(_d.get("uuid","")).strip()
+        if _u:
+            _rec=_existing.get(_u.lower())
+            if _rec:
+                _raw=str(_d.get("status","") or "")
+                if _raw:
+                    _rec["status"]=smap.get(_raw.lower(),_raw);_rec["status_en"]=_raw
+            else:
+                _note,_e=_cn_fetch(token,_u,smap)
+                if _note is None:
+                    _note={"uuid":_u,"amount":round(float(_d.get("total",0) or 0),2),"issuer_id":str(_d.get("issuerId","") or ""),
+                           "issued":str(_d.get("dateTimeIssued","") or "")[:10],"status":"تعذر جلب التفاصيل","status_en":"","refs":[]}
+                _note["issuer_name"]=str(_d.get("issuerName","") or "")
+                _note["match"]="none";_note["invoice"]=""
+                _note["checked_at"]=datetime.now().strftime("%Y-%m-%d %H:%M")
+                notes.append(_note)
+        _prog.progress((_i+1)/max(1,len(_cn_docs)))
+    _prog.empty()
+    _need=[inv for inv in (scope if scope is not None else invoices) if not inv.get("invoice_total")]
+    if _need:
+        _ph=st.empty();_prog2=st.progress(0.0)
+        for _j,inv in enumerate(_need):
+            _ph.markdown(f"📄 جاري جلب بيانات الفاتورة {_j+1}/{len(_need)}")
+            _meta,_e=_cn_invoice_meta(token,str(inv.get("uuid","")).strip())
+            if _meta:
+                if _meta.get("invoice_total"): inv["invoice_total"]=float(_meta["invoice_total"])
+                if _meta.get("issuer_id"): inv["issuer_id"]=_meta["issuer_id"]
+                if _meta.get("issued_date"): inv["issued_date"]=_meta["issued_date"]
+                inv["meta_checked"]=datetime.now().strftime("%Y-%m-%d %H:%M")
+            _prog2.progress((_j+1)/len(_need))
+        _ph.empty()
+        linked["invoices"]=invoices
+        save_linked_invoices(linked)
+    _by_u={str(inv.get("uuid","")).strip().lower():inv for inv in invoices}
+    for n in notes:
+        if n.get("match") in ("auto","manual"): continue
+        _hit=""
+        for r in (n.get("refs") or []):
+            if str(r).strip().lower() in _by_u: _hit=str(r).strip().lower();break
+        if _hit:
+            n["match"]="auto";n["invoice"]=_by_u[_hit].get("uuid","")
+            continue
+        _amt=float(n.get("amount") or 0)
+        _cands=[]
+        if _amt>0 and n.get("issuer_id"):
+            for inv in invoices:
+                if not inv.get("invoice_total"): continue
+                if str(inv.get("issuer_id","")).strip() and str(inv.get("issuer_id","")).strip()!=str(n.get("issuer_id","")).strip(): continue
+                if abs(float(inv.get("invoice_total") or 0)-_amt)>0.5: continue
+                if n.get("issued") and inv.get("issued_date") and n.get("issued")<inv.get("issued_date"): continue
+                _cands.append(inv)
+        if len(_cands)==1:
+            n["match"]="suggested";n["invoice"]=_cands[0].get("uuid","")
+        else:
+            n["match"]="none";n["invoice"]=""
+    cn_data["notes"]=notes
+    cn_data["last_check"]=datetime.now().strftime("%Y-%m-%d %H:%M")
+    save_credit_notes(cn_data)
+    return True
+
+def _issued_match_tab(token,smap,norm_all):
+    linked=load_linked_invoices();invoices=linked.get("invoices",[])
+    folders=_lnk_folders(linked,invoices)
+    cn_data=load_credit_notes();notes=cn_data.get("notes",[])
+    st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot" style="background:#fd79a8;"></div><h3>مطابقة الإشعارات الدائنة مع الفواتير</h3></div>',unsafe_allow_html=True)
+    st.markdown('<div style="padding:.5rem 1rem;border-radius:10px;background:rgba(253,121,168,.06);border:1px solid rgba(253,121,168,.18);color:#fd79a8;font-size:.78rem;">📌 البورتال بيسيب الفاتورة «سارية» حتى لو المورد أصدر عليها إشعار دائن بكامل القيمة — التاب ده بيجلب الإشعارات الدائنة من مستندات الوارد ويطابقها مع الفواتير المرتبطة: تغطية كاملة يبقى أحمر، تغطية جزئية يبقى برتقالي. الإشعار مش بيتحسب لو حالته «ملغاة».</div>',unsafe_allow_html=True)
+    if not token:
+        st.markdown('<div style="padding:.5rem 1rem;border-radius:10px;background:rgba(253,203,110,.06);border:1px solid rgba(253,203,110,.15);color:#fdcb6e;font-size:.78rem;margin-top:.5rem;">💡 اربط البورتال الأول من فوق عشان تقدر تفحص الإشعارات</div>',unsafe_allow_html=True)
+    st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot" style="background:#6c5ce7;"></div><h3>📁 إضافة شيت فواتير ومجلد للفحص</h3></div>',unsafe_allow_html=True)
+    _cc1,_cc2=st.columns([1,1])
+    with _cc1:
+        _cfname=st.text_input("اسم مجلد الفحص (فترة الفواتير)",key="cn_folder_name",placeholder="مثال: فواتير أكتوبر 2026").strip()
+    with _cc2:
+        _cf=st.file_uploader("ارفع شيت فيه أرقام UUID الفواتير",type=["xlsx","xls"],key="cn_folder_file")
+    if _cf:
+        _cn_new=[];_cn_sheets=None
+        try:
+            _cf.seek(0)
+            _cn_sheets=pd.read_excel(_cf,sheet_name=None,header=None,dtype=str,engine="openpyxl")
+        except Exception:
+            st.error("تعذر قراءة الملف — لو الملف بصيغة .xls قديمة حوّله .xlsx الأول")
+        if _cn_sheets is not None:
+            _cseen=set();_csamples=[]
+            for _sh_df in _cn_sheets.values():
+                for _ri in range(len(_sh_df.index)):
+                    for _ci in range(len(_sh_df.columns)):
+                        _cell=_sh_df.iat[_ri,_ci]
+                        if _cell is None or (isinstance(_cell,float) and pd.isna(_cell)): continue
+                        _s=str(_cell).strip()
+                        if not _s: continue
+                        if len(_csamples)<6: _csamples.append(_s[:60])
+                        for _m in norm_all(_s):
+                            if _m not in _cseen: _cseen.add(_m);_cn_new.append(_m)
+            if not _cn_new:
+                st.warning("مفيش أرقام UUID صالحة في الملف — الصيغ المدعومة: 8-4-4-4-12 أو 32 خانة HEX أو 26 خانة زي JM0D3ZW0C615RJ8V2Y4DZG6M10")
+                if _csamples: st.caption("أمثلة من القيم اللي اتقرأت: "+" • ".join(_csamples))
+            else:
+                st.markdown(f'<div style="padding:.5rem 1rem;border-radius:10px;background:rgba(253,121,168,.06);border:1px solid rgba(253,121,168,.18);color:#fd79a8;font-size:.82rem;">✅ تم قراءة <strong>{len(_cn_new)}</strong> رقم UUID فريد من الملف</div>',unsafe_allow_html=True)
+                if not _cfname: st.caption("✍️ اكتب اسم مجلد الفحص فوق الأول، وبعدين اضغط الربط")
+                if st.button(f"📁 ربط {len(_cn_new)} فاتورة في مجلد «{_cfname or '—'}»",key="cn_folder_add",type="primary",use_container_width=True,disabled=not bool(_cfname)):
+                    _exist={str(v.get("uuid","")).strip().lower() for v in invoices}
+                    _now_iso=datetime.now().isoformat(timespec="seconds")
+                    _added=0;_skipped=0
+                    for _u in _cn_new:
+                        if _u.strip().lower() in _exist: _skipped+=1; continue
+                        _exist.add(_u.strip().lower());_added+=1
+                        invoices.append({"uuid":_u,"file":_cf.name,"linked_at":_now_iso,"folder":_cfname,"last_status":"","last_status_en":"","last_notes":"","last_cancel_date":"","last_days_left":"","last_checked":""})
+                    if _added:
+                        _fold0=next((f for f in folders if str(f.get("name",""))==_cfname),None)
+                        if _fold0 is None:
+                            folders.append({"name":_cfname,"created_at":_now_iso,"file":_cf.name})
+                        else:
+                            _fold0["file"]=_cf.name
+                        linked["invoices"]=invoices
+                        linked["folders"]=folders
+                        save_linked_invoices(linked)
+                        st.success(f"تم ربط {_added} فاتورة داخل مجلد «{_cfname}»"+(f" — {_skipped} فاتورة كانت مربوطة قبل كده واتخطت" if _skipped else ""))
+                        st.rerun()
+                    else:
+                        st.info("كل الفواتير دي مربوطة بالفعل")
+    if not invoices:
+        st.info("لسه مفيش فواتير — ارفع شيت فوق أو اربطها من تاب «🔗 الفواتير المرتبطة» وبعدين ارجع هنا")
+        return
+    _m1,_m2=st.columns([1,2])
+    with _m1:
+        _months=st.selectbox("فترة الفحص",[6,12,24,36],index=1,format_func=lambda m:f"آخر {m} شهر",key="cn_months")
+    with _m2:
+        st.caption("الفحص بيجلب إشعارات الوارد من البورتال ويطابقها بالمرجع، ولو مفيش مرجع بيقترح المطابقة بنفس المورد ونفس المبلغ بعد تأكيدك")
+    _fmap={}
+    for _v in invoices: _fmap.setdefault(str(_v.get("folder","") or "بدون مجلد"),[]).append(_v)
+    st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot" style="background:#fdcb6e;"></div><h3>📁 مجلدات الفحص</h3></div>',unsafe_allow_html=True)
+    for _fold in sorted(folders,key=lambda x:str(x.get("created_at","")),reverse=True):
+        _fname2=str(_fold.get("name","")).strip() or "بدون اسم"
+        _finv=_fmap.get(_fname2,[])
+        if not _finv: continue
+        _frows=_cn_inv_rows(_finv,notes)
+        _ffull=sum(1 for r in _frows if r["الحالة"]=="مغطاة كلياً")
+        _fpart=sum(1 for r in _frows if r["الحالة"]=="تغطية جزئية")
+        _flbl=f"📁 {_fname2} — {len(_finv)} فاتورة"+(f" — مغطاة كلياً {_ffull}" if _ffull else "")
+        with st.expander(_flbl):
+            _b1,_b2,_b3,_b4=st.columns(4)
+            with _b1: st.markdown(f'<div class="erp-card" style="text-align:center;padding:.6rem .3rem;"><div style="font-size:1.3rem;font-weight:800;color:#a29bfe;">{len(_finv)}</div><div style="color:var(--text2);font-size:.7rem;">إجمالي المجلد</div></div>',unsafe_allow_html=True)
+            with _b2: st.markdown(f'<div class="erp-card" style="text-align:center;padding:.6rem .3rem;"><div style="font-size:1.3rem;font-weight:800;color:#ff6b6b;">{_ffull}</div><div style="color:var(--text2);font-size:.7rem;">مغطاة كلياً</div></div>',unsafe_allow_html=True)
+            with _b3: st.markdown(f'<div class="erp-card" style="text-align:center;padding:.6rem .3rem;"><div style="font-size:1.3rem;font-weight:800;color:#e17055;">{_fpart}</div><div style="color:var(--text2);font-size:.7rem;">تغطية جزئية</div></div>',unsafe_allow_html=True)
+            with _b4: st.markdown(f'<div class="erp-card" style="text-align:center;padding:.6rem .3rem;"><div style="font-size:1.3rem;font-weight:800;color:#55efc4;">{sum(1 for r in _frows if r["الحالة"]=="سليمة")}</div><div style="color:var(--text2);font-size:.7rem;">سليمة</div></div>',unsafe_allow_html=True)
+            if st.button(f"🔄 فحص إشعارات هذا المجلد ({len(_finv)})",key=f"cn_fscan_{_fname2}",type="primary",use_container_width=True,disabled=not bool(token)):
+                if _cn_scan_portal(token,smap,_months,invoices,notes,linked,cn_data,scope=_finv):
+                    st.rerun()
+            st.dataframe(pd.DataFrame(_frows),use_container_width=True,height=min(320,80+len(_frows)*32),hide_index=True)
+    _scan=st.button("🔄 فحص الإشعارات الدائنة من البورتال",key="cn_scan_btn",type="primary",use_container_width=True,disabled=not bool(token))
+    _last=str(cn_data.get("last_check","") or "")
+    st.markdown(f'<div style="padding:.5rem 1rem;border-radius:10px;background:rgba(162,155,254,.06);border:1px solid rgba(162,155,254,.15);color:#a29bfe;font-size:.82rem;margin:.4rem 0;">🗓️ آخر فحص: <strong>{_last or "لسه ما اتعملش فحص"}</strong></div>',unsafe_allow_html=True)
+    if _scan:
+        if _cn_scan_portal(token,smap,_months,invoices,notes,linked,cn_data):
+            st.rerun()
+    _inv_rows=_cn_inv_rows(invoices,notes)
     _full=[r for r in _inv_rows if r["الحالة"]=="مغطاة كلياً"]
     _part=[r for r in _inv_rows if r["الحالة"]=="تغطية جزئية"]
     _suggested=[n for n in notes if n.get("match")=="suggested"]
