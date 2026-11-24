@@ -7792,10 +7792,32 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                     try:
                         import zipfile
                         _bz=BytesIO()
-                        _made=0; _bad=[]
+                        _made=0; _bad=[]; _rows=[]; _used={}
                         with zipfile.ZipFile(_bz,"w",zipfile.ZIP_DEFLATED) as _zf:
                             for _up in bx_files:
-                                _p=_rent_parse(_up.getvalue())
+                                _uname=getattr(_up,"name","ملف؟")
+                                _row={"الملف":_uname,"الحالة":"❌ لم يُصدَّر","السبب":"","إيجار":"","كهرباء":"","مياه":"","CIV":"","المستأجر":""}
+                                try:
+                                    _raw=_up.getvalue()
+                                except Exception:
+                                    _raw=b""
+                                if not _raw:
+                                    _row["السبب"]="الملف فارغ (0 بايت) — أعد تحميله من البورتال وارفعه تاني"
+                                    _rows.append(_row); _bad.append(_uname); continue
+                                _htxt=_rent_clean_html(_raw)
+                                if '<' not in _htxt:
+                                    _row["السبب"]="تعذّر استخراج محتوى الصفحة — الملف ليس HTML/MHTML صالح (تأكد إنه محفوظ من صفحة الفاتورة نفسها)"
+                                    _rows.append(_row); _bad.append(_uname); continue
+                                try:
+                                    _p=_rent_parse(_raw)
+                                except Exception as _pe:
+                                    _row["السبب"]="خطأ أثناء قراءة الملف: "+str(_pe)[:160]
+                                    _rows.append(_row); _bad.append(_uname); continue
+                                _row["إيجار"]=str(_p.get('rent','') or "—")
+                                _row["كهرباء"]=str(_p.get('elec','') or "—")
+                                _row["مياه"]=str(_p.get('water','') or "—")
+                                _row["CIV"]=str(_p.get('civ','') or "—")
+                                _row["المستأجر"]=str(_p.get('customer','') or "—")
                                 _rc=_p.get('customer','') or "المستأجر"
                                 _rent=_bk_fval(_p.get('rent','')); _elec=_bk_fval(_p.get('elec','')); _water=_bk_fval(_p.get('water',''))
                                 _lines=[]
@@ -7809,20 +7831,73 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                                 if _water>0:
                                     _lines.append({"name":"مياه","desc":f"مياه {MONTHS[bx_sel_m]} {bx_sel_y}","barcode":RENT_META["G134260"]["barcode"],"gross":_water,"net":_water,"tax":0.0,"rate":0.0,"at":"","sub":""})
                                 if not _lines:
-                                    _bad.append(getattr(_up,"name","ملف؟")); continue
-                                _xbuf=_bk_build_xlsx(_lines)
+                                    _codes=sorted(set(_rent_re.findall(r'G\d{6}',_rent_collapse(_htxt))))
+                                    if _codes:
+                                        _cnames={"G127409":"إيجار","G127411":"كهرباء","G134260":"مياه","G127410":"جزاءات"}
+                                        _cl="، ".join((f"{_c} ({_cnames[_c]})" if _c in _cnames else _c) for _c in _codes)
+                                        _row["السبب"]=f"لا يوجد صنف إيجار/كهرباء/مياه بمبلغ صالح — أصناف الفاتورة: {_cl} (المطلوب: G127409 إيجار أو G127411 كهرباء أو G134260 مياه)"
+                                    else:
+                                        _miss=[]
+                                        if not str(_p.get('rent','')).strip(): _miss.append("الإيجار G127409")
+                                        elif _rent<=0: _miss.append("الإيجار G127409 (قيمة غير صالحة)")
+                                        if not str(_p.get('elec','')).strip(): _miss.append("الكهرباء G127411")
+                                        elif _elec<=0: _miss.append("الكهرباء G127411 (قيمة غير صالحة)")
+                                        if not str(_p.get('water','')).strip(): _miss.append("المياه G134260")
+                                        elif _water<=0: _miss.append("المياه G134260 (قيمة غير صالحة)")
+                                        _row["السبب"]="لا توجد مبالغ قابلة للتصدير — غير موجود أو غير مقروء: "+"، ".join(_miss)
+                                    _rows.append(_row); _bad.append(_uname); continue
+                                try:
+                                    _xbuf=_bk_build_xlsx(_lines)
+                                except Exception as _xe:
+                                    _row["السبب"]="تعذّر إنشاء شيت Excel: "+str(_xe)[:160]
+                                    _rows.append(_row); _bad.append(_uname); continue
                                 _fn=f"{_bk_safe_name(_rc)} - {str(_p.get('civ','')).strip() or 'no-civ'} - {str(_p.get('so_ref','')).strip() or 'no-so'} - {str(_p.get('tax_num','')).strip() or 'no-tax'}"
                                 _addr_clean=str(_p.get('address','') or '').strip().replace(':','').replace('/','').replace('\\','').replace('<','').replace('>','').replace('"','').replace('*','').replace('?','').replace('|','').strip()
                                 if _addr_clean:
                                     _fn+=f" - {_addr_clean[:90]}"
                                 _fn+=".xlsx"
+                                _dup=_used.get(_fn,0)+1; _used[_fn]=_dup
+                                if _dup>1: _fn=_fn[:-5]+f" ({_dup}).xlsx"
+                                _warns=[]
+                                if _dup>1: _warns.append("نفس اسم الشيت موجود لملف سابق في الدفعة — أُضيف رقم للتمييز")
+                                if not str(_p.get('civ','')).strip(): _warns.append("بدون رقم CIV")
+                                if not str(_p.get('customer','')).strip(): _warns.append("بدون اسم مستأجر (اتكتب «المستأجر»)")
+                                if not str(_p.get('tax_num','')).strip(): _warns.append("بدون رقم تسجيل ضريبي")
+                                if not str(_p.get('so_ref','')).strip(): _warns.append("بدون رقم أمر مبيعات")
+                                if not _addr_clean: _warns.append("بدون عنوان")
                                 _zf.writestr(_fn,_xbuf.getvalue())
                                 _made+=1
+                                _row["الحالة"]="⚠️ تم التصدير مع تنبيهات" if _warns else "✅ تم التصدير"
+                                _row["السبب"]="؛ ".join(_warns) if _warns else "—"
+                                _rows.append(_row)
+                            if _rows:
+                                try:
+                                    import csv as _csvmod, io as _iomod
+                                    _sbuf=_iomod.StringIO(); _cw=_csvmod.writer(_sbuf)
+                                    _cw.writerow(["الملف","الحالة","السبب","إيجار","كهرباء","مياه","CIV","المستأجر"])
+                                    for _r in _rows:
+                                        _cw.writerow([_r["الملف"],_r["الحالة"],_r["السبب"],_r["إيجار"],_r["كهرباء"],_r["مياه"],_r["CIV"],_r["المستأجر"]])
+                                    _zf.writestr("تقرير الملفات.csv","\ufeff"+_sbuf.getvalue())
+                                except Exception: pass
                         _bz.seek(0)
-                        _msg=f"✅ تم تجهيز {_made} شيت"
-                        if _bad: _msg+=f" — {len(_bad)} ملف من غير أصناف بالمبالغ يتم تجاوزها: "+", ".join(_bad[:5])
+                        _fail=[_r for _r in _rows if _r["الحالة"].startswith("❌")]
+                        _warn=[_r for _r in _rows if _r["الحالة"].startswith("⚠️")]
+                        _msg=f"✅ تم تجهيز {_made} شيت من أصل {len(bx_files)} ملف"
+                        if _fail: _msg+=f" — ❌ {len(_fail)} ملف لم يُصدَّر"
+                        if _warn: _msg+=f" — ⚠️ {len(_warn)} ملف تم تصديره مع تنبيهات"
                         st.success(_msg)
+                        if _fail:
+                            with st.expander(f"❌ ملفات لم تُصدَّر ({len(_fail)}) — اضغط لعرض السبب"):
+                                for _r in _fail:
+                                    st.markdown(f"- **{_r['الملف']}** — {_r['السبب']}")
+                        if _warn:
+                            with st.expander(f"⚠️ ملفات تم تصديرها مع تنبيهات ({len(_warn)}) — اضغط لعرض السبب"):
+                                for _r in _warn:
+                                    st.markdown(f"- **{_r['الملف']}** — {_r['السبب']}")
+                        st.markdown("**📋 تقرير الدفعة — حالة كل ملف وما تم استخراجه منه:**")
+                        st.dataframe(_rows,use_container_width=True,hide_index=True)
                         if _made:
+                            st.caption("نفس التقرير مرفق داخل الـ ZIP باسم «تقرير الملفات.csv».")
                             st.download_button("⬇️ نزّل ZIP الفواتير",data=_bz.getvalue(),file_name=f"فواتير-مبيعات-{MONTHS[bx_sel_m]}-{bx_sel_y}.zip",mime="application/zip",key="xl_bulk_dl")
                     except Exception as _be:
                         st.error("خطأ أثناء تجهيز الدفعة: "+str(_be)[:200])
