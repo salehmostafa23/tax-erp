@@ -7096,6 +7096,24 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
             _ISS_ID="100027024"
 
             def _rent_clean_html(raw):
+                _head=raw[:2048].lower()
+                if b"mime-version" in _head or b"content-type: multipart" in _head:
+                    try:
+                        from email import policy as _rpolicy
+                        from email.parser import BytesParser as _RBytesParser
+                        _msg=_RBytesParser(policy=_rpolicy.default).parsebytes(raw)
+                        for _part in _msg.walk():
+                            if _part.get_content_type()=="text/html":
+                                _payload=_part.get_payload(decode=True)
+                                if _payload:
+                                    _charset=(_part.get_content_charset() or "").strip()
+                                    for _enc in (_charset,"utf-8","cp1256","windows-1256"):
+                                        if not _enc: continue
+                                        try: return _payload.decode(_enc)
+                                        except Exception: continue
+                                    return _payload.decode("utf-8",errors="replace")
+                    except Exception:
+                        pass
                 text=""
                 for enc in ("utf-8","cp1256","windows-1256"):
                     try:
@@ -7358,7 +7376,7 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                 _rent_sel_y=st.selectbox("السنة",range(2020,2031),index=list(range(2020,2031)).index(datetime.now().year) if datetime.now().year in range(2020,2031) else 6,key="rent_sel_y")
             _month_ar=MONTHS[_rent_sel_m]
 
-            rent_html=st.file_uploader("ارفع ملف HTML لأمر المبيعات",type=["html","htm"],key="rent_html_upload")
+            rent_html=st.file_uploader("ارفع ملف HTML/MHTML لأمر المبيعات",type=["html","htm","mhtml"],key="rent_html_upload")
             parsed=None
             if rent_html:
                 parsed=_rent_parse(rent_html.getvalue())
@@ -7742,7 +7760,7 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                 with bx_y:
                     bx_sel_y=st.selectbox("السنة",range(2020,2031),index=list(range(2020,2031)).index(datetime.now().year) if datetime.now().year in range(2020,2031) else 6,key="xl_bk_sel_y")
                 bx_type=st.radio("اختر نوع الفاتورة",["💼 إيجار عادي - ضريبة جدول 1% (T3)","🤝 إيجار مشاركة - ضريبة 14% (T1/V010)"],horizontal=True,key="xl_bk_type")
-                bx_files=st.file_uploader("ارفع عدة ملفات HTML لأوامر المبيعات",type=["html","htm"],accept_multiple_files=True,key="xl_bulk_upload")
+                bx_files=st.file_uploader("ارفع عدة ملفات HTML/MHTML لأوامر المبيعات",type=["html","htm","mhtml"],accept_multiple_files=True,key="xl_bulk_upload")
                 def _bk_fval(s):
                     try:
                         v=float(str(s).replace(',','').strip())
@@ -7817,7 +7835,7 @@ elif page=="📦 فواتير مبيعات الجملة والإيجارات":
                 xl_sel_y=st.selectbox("السنة",range(2020,2031),index=list(range(2020,2031)).index(datetime.now().year) if datetime.now().year in range(2020,2031) else 6,key="xl_sel_y")
             xl_month_ar=MONTHS[xl_sel_m]
 
-            xl_html=st.file_uploader("ارفع ملف HTML لأمر المبيعات",type=["html","htm"],key="xl_html_upload")
+            xl_html=st.file_uploader("ارفع ملف HTML/MHTML لأمر المبيعات",type=["html","htm","mhtml"],key="xl_html_upload")
             if xl_html:
                 xl_parsed=_rent_parse(xl_html.getvalue())
                 st.markdown('<div class="erp-section" style="margin-top:1rem"><div class="erp-section-dot" style="background:#a29bfe;"></div><h3>📥 نتائج قراءة الملف</h3></div>',unsafe_allow_html=True)
